@@ -6,18 +6,60 @@ import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
 import { formatDate, daysUntil, todayStr } from '../utils/dates';
 
-const EF = { vehicleId: '', type: 'service', description: '', date: todayStr(), nextServiceDate: '', cost: '' };
+const EF = { vehicleId: '', type: 'service', description: '', date: todayStr(), nextServiceDate: '', cost: '', odometer: '' };
 
 export default function Maintenance() {
   const { data, add, update, remove } = useStore();
   const [tab, setTab]           = useState('log');
   const [showAdd, setShowAdd]   = useState(false);
+  const [editM, setEditM]       = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [saving, setSaving]     = useState(false);
+  const [sort, setSort]         = useState({ col: 'date', dir: 'desc' });
   const [form, setForm]         = useState(EF);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const records  = [...data.maintenance].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const toggleSort = (col) =>
+    setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
+
+  const SortTh = ({ col, children }) => {
+    const active = sort.col === col;
+    return (
+      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+        {children}
+        <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
+          {active && sort.dir === 'desc' ? '▼' : '▲'}
+        </span>
+      </th>
+    );
+  };
+
+  const openEdit = (m) => {
+    setEditM(m);
+    setForm({
+      vehicleId:       m.vehicleId      || '',
+      type:            m.type           || 'service',
+      description:     m.description   || '',
+      date:            m.date           || todayStr(),
+      nextServiceDate: m.nextServiceDate || '',
+      cost:            m.cost           || '',
+      odometer:        m.odometer       || '',
+    });
+  };
+
+  const records = [...data.maintenance].sort((a, b) => {
+    const mul = sort.dir === 'asc' ? 1 : -1;
+    if (sort.col === 'vehicle') {
+      const av = data.vehicles.find(x => x.id === a.vehicleId)?.plate || '';
+      const bv = data.vehicles.find(x => x.id === b.vehicleId)?.plate || '';
+      return av.localeCompare(bv) * mul;
+    }
+    if (sort.col === 'type')     return (a.type || '').localeCompare(b.type || '') * mul;
+    if (sort.col === 'date')     return (a.date || '').localeCompare(b.date || '') * mul;
+    if (sort.col === 'odometer') return ((Number(a.odometer) || 0) - (Number(b.odometer) || 0)) * mul;
+    if (sort.col === 'cost')     return ((Number(a.cost) || 0) - (Number(b.cost) || 0)) * mul;
+    return 0;
+  });
   const upcoming = data.vehicles
     .filter(v => v.nextServiceDate)
     .map(v => ({ ...v, days: daysUntil(v.nextServiceDate) }))
@@ -32,6 +74,18 @@ export default function Maintenance() {
       await add('maintenance', { ...form });
       if (form.nextServiceDate) await update('vehicles', form.vehicleId, { nextServiceDate: form.nextServiceDate });
       setShowAdd(false);
+      setForm(EF);
+    } finally { setSaving(false); }
+  };
+
+  const saveEdit = async () => {
+    if (!form.vehicleId) { alert('Please select a vehicle'); return; }
+    if (!form.date) { alert('Date is required'); return; }
+    setSaving(true);
+    try {
+      await update('maintenance', editM.id, { ...form });
+      if (form.nextServiceDate) await update('vehicles', form.vehicleId, { nextServiceDate: form.nextServiceDate });
+      setEditM(null);
       setForm(EF);
     } finally { setSaving(false); }
   };
@@ -57,6 +111,12 @@ export default function Maintenance() {
       <div className="grid-2">
         <div className="field"><label className="label">Date *</label><input className="input" type="date" value={form.date} onChange={e => sf('date', e.target.value)} /></div>
         <div className="field"><label className="label">Cost ($)</label><input className="input" type="number" min="0" value={form.cost} onChange={e => sf('cost', e.target.value)} placeholder="Optional" /></div>
+      </div>
+      <div className="grid-2">
+        <div className="field">
+          <label className="label">Odometer (km)</label>
+          <input className="input" type="number" min="0" value={form.odometer} onChange={e => sf('odometer', e.target.value)} placeholder="e.g. 4250" />
+        </div>
       </div>
       <div className="field"><label className="label">Description</label><textarea className="textarea" rows={3} value={form.description} onChange={e => sf('description', e.target.value)} placeholder="What was done?" /></div>
       <div className="field"><label className="label">Next Service Date</label>
@@ -85,7 +145,15 @@ export default function Maintenance() {
           {records.length === 0
             ? <EmptyState message="No maintenance records yet" action={<button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>Log service</button>} />
             : <table className="table">
-                <thead><tr><th>Vehicle</th><th>Type</th><th>Date</th><th>Description</th><th>Cost</th><th></th></tr></thead>
+                <thead><tr>
+                  <SortTh col="vehicle">Vehicle</SortTh>
+                  <SortTh col="type">Type</SortTh>
+                  <SortTh col="date">Date</SortTh>
+                  <SortTh col="odometer">Odometer</SortTh>
+                  <th>Description</th>
+                  <SortTh col="cost">Cost</SortTh>
+                  <th></th>
+                </tr></thead>
                 <tbody>
                   {records.map(m => {
                     const v = data.vehicles.find(x => x.id === m.vehicleId);
@@ -94,9 +162,15 @@ export default function Maintenance() {
                         <td className="fw-500">{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</td>
                         <td><Badge variant={m.type === 'repair' ? 'red' : m.type === 'inspection' ? 'blue' : 'gray'}>{m.type}</Badge></td>
                         <td className="text-muted">{formatDate(m.date)}</td>
+                        <td className="text-muted">{m.odometer ? Number(m.odometer).toLocaleString() + ' km' : '—'}</td>
                         <td className="text-muted" style={{ maxWidth: 220 }}>{m.description || '—'}</td>
                         <td>{m.cost ? '$' + m.cost : '—'}</td>
-                        <td><button className="btn btn-danger btn-sm" onClick={() => setDeleteId(m.id)}>Delete</button></td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => openEdit(m)}>Edit</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(m.id)}>Delete</button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -133,6 +207,11 @@ export default function Maintenance() {
 
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Log Service / Repair"
         footer={<><button className="btn btn-secondary" onClick={() => setShowAdd(false)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save Record'}</button></>}>
+        {renderForm()}
+      </Modal>
+
+      <Modal open={!!editM} onClose={() => { setEditM(null); setForm(EF); }} title="Edit Service Record"
+        footer={<><button className="btn btn-secondary" onClick={() => { setEditM(null); setForm(EF); }}>Cancel</button><button className="btn btn-primary" onClick={saveEdit} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button></>}>
         {renderForm()}
       </Modal>
 

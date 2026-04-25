@@ -7,6 +7,13 @@ const fmtDate = (s) => {
   return new Date(s + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 };
 
+const Field = ({ label, value }) => (
+  <div>
+    <div style={{ fontSize: 11, color: '#666', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>{label}</div>
+    <div style={{ fontSize: 14, fontWeight: 600 }}>{value}</div>
+  </div>
+);
+
 export default function ContractPage() {
   const { state } = useLocation();
   const navigate  = useNavigate();
@@ -18,6 +25,7 @@ export default function ContractPage() {
   const customer = rental ? data.customers.find(c => c.id === rental.customerId) : null;
   const vehicle  = rental ? data.vehicles.find(v => v.id === rental.vehicleId)   : null;
   const settings = data.settings || {};
+  const isEbike  = vehicle?.type === 'ebike';
 
   if (!rental) {
     return (
@@ -46,15 +54,16 @@ export default function ContractPage() {
     startDate:        rental.startDate || '',
     endDate:          rental.endDate || '',
     bondAmount:       rental.bond?.amount || settings.defaultBond || '300',
+    contractNumber:   rental.contractNumber || '',
   };
 
-  const today     = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
-  const makeModel = [d.vehicleMake, d.vehicleModel].filter(Boolean).join(' ') || '_______________';
+  const today = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const missing = [];
-  if (!d.vehicleMake && !d.vehicleModel) missing.push('vehicle make/model');
-  if (!d.renterName)  missing.push('renter name');
-  if (!d.startDate)   missing.push('start date');
+  if (!d.vehicleMake) missing.push('vehicle make');
+  if (!isEbike && !d.vehicleModel) missing.push('vehicle model');
+  if (!d.renterName) missing.push('renter name');
+  if (!d.startDate)  missing.push('start date');
 
   const downloadPDF = async () => {
     setDownloading(true);
@@ -74,23 +83,26 @@ export default function ContractPage() {
     } finally { setDownloading(false); }
   };
 
-  const sections = [
+  const sectionStyle      = { marginBottom: 22 };
+  const sectionTitleStyle = { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#2d8a5a', marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid #d0d0cc', display: 'flex', alignItems: 'center', gap: 8 };
+  const numBadge          = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#2d8a5a', color: 'white', width: 20, height: 20, borderRadius: '50%', fontSize: 11, fontWeight: 700, flexShrink: 0 };
+  const bodyText          = { fontSize: 13.5, lineHeight: 1.7, color: '#333' };
+  const grid3             = { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px 16px' };
+
+  // ── Scooter sections ─────────────────────────────────────────────────────────
+  const scooterSections = [
     { num: '1', title: 'Scooter Details', content: (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px 16px' }}>
-        {[['Make and Model', makeModel], ['Year', d.vehicleYear || '_______________'], ['Colour', d.vehicleColour ? d.vehicleColour.toUpperCase() : '_______________'], ['Registration', d.vehicleRego || '_______________'], ['Engine Capacity', d.vehicleEngine || '_______________']].map(([l, v]) => (
-          <div key={l}><div style={{ fontSize: 11, color: '#666', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>{l}</div><div style={{ fontSize: 14, fontWeight: 600 }}>{v}</div></div>
-        ))}
+      <div style={grid3}>
+        {[['Make and Model', [d.vehicleMake, d.vehicleModel].filter(Boolean).join(' ') || '_______________'], ['Year', d.vehicleYear || '_______________'], ['Colour', d.vehicleColour ? d.vehicleColour.toUpperCase() : '_______________'], ['Registration', d.vehicleRego || '_______________'], ['Engine Capacity', d.vehicleEngine || '_______________']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
     { num: '2', title: 'Rental Period (Weekly Basis)', content: (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px 16px' }}>
-        {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : 'Ongoing weekly rental']].map(([l, v]) => (
-          <div key={l}><div style={{ fontSize: 11, color: '#666', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>{l}</div><div style={{ fontSize: 14, fontWeight: 600 }}>{v}</div></div>
-        ))}
+      <div style={grid3}>
+        {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : 'Ongoing weekly rental']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
     { num: '3', title: 'Payment & Security Bond', content: (
-      <div style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>
+      <div style={bodyText}>
         <p style={{ marginBottom: 8 }}>Rental fees must be paid before scooter key handover.</p>
         <p style={{ marginBottom: 8 }}>A refundable security bond of <strong>${d.bondAmount} AUD</strong> is required.</p>
         <p style={{ marginBottom: 4 }}>The bond may be used to cover:</p>
@@ -101,7 +113,7 @@ export default function ContractPage() {
       </div>
     )},
     { num: '4', title: 'Licensing & Eligibility (QLD Law)', content: (
-      <div style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>
+      <div style={bodyText}>
         <p style={{ marginBottom: 4 }}>The Renter declares that they:</p>
         <ul style={{ marginLeft: 20 }}>
           {['Are 18 years of age or older', 'Hold a valid Australian or international licence legally permitting them to ride a 50cc scooter in Queensland', 'Are medically fit to operate a motor vehicle', 'Only the Renter is permitted to operate the scooter'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
@@ -109,7 +121,7 @@ export default function ContractPage() {
       </div>
     )},
     { num: '5', title: 'Safety & Road Rules (Mandatory)', content: (
-      <div style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>
+      <div style={bodyText}>
         <p style={{ marginBottom: 4 }}>The Renter agrees to:</p>
         <ul style={{ marginLeft: 20, marginBottom: 8 }}>
           {['Wear an approved helmet at all times', 'Comply with Queensland road laws', 'Ride only on permitted public roads', 'NOT ride on footpaths, beaches, boardwalks, bike paths, or pedestrian areas'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
@@ -118,14 +130,14 @@ export default function ContractPage() {
       </div>
     )},
     { num: '6', title: 'Fines, Tolls, Accidents & Insurance', content: (
-      <div style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>
+      <div style={bodyText}>
         <div style={{ marginTop: 10 }}><strong>6.1 Traffic Fines and Tolls</strong><p>The Renter is responsible for all traffic infringements, parking fines, and toll charges during the rental period.</p></div>
         <div style={{ marginTop: 10 }}><strong>6.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the moped occurring during the rental period. The Renter must immediately notify the Owner and, if applicable, the police of any accident, theft, or incident. Rental fees continue until the moped is repaired or replaced.</p></div>
         <div style={{ marginTop: 10 }}><strong>6.3 Insurance</strong><p>The moped is covered by CTP insurance as required by Queensland law. CTP does not cover damage to the moped, damage to third-party property, or personal injury to the Renter. The Renter remains fully liable for any damage or loss not covered by CTP.</p></div>
       </div>
     )},
     { num: '7', title: 'Condition of the Scooter', content: (
-      <div style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>
+      <div style={bodyText}>
         <p><strong>At the Start:</strong> The Owner confirms the moped is in good working and roadworthy condition.</p>
         <div style={{ border: '1px solid #d0d0cc', borderRadius: 8, padding: '12px 14px', margin: '8px 0' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Existing damage (if any)</div>
@@ -134,25 +146,105 @@ export default function ContractPage() {
         <p><strong>At the End:</strong> The Renter must return the moped in the same condition, except for fair wear and tear, and with the same level of fuel.</p>
       </div>
     )},
-    { num: '8', title: 'Prohibited Uses', content: (
-      <div style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>
+    { num: '8',  title: 'Prohibited Uses', content: (
+      <div style={bodyText}>
         <p style={{ marginBottom: 4 }}>The moped must not be used for:</p>
         <ul style={{ marginLeft: 20 }}>
           {['Racing or competition', 'Carrying more passengers than designed', 'Towing other vehicles or trailers', 'Off-road or beach riding', 'Operation under the influence of alcohol or drugs'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
         </ul>
       </div>
     )},
-    { num: '9',  title: 'Insurance Included', content: <p style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>The rental price includes comprehensive insurance, subject to the terms, limitations, and exclusions outlined in this Agreement. The included insurance includes CTP as required by Queensland law and limited damage protection.</p> },
-    { num: '10', title: 'Insurance Limitations & Exclusions', content: <p style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>The included insurance does NOT cover: theft, loss, or total write-off; damage caused by reckless or illegal use; riding under the influence; riding outside permitted areas; mechanical damage caused by misuse; personal injury to the Renter; damage to personal property; fines, penalties, towing, or recovery costs; or loss of use.</p> },
-    { num: '11', title: 'Personal Insurance Recommendation', content: <p style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel insurance and personal health or accident insurance. The Renter acknowledges the included insurance does not cover personal injury, medical costs, or loss of personal belongings.</p> },
-    { num: '12', title: 'Assumption of Risk', content: <p style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>The Renter acknowledges that riding a scooter involves inherent risks, including serious injury or death. The Renter voluntarily accepts all risks, whether foreseeable or not.</p> },
-    { num: '13', title: 'Indemnity', content: <p style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>The Renter agrees to indemnify and hold harmless the Owner from any claim, loss, or expense (including legal costs) arising out of the Renter's use of the scooter, except where caused by the Owner's negligence or breach of this Agreement.</p> },
-    { num: '14', title: 'Governing Law', content: <p style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333' }}>This Agreement is governed by the laws of Queensland, Australia. Any disputes will be resolved through appropriate legal channels within Queensland.</p> },
+    { num: '9',  title: 'Insurance Included',               content: <p style={bodyText}>The rental price includes comprehensive insurance, subject to the terms, limitations, and exclusions outlined in this Agreement. The included insurance includes CTP as required by Queensland law and limited damage protection.</p> },
+    { num: '10', title: 'Insurance Limitations & Exclusions', content: <p style={bodyText}>The included insurance does NOT cover: theft, loss, or total write-off; damage caused by reckless or illegal use; riding under the influence; riding outside permitted areas; mechanical damage caused by misuse; personal injury to the Renter; damage to personal property; fines, penalties, towing, or recovery costs; or loss of use.</p> },
+    { num: '11', title: 'Personal Insurance Recommendation', content: <p style={bodyText}>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel insurance and personal health or accident insurance. The Renter acknowledges the included insurance does not cover personal injury, medical costs, or loss of personal belongings.</p> },
+    { num: '12', title: 'Assumption of Risk',               content: <p style={bodyText}>The Renter acknowledges that riding a scooter involves inherent risks, including serious injury or death. The Renter voluntarily accepts all risks, whether foreseeable or not.</p> },
+    { num: '13', title: 'Indemnity',                        content: <p style={bodyText}>The Renter agrees to indemnify and hold harmless the Owner from any claim, loss, or expense (including legal costs) arising out of the Renter's use of the scooter, except where caused by the Owner's negligence or breach of this Agreement.</p> },
+    { num: '14', title: 'Governing Law',                    content: <p style={bodyText}>This Agreement is governed by the laws of Queensland, Australia. Any disputes will be resolved through appropriate legal channels within Queensland.</p> },
   ];
 
-  const sectionStyle = { marginBottom: 22 };
-  const sectionTitleStyle = { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#2d8a5a', marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid #d0d0cc', display: 'flex', alignItems: 'center', gap: 8 };
-  const numBadge = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#2d8a5a', color: 'white', width: 20, height: 20, borderRadius: '50%', fontSize: 11, fontWeight: 700, flexShrink: 0 };
+  // ── E-bike sections ──────────────────────────────────────────────────────────
+  const ebikeSections = [
+    { num: '1', title: 'E-Bike Details', content: (
+      <div style={grid3}>
+        {[['Make', d.vehicleMake || '_______________'], ['Year', d.vehicleYear || '_______________'], ['Colour', d.vehicleColour ? d.vehicleColour.toUpperCase() : '_______________'], ['Registration / ID', d.vehicleRego || '_______________']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
+      </div>
+    )},
+    { num: '2', title: 'Rental Period (Weekly Basis)', content: (
+      <div style={grid3}>
+        {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : 'Ongoing weekly rental']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
+      </div>
+    )},
+    { num: '3', title: 'Payment & Security Bond', content: (
+      <div style={bodyText}>
+        <p style={{ marginBottom: 8 }}>Rental fees must be paid prior to e-bike handover.</p>
+        <p style={{ marginBottom: 8 }}>A refundable security bond of <strong>${d.bondAmount} AUD</strong> is required.</p>
+        <p style={{ marginBottom: 4 }}>The bond may be used to cover:</p>
+        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
+          {['Damage, loss, or theft of the e-bike or accessories', 'Traffic fines or penalties incurred during the rental', 'Late return or recovery costs', 'Cleaning costs where the e-bike is returned in an unacceptable condition'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+        </ul>
+        <p>Bond refunds are processed after inspection and may take up to 24 hours.</p>
+      </div>
+    )},
+    { num: '4', title: 'Eligibility', content: (
+      <div style={bodyText}>
+        <p style={{ marginBottom: 4 }}>The Renter declares that they:</p>
+        <ul style={{ marginLeft: 20 }}>
+          {['Are 18 years of age or older', 'Are medically fit to ride an e-bike', 'Only the Renter is permitted to operate the e-bike', 'Understand that no motor vehicle licence is required to ride this e-bike under Queensland law'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+        </ul>
+      </div>
+    )},
+    { num: '5', title: 'Safety & Road Rules (Mandatory)', content: (
+      <div style={bodyText}>
+        <p style={{ marginBottom: 4 }}>The Renter agrees to:</p>
+        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
+          {['Wear an approved helmet at all times', 'Comply with all Queensland road laws applicable to e-bikes', 'Ride only in permitted areas — public roads, bike lanes, and shared paths', 'NOT ride on footpaths or pedestrian-only areas unless otherwise signed', 'NOT ride on beaches, boardwalks, or restricted areas'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+        </ul>
+        <p>Failure to comply constitutes a serious breach of this Agreement.</p>
+      </div>
+    )},
+    { num: '6', title: 'Fines, Accidents & Damage', content: (
+      <div style={bodyText}>
+        <div style={{ marginTop: 10 }}><strong>6.1 Traffic Fines and Penalties</strong><p>The Renter is responsible for all traffic infringements, fines, and penalties incurred during the rental period.</p></div>
+        <div style={{ marginTop: 10 }}><strong>6.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the e-bike or its accessories occurring during the rental period. The Renter must immediately notify the Owner and, where applicable, the police of any accident, theft, or incident. Rental fees continue until the e-bike is repaired or replaced.</p></div>
+        <div style={{ marginTop: 10 }}><strong>6.3 Battery and Charging</strong><p>The Renter must not attempt to modify, tamper with, or use third-party chargers on the e-bike battery. Damage resulting from improper charging or battery misuse is the Renter's full financial responsibility.</p></div>
+      </div>
+    )},
+    { num: '7', title: 'Condition of the E-Bike', content: (
+      <div style={bodyText}>
+        <p><strong>At the Start:</strong> The Owner confirms the e-bike is in good working condition with a charged battery and all accessories present.</p>
+        <div style={{ border: '1px solid #d0d0cc', borderRadius: 8, padding: '12px 14px', margin: '8px 0' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Existing damage (if any)</div>
+          <div style={{ fontSize: 13.5, minHeight: 28, color: d.vehicleCondition ? '#c05000' : '#999' }}>{d.vehicleCondition || 'None'}</div>
+        </div>
+        <p><strong>At the End:</strong> The Renter must return the e-bike in the same condition, with the battery at a reasonable charge level and all accessories intact.</p>
+      </div>
+    )},
+    { num: '8', title: 'Prohibited Uses', content: (
+      <div style={bodyText}>
+        <p style={{ marginBottom: 4 }}>The e-bike must not be used for:</p>
+        <ul style={{ marginLeft: 20 }}>
+          {['Racing, competition, or stunt riding', 'Carrying more than one rider', 'Towing other vehicles or trailers', 'Off-road, beach, or trail riding', 'Operation under the influence of alcohol or drugs', 'Any modification or tampering with the motor, battery, or controls'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+        </ul>
+      </div>
+    )},
+    { num: '9', title: 'Liability & Insurance', content: (
+      <div style={bodyText}>
+        <p style={{ marginBottom: 8 }}>This e-bike is not a registered motor vehicle and is not covered by Compulsory Third Party (CTP) insurance.</p>
+        <p style={{ marginBottom: 8 }}>The Renter acknowledges that:</p>
+        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
+          {['No registration or CTP is applicable to this e-bike', 'The security bond is the primary mechanism for recovering costs from damage or loss', 'The Renter is fully liable for any damage to third-party property or injury caused by the Renter\'s use of the e-bike', 'The Owner holds no liability for personal injury to the Renter'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+        </ul>
+        <p>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel or accident insurance for the duration of the rental.</p>
+      </div>
+    )},
+    { num: '10', title: 'Assumption of Risk', content: <p style={bodyText}>The Renter acknowledges that riding an e-bike involves inherent risks, including serious injury or death. The Renter voluntarily accepts all risks associated with the use of the e-bike, whether foreseeable or not.</p> },
+    { num: '11', title: 'Indemnity',          content: <p style={bodyText}>The Renter agrees to indemnify and hold harmless the Owner from any claim, loss, or expense (including legal costs) arising out of the Renter's use of the e-bike, except where caused by the Owner's negligence or breach of this Agreement.</p> },
+    { num: '12', title: 'Governing Law',      content: <p style={bodyText}>This Agreement is governed by the laws of Queensland, Australia. Any disputes will be resolved through appropriate legal channels within Queensland.</p> },
+  ];
+
+  const sections      = isEbike ? ebikeSections : scooterSections;
+  const signaturesNum = sections.length + 1;
+  const agreementType = isEbike ? 'E-Bike Rental Agreement' : 'Scooter Rental Agreement';
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#f5f4f0', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -166,7 +258,7 @@ export default function ContractPage() {
             </svg>
           </div>
           <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--muted)' }}>
-            Rental Agreement · {d.renterName || '—'}{d.vehicleRego ? ' · ' + d.vehicleRego : ''}
+            {agreementType} · {d.renterName || '—'}{d.vehicleRego ? ' · ' + d.vehicleRego : ''}{d.contractNumber ? ' · ' + d.contractNumber : ''}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -178,7 +270,7 @@ export default function ContractPage() {
         </div>
       </div>
 
-      {/* Contract body — this div is captured by html2pdf */}
+      {/* Contract body */}
       <div style={{ padding: '32px 16px 64px', maxWidth: 800, margin: '0 auto', width: '100%' }}>
         <div ref={contractRef} style={{ background: 'white', borderRadius: 12, padding: '48px 56px', boxShadow: '0 2px 20px rgba(0,0,0,0.06)', fontFamily: "'DM Sans', sans-serif" }}>
 
@@ -191,8 +283,11 @@ export default function ContractPage() {
           {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: 32, paddingBottom: 24, borderBottom: '2px solid #1a1a1a' }}>
             <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>{d.ownerCompany}</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>Bike Rental Agreement</div>
-            <div style={{ fontSize: 14 }}>Date: <strong>{today}</strong></div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{agreementType}</div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 24, fontSize: 14 }}>
+              <span>Date: <strong>{today}</strong></span>
+              {d.contractNumber && <span>Contract No.: <strong>{d.contractNumber}</strong></span>}
+            </div>
           </div>
 
           {/* Parties */}
@@ -227,11 +322,11 @@ export default function ContractPage() {
           {/* Signatures */}
           <div style={sectionStyle}>
             <div style={sectionTitleStyle}>
-              <span style={numBadge}>15</span>
+              <span style={numBadge}>{signaturesNum}</span>
               Signatures
             </div>
             <p style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333', marginBottom: 24 }}>
-              By signing this Agreement, the Renter confirms that they have read and understood all terms, understand the insurance inclusions and exclusions, accept financial responsibility where insurance does not apply, and agree to comply with all Queensland road laws.
+              By signing this Agreement, the Renter confirms that they have read and understood all terms, accept financial responsibility where applicable, and agree to comply with all relevant Queensland road laws and regulations.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
               {[{ label: 'Owner', name: d.ownerCompany, role: d.ownerResponsible }, { label: 'Renter', name: d.renterName, role: '' }].map(sig => (

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import Badge from '../components/shared/Badge';
@@ -7,14 +8,46 @@ import { formatDate, daysUntil } from '../utils/dates';
 export default function Dashboard() {
   const { data } = useStore();
   const navigate = useNavigate();
+  const [sort, setSort] = useState({ col: 'startDate', dir: 'desc' });
 
-  const activeRentals     = data.rentals.filter(r => r.status === 'active');
+  const toggleSort = (col) =>
+    setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
+
+  const SortTh = ({ col, children }) => {
+    const active = sort.col === col;
+    return (
+      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+        {children}
+        <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
+          {active && sort.dir === 'desc' ? '▼' : '▲'}
+        </span>
+      </th>
+    );
+  };
+
+  const activeRentals = [...data.rentals.filter(r => r.status === 'active')].sort((a, b) => {
+    const mul = sort.dir === 'asc' ? 1 : -1;
+    if (sort.col === 'customer') {
+      const ac = data.customers.find(x => x.id === a.customerId)?.name || '';
+      const bc = data.customers.find(x => x.id === b.customerId)?.name || '';
+      return ac.localeCompare(bc) * mul;
+    }
+    if (sort.col === 'vehicle') {
+      const av = data.vehicles.find(x => x.id === a.vehicleId)?.plate || '';
+      const bv = data.vehicles.find(x => x.id === b.vehicleId)?.plate || '';
+      return av.localeCompare(bv) * mul;
+    }
+    if (sort.col === 'startDate') return (a.startDate || '').localeCompare(b.startDate || '') * mul;
+    if (sort.col === 'bond')      return ((Number(a.bond?.amount) || 0) - (Number(b.bond?.amount) || 0)) * mul;
+    return 0;
+  });
   const availableVehicles = data.vehicles.filter(v => v.status === 'available');
   const heldBonds         = data.rentals.filter(r => r.bond?.status === 'held');
   const totalBondHeld     = heldBonds.reduce((s, r) => s + (Number(r.bond.amount) || 0), 0);
 
   const alerts = [];
   data.vehicles.forEach(v => {
+    if (v.status === 'stolen' || v.status === 'sold') return;
     if (v.regoExpiry) {
       const d = daysUntil(v.regoExpiry);
       if (d !== null && d <= 30)
@@ -81,7 +114,12 @@ export default function Dashboard() {
               <button className="btn btn-primary btn-sm" onClick={() => navigate('/rentals')}>Create rental</button>
             } />
           : <table className="table">
-              <thead><tr><th>Customer</th><th>Vehicle</th><th>Started</th><th>Bond</th></tr></thead>
+              <thead><tr>
+                <SortTh col="customer">Customer</SortTh>
+                <SortTh col="vehicle">Vehicle</SortTh>
+                <SortTh col="startDate">Started</SortTh>
+                <SortTh col="bond">Bond</SortTh>
+              </tr></thead>
               <tbody>
                 {activeRentals.map(r => {
                   const c = data.customers.find(x => x.id === r.customerId);

@@ -16,24 +16,40 @@ const EF = {
 
 export default function Vehicles() {
   const { data, add, update, remove } = useStore();
-  const [showAdd, setShowAdd]   = useState(false);
-  const [editV, setEditV]       = useState(null);
-  const [detailV, setDetailV]   = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editV, setEditV] = useState(null);
+  const [detailV, setDetailV] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
-  const [filter, setFilter]     = useState('all');
-  const [search, setSearch]     = useState('');
-  const [saving, setSaving]       = useState(false);
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [form, setForm]           = useState(EF);
+  const [sort, setSort] = useState({ col: 'plate', dir: 'asc' });
+  const [form, setForm] = useState(EF);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const toggleSort = (col) =>
+    setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
+
+  const SortTh = ({ col, children }) => {
+    const active = sort.col === col;
+    return (
+      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+        {children}
+        <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
+          {active && sort.dir === 'desc' ? '▼' : '▲'}
+        </span>
+      </th>
+    );
+  };
   const fileInputRef = useRef(null);
 
   const RF = { renewalDate: todayStr(), expiryDate: '', duration: '1 year', cost: '', notes: '' };
-  const [renewals, setRenewals]           = useState([]);
+  const [renewals, setRenewals] = useState([]);
   const [showAddRenewal, setShowAddRenewal] = useState(false);
-  const [editRenewal, setEditRenewal]       = useState(null);
-  const [renewalForm, setRenewalForm]       = useState(RF);
-  const [savingRenewal, setSavingRenewal]   = useState(false);
+  const [editRenewal, setEditRenewal] = useState(null);
+  const [renewalForm, setRenewalForm] = useState(RF);
+  const [savingRenewal, setSavingRenewal] = useState(false);
   const srf = (k, v) => setRenewalForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
@@ -46,15 +62,15 @@ export default function Vehicles() {
       .then(({ data: rows }) => setRenewals(rows || []));
   }, [detailV?.id]);
 
-  const openAddRenewal  = () => { setEditRenewal(null); setRenewalForm(RF); setShowAddRenewal(true); };
+  const openAddRenewal = () => { setEditRenewal(null); setRenewalForm(RF); setShowAddRenewal(true); };
   const openEditRenewal = (r) => {
     setEditRenewal(r);
     setRenewalForm({
       renewalDate: r.renewal_date,
-      expiryDate:  r.expiry_date,
-      duration:    r.duration,
-      cost:        r.cost != null ? String(r.cost) : '',
-      notes:       r.notes || '',
+      expiryDate: r.expiry_date,
+      duration: r.duration,
+      cost: r.cost != null ? String(r.cost) : '',
+      notes: r.notes || '',
     });
     setShowAddRenewal(true);
   };
@@ -65,10 +81,10 @@ export default function Vehicles() {
     try {
       const payload = {
         renewal_date: renewalForm.renewalDate,
-        expiry_date:  renewalForm.expiryDate,
-        duration:     renewalForm.duration,
-        cost:         renewalForm.cost ? Number(renewalForm.cost) : null,
-        notes:        renewalForm.notes || null,
+        expiry_date: renewalForm.expiryDate,
+        duration: renewalForm.duration,
+        cost: renewalForm.cost ? Number(renewalForm.cost) : null,
+        notes: renewalForm.notes || null,
       };
       if (editRenewal) {
         const { data: row, error } = await supabase.from('rego_renewals').update(payload).eq('id', editRenewal.id).select().single();
@@ -95,17 +111,27 @@ export default function Vehicles() {
     }
   };
 
-  const vehicles = data.vehicles.filter(v => {
+  const vehicles = [...data.vehicles.filter(v => {
     const q = search.toLowerCase();
     const matchQ = !q || v.plate.toLowerCase().includes(q) || (v.name || '').toLowerCase().includes(q) || (v.make || '').toLowerCase().includes(q) || (v.model || '').toLowerCase().includes(q);
     const matchF = filter === 'all' || v.status === filter;
     return matchQ && matchF;
+  })].sort((a, b) => {
+    const mul = sort.dir === 'asc' ? 1 : -1;
+    if (sort.col === 'plate') return a.plate.localeCompare(b.plate) * mul;
+    if (sort.col === 'make') return ([a.make, a.model].filter(Boolean).join(' ')).localeCompare([b.make, b.model].filter(Boolean).join(' ')) * mul;
+    if (sort.col === 'colour') return (a.colour || '').localeCompare(b.colour || '') * mul;
+    if (sort.col === 'fleetGroup') return (a.fleetGroup || '').localeCompare(b.fleetGroup || '') * mul;
+    if (sort.col === 'status') return (a.status || '').localeCompare(b.status || '') * mul;
+    if (sort.col === 'purchaseDate') return (a.purchaseDate || '').localeCompare(b.purchaseDate || '') * mul;
+    if (sort.col === 'regoExpiry') return (a.regoExpiry || '').localeCompare(b.regoExpiry || '') * mul;
+    return 0;
   });
 
-  const counts = { all: data.vehicles.length, available: 0, rented: 0, maintenance: 0 };
+  const counts = { all: data.vehicles.length, available: 0, rented: 0, maintenance: 0, stolen: 0, sold: 0 };
   data.vehicles.forEach(v => { if (counts[v.status] !== undefined) counts[v.status]++; });
 
-  const openAdd  = () => { setForm(EF); setShowAdd(true); };
+  const openAdd = () => { setForm(EF); setShowAdd(true); };
   const openEdit = (v, e) => { e?.stopPropagation(); setEditV(v); setForm({ ...EF, ...v }); };
 
   const saveVehicle = async () => {
@@ -120,6 +146,11 @@ export default function Vehicles() {
 
   const doDelete = async () => {
     const v = data.vehicles.find(x => x.id === deleteId);
+    if (v?.status === 'rented') {
+      alert('This vehicle is currently rented and cannot be deleted. End the rental first.');
+      setDeleteId(null);
+      return;
+    }
     if (v?.regoDocPath) {
       await supabase.storage.from('vehicle-docs').remove([v.regoDocPath]);
     }
@@ -129,7 +160,7 @@ export default function Vehicles() {
   };
 
   const uploadRego = async (vehicleId, file) => {
-    const ext  = file.name.split('.').pop().toLowerCase();
+    const ext = file.name.split('.').pop().toLowerCase();
     const path = `${vehicleId}/rego.${ext}`;
     setUploading(true);
     try {
@@ -157,9 +188,11 @@ export default function Vehicles() {
   };
 
   const statusBadge = (s) => {
-    if (s === 'available')  return <Badge variant="green">Available</Badge>;
-    if (s === 'rented')     return <Badge variant="blue">Rented</Badge>;
+    if (s === 'available') return <Badge variant="green">Available</Badge>;
+    if (s === 'rented') return <Badge variant="blue">Rented</Badge>;
     if (s === 'maintenance') return <Badge variant="amber">Maintenance</Badge>;
+    if (s === 'stolen') return <Badge variant="red">Stolen</Badge>;
+    if (s === 'sold') return <Badge variant="black">Sold</Badge>;
     return <Badge variant="gray">{s}</Badge>;
   };
 
@@ -172,14 +205,18 @@ export default function Vehicles() {
       <div className="form-divider"><span>Vehicle Specs</span></div>
       <div className="grid-2">
         <div className="field"><label className="label">Make</label><input className="input" value={form.make} onChange={e => sf('make', e.target.value)} placeholder="e.g. LONGJIA" /></div>
-        <div className="field"><label className="label">Model</label><input className="input" value={form.model} onChange={e => sf('model', e.target.value)} placeholder="e.g. RIVIERA X" /></div>
+        {form.type !== 'ebike' && (
+          <div className="field"><label className="label">Model</label><input className="input" value={form.model} onChange={e => sf('model', e.target.value)} placeholder="e.g. RIVIERA X" /></div>
+        )}
       </div>
       <div className="grid-2">
         <div className="field"><label className="label">Year</label><input className="input" value={form.year} onChange={e => sf('year', e.target.value)} placeholder="e.g. 2025" /></div>
         <div className="field"><label className="label">Colour</label><input className="input" value={form.colour} onChange={e => sf('colour', e.target.value)} placeholder="e.g. WHITE" /></div>
       </div>
       <div className="grid-2">
-        <div className="field"><label className="label">Engine Capacity</label><input className="input" value={form.engineCapacity} onChange={e => sf('engineCapacity', e.target.value)} placeholder="e.g. 50cc" /></div>
+        {form.type !== 'ebike' && (
+          <div className="field"><label className="label">Engine Capacity</label><input className="input" value={form.engineCapacity} onChange={e => sf('engineCapacity', e.target.value)} placeholder="e.g. 50cc" /></div>
+        )}
         <div className="field"><label className="label">Type</label>
           <select className="select" value={form.type} onChange={e => sf('type', e.target.value)}>
             <option value="scooter">Scooter</option><option value="ebike">E-bike</option>
@@ -195,7 +232,11 @@ export default function Vehicles() {
         </div>
         <div className="field"><label className="label">Status</label>
           <select className="select" value={form.status} onChange={e => sf('status', e.target.value)}>
-            <option value="available">Available</option><option value="rented">Rented</option><option value="maintenance">Maintenance</option>
+            <option value="available">Available</option>
+            <option value="rented">Rented</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="stolen">Stolen</option>
+            <option value="sold">Sold</option>
           </select>
         </div>
       </div>
@@ -210,9 +251,9 @@ export default function Vehicles() {
     </>
   );
 
-  const selected  = detailV ? data.vehicles.find(v => v.id === detailV.id) : null;
-  const vRentals  = selected ? data.rentals.filter(r => r.vehicleId === selected.id) : [];
-  const vMaint    = selected ? [...data.maintenance].filter(m => m.vehicleId === selected.id).sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
+  const selected = detailV ? data.vehicles.find(v => v.id === detailV.id) : null;
+  const vRentals = selected ? data.rentals.filter(r => r.vehicleId === selected.id) : [];
+  const vMaint = selected ? [...data.maintenance].filter(m => m.vehicleId === selected.id).sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
 
   return (
     <div>
@@ -227,6 +268,8 @@ export default function Vehicles() {
           { label: 'Available', value: 'available', count: counts.available },
           { label: 'Rented', value: 'rented', count: counts.rented },
           { label: 'Maintenance', value: 'maintenance', count: counts.maintenance },
+          { label: 'Stolen', value: 'stolen', count: counts.stolen },
+          { label: 'Sold', value: 'sold', count: counts.sold },
         ]} active={filter} onChange={setFilter} />
         <input className="input" style={{ width: 220 }} placeholder="Search plate, name, make…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
@@ -234,42 +277,54 @@ export default function Vehicles() {
       <div className="card">
         {vehicles.length === 0
           ? <EmptyState message={data.vehicles.length === 0 ? 'No vehicles yet — add your first one' : 'No vehicles match your filter'}
-              action={data.vehicles.length === 0 ? <button className="btn btn-primary btn-sm" onClick={openAdd}>Add vehicle</button> : null} />
+            action={data.vehicles.length === 0 ? <button className="btn btn-primary btn-sm" onClick={openAdd}>Add vehicle</button> : null} />
           : <table className="table">
-              <thead><tr><th>Plate</th><th>Make / Model</th><th>Colour</th><th>Fleet</th><th>Status</th><th>Rego Expiry (latest)</th><th></th></tr></thead>
-              <tbody>
-                {vehicles.map(v => {
-                  const rd = v.regoExpiry ? daysUntil(v.regoExpiry) : null;
-                  const regoWarn = rd !== null && rd <= 30;
-                  const makeModel = [v.make, v.model].filter(Boolean).join(' ') || v.name || '—';
-                  return (
-                    <tr key={v.id} onClick={() => setDetailV(v)}>
-                      <td>
-                        <div className="fw-600">{v.plate}</div>
-                        {v.name && <div className="text-sm text-muted">{v.name}</div>}
-                      </td>
-                      <td>
-                        <div className="fw-500">{makeModel}</div>
-                        <div className="text-sm text-muted">{v.year || ''} · <span style={{ textTransform: 'capitalize' }}>{v.type}</span></div>
-                      </td>
-                      <td className="text-muted">{v.colour || '—'}</td>
-                      <td><Badge variant="gray">{v.fleetGroup}</Badge></td>
-                      <td>{statusBadge(v.status)}</td>
-                      <td style={{ color: regoWarn ? (rd < 0 ? 'var(--red)' : 'var(--amber)') : 'inherit' }}>
-                        {v.regoExpiry ? formatDate(v.regoExpiry) : '—'}
-                        {regoWarn && <span className="text-sm" style={{ marginLeft: 5 }}>({rd < 0 ? `${Math.abs(rd)}d over` : `${rd}d`})</span>}
-                      </td>
-                      <td onClick={e => e.stopPropagation()}>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn btn-secondary btn-sm" onClick={e => openEdit(v, e)}>Edit</button>
-                          <button className="btn btn-danger btn-sm" onClick={e => { e.stopPropagation(); setDeleteId(v.id); }}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <thead><tr>
+              <SortTh col="plate">Plate</SortTh>
+              <SortTh col="make">Make / Model</SortTh>
+              <SortTh col="colour">Colour</SortTh>
+              <SortTh col="fleetGroup">Fleet</SortTh>
+              <SortTh col="status">Status</SortTh>
+              <SortTh col="purchaseDate">Purchase Date</SortTh>
+              <SortTh col="regoExpiry">Rego Expiry (latest)</SortTh>
+              <th></th>
+            </tr></thead>
+            <tbody>
+              {vehicles.map(v => {
+                const rd = v.regoExpiry ? daysUntil(v.regoExpiry) : null;
+                const regoWarn = rd !== null && rd <= 30;
+                const makeModel = [v.make, v.model].filter(Boolean).join(' ') || v.name || '—';
+                return (
+                  <tr key={v.id} onClick={() => setDetailV(v)}>
+                    <td>
+                      <div className="fw-600">{v.plate}</div>
+                      {v.name && <div className="text-sm text-muted">{v.name}</div>}
+                    </td>
+                    <td>
+                      <div className="fw-500">{makeModel}</div>
+                      <div className="text-sm text-muted">{v.year || ''} · <span style={{ textTransform: 'capitalize' }}>{v.type}</span></div>
+                    </td>
+                    <td className="text-muted">{v.colour || '—'}</td>
+                    <td><Badge variant="gray">{v.fleetGroup}</Badge></td>
+                    <td>{statusBadge(v.status)}</td>
+                    <td>{v.purchaseDate ? formatDate(v.purchaseDate) : '—'}</td>
+                    <td style={{ color: regoWarn ? (rd < 0 ? 'var(--red)' : 'var(--amber)') : 'inherit' }}>
+                      {(v.status === 'stolen' || v.status === 'sold')
+                        ? <span className="text-muted">—</span>
+                        : <>{v.regoExpiry ? formatDate(v.regoExpiry) : '—'}{regoWarn && <span className="text-sm" style={{ marginLeft: 5 }}>({rd < 0 ? `${Math.abs(rd)}d over` : `${rd}d`})</span>}</>
+                      }
+                    </td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button className="btn btn-secondary btn-sm" onClick={e => openEdit(v, e)}>Edit</button>
+                        <button className="btn btn-danger btn-sm" disabled={v.status === 'rented'} title={v.status === 'rented' ? 'End the rental before deleting' : undefined} onClick={e => { e.stopPropagation(); setDeleteId(v.id); }}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         }
       </div>
 
@@ -353,23 +408,23 @@ export default function Vehicles() {
             {renewals.length === 0
               ? <p className="text-sm text-muted mb-20">No renewals recorded</p>
               : <div className="mb-20">
-                  {renewals.map(r => (
-                    <div key={r.id} className="history-card">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div className="fw-500" style={{ fontSize: 14 }}>{r.duration}</div>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <div className="text-sm text-muted">{formatDate(r.renewal_date)}</div>
-                          <button className="btn btn-secondary btn-sm" onClick={() => openEditRenewal(r)}>Edit</button>
-                        </div>
+                {renewals.map(r => (
+                  <div key={r.id} className="history-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div className="fw-500" style={{ fontSize: 14 }}>{r.duration}</div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div className="text-sm text-muted">{formatDate(r.renewal_date)}</div>
+                        <button className="btn btn-secondary btn-sm" onClick={() => openEditRenewal(r)}>Edit</button>
                       </div>
-                      <div className="text-sm text-muted" style={{ marginTop: 3 }}>
-                        Expires {formatDate(r.expiry_date)}
-                        {r.cost ? ` · $${Number(r.cost).toLocaleString()}` : ''}
-                      </div>
-                      {r.notes && <div className="text-sm text-muted" style={{ marginTop: 4, fontStyle: 'italic' }}>{r.notes}</div>}
                     </div>
-                  ))}
-                </div>
+                    <div className="text-sm text-muted" style={{ marginTop: 3 }}>
+                      Expires {formatDate(r.expiry_date)}
+                      {r.cost ? ` · $${Number(r.cost).toLocaleString()}` : ''}
+                    </div>
+                    {r.notes && <div className="text-sm text-muted" style={{ marginTop: 4, fontStyle: 'italic' }}>{r.notes}</div>}
+                  </div>
+                ))}
+              </div>
             }
 
             <div className="drawer-section-title">Rental History ({vRentals.length})</div>
@@ -429,6 +484,8 @@ export default function Vehicles() {
           <div className="field">
             <label className="label">Duration</label>
             <select className="select" value={renewalForm.duration} onChange={e => srf('duration', e.target.value)}>
+              <option value="1 month">1 month</option>
+              <option value="3 months">3 months</option>
               <option value="6 months">6 months</option>
               <option value="1 year">1 year</option>
             </select>

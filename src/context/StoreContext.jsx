@@ -46,6 +46,8 @@ const rentalFromDb = (r) => ({
   startDate: r.start_date, endDate: r.end_date, status: r.status,
   bond: { amount: r.bond_amount ? String(r.bond_amount) : '', method: r.bond_method || 'cash', status: r.bond_status || 'held' },
   shopifyRef: r.shopify_ref, contractRef: r.contract_ref, notes: r.notes,
+  odometer: r.odometer ? String(r.odometer) : '',
+  contractNumber: r.contract_number || '',
 });
 
 const rentalToDb = (r) => ({
@@ -55,12 +57,15 @@ const rentalToDb = (r) => ({
   bond_amount: r.bond?.amount ? Number(r.bond.amount) : null,
   bond_method: r.bond?.method || 'cash', bond_status: r.bond?.status || 'held',
   shopify_ref: r.shopifyRef || null, contract_ref: r.contractRef || null, notes: r.notes || null,
+  odometer: r.odometer ? Number(r.odometer) : null,
+  contract_number: r.contractNumber || null,
 });
 
 const maintenanceFromDb = (m) => ({
   id: m.id, vehicleId: m.vehicle_id, type: m.type, description: m.description,
   date: m.date, nextServiceDate: m.next_service_date,
   cost: m.cost ? String(m.cost) : '',
+  odometer: m.odometer ? String(m.odometer) : '',
 });
 
 const maintenanceToDb = (m) => ({
@@ -68,6 +73,7 @@ const maintenanceToDb = (m) => ({
   description: m.description || null, date: m.date || null,
   next_service_date: m.nextServiceDate || null,
   cost: m.cost ? Number(m.cost) : null,
+  odometer: m.odometer ? Number(m.odometer) : null,
 });
 
 const settingsFromDb = (s) => ({

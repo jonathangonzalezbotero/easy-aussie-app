@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import Modal from '../components/shared/Modal';
@@ -9,7 +9,7 @@ import Tabs from '../components/shared/Tabs';
 import { formatDate, daysBetween, todayStr } from '../utils/dates';
 
 const EF = {
-  customerId: '', vehicleId: '', startDate: todayStr(), endDate: '', shopifyRef: '', contractRef: '', notes: '',
+  customerId: '', vehicleId: '', startDate: todayStr(), endDate: '', contractNumber: '', notes: '', odometer: '',
   bond: { amount: '', method: 'cash', status: 'held' },
 };
 
@@ -25,8 +25,24 @@ export default function Rentals() {
   const [retainedNote, setRetainedNote]     = useState('');
   const [saving, setSaving]       = useState(false);
   const [form, setForm]           = useState(EF);
+  const [sort, setSort]           = useState({ col: 'startDate', dir: 'desc' });
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const sb = (k, v) => setForm(f => ({ ...f, bond: { ...f.bond, [k]: v } }));
+
+  // Auto-suggest contract number when vehicle is selected in create form
+  useEffect(() => {
+    if (!showCreate || !form.vehicleId) return;
+    const vehicle = data.vehicles.find(v => v.id === form.vehicleId);
+    if (!vehicle) return;
+    const prefix = vehicle.type === 'ebike' ? 'EB' : 'SC';
+    const nums = data.rentals
+      .map(r => r.contractNumber)
+      .filter(n => n && n.startsWith(prefix + '-'))
+      .map(n => parseInt(n.slice(prefix.length + 1), 10))
+      .filter(n => !isNaN(n));
+    const next = Math.max(20, ...nums) + 1;
+    setForm(f => ({ ...f, contractNumber: `${prefix}-${String(next).padStart(3, '0')}` }));
+  }, [form.vehicleId, showCreate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const active    = data.rentals.filter(r => r.status === 'active');
   const past      = data.rentals.filter(r => r.status === 'completed');
@@ -40,13 +56,13 @@ export default function Rentals() {
     e?.stopPropagation();
     setEditR(r);
     setForm({
-      customerId: r.customerId || '',
-      vehicleId:  r.vehicleId  || '',
-      startDate:  r.startDate  || '',
-      endDate:    r.endDate    || '',
-      shopifyRef: r.shopifyRef || '',
-      contractRef: r.contractRef || '',
-      notes:      r.notes      || '',
+      customerId:     r.customerId     || '',
+      vehicleId:      r.vehicleId      || '',
+      startDate:      r.startDate      || '',
+      endDate:        r.endDate        || '',
+      contractNumber: r.contractNumber || '',
+      notes:          r.notes          || '',
+      odometer:       r.odometer       || '',
       bond: { amount: r.bond?.amount || '', method: r.bond?.method || 'cash', status: r.bond?.status || 'held' },
     });
   };
@@ -143,6 +159,14 @@ export default function Rentals() {
         <div className="field"><label className="label">Start Date *</label><input className="input" type="date" value={form.startDate} onChange={e => sf('startDate', e.target.value)} /></div>
         <div className="field"><label className="label">End Date (optional)</label><input className="input" type="date" value={form.endDate} onChange={e => sf('endDate', e.target.value)} /></div>
       </div>
+      {data.vehicles.find(v => v.id === form.vehicleId)?.type !== 'ebike' && (
+        <div className="grid-2">
+          <div className="field">
+            <label className="label">Odometer (km)</label>
+            <input className="input" type="number" min="0" value={form.odometer} onChange={e => sf('odometer', e.target.value)} placeholder="e.g. 4250" />
+          </div>
+        </div>
+      )}
       <div className="form-divider"><span>Bond / Deposit</span></div>
       <div className="grid-2">
         <div className="field">
@@ -167,14 +191,64 @@ export default function Rentals() {
           </select>
         </div>
       </div>
-      <div className="form-divider"><span>References</span></div>
       <div className="grid-2">
-        <div className="field"><label className="label">Shopify Order #</label><input className="input" value={form.shopifyRef} onChange={e => sf('shopifyRef', e.target.value)} placeholder="Optional" /></div>
-        <div className="field"><label className="label">Contract Reference</label><input className="input" value={form.contractRef} onChange={e => sf('contractRef', e.target.value)} placeholder="URL or reference" /></div>
+        <div className="field">
+          <label className="label">Contract Number</label>
+          <input className="input" value={form.contractNumber} onChange={e => sf('contractNumber', e.target.value)} placeholder="e.g. SC-021" />
+          <span className="field-hint">Auto-suggested from vehicle type — you can edit this</span>
+        </div>
       </div>
       <div className="field"><label className="label">Notes</label><textarea className="textarea" rows={2} value={form.notes} onChange={e => sf('notes', e.target.value)} /></div>
     </>
   );
+
+  const toggleSort = (col) =>
+    setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
+
+  const sortRentals = (list) => {
+    const { col, dir } = sort;
+    const mul = dir === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => {
+      let av, bv;
+      if (col === 'customer') {
+        av = data.customers.find(x => x.id === a.customerId)?.name || '';
+        bv = data.customers.find(x => x.id === b.customerId)?.name || '';
+      } else if (col === 'vehicle') {
+        av = data.vehicles.find(x => x.id === a.vehicleId)?.plate || '';
+        bv = data.vehicles.find(x => x.id === b.vehicleId)?.plate || '';
+      } else if (col === 'contractNumber') {
+        av = a.contractNumber || '';
+        bv = b.contractNumber || '';
+      } else if (col === 'startDate') {
+        av = a.startDate || '';
+        bv = b.startDate || '';
+      } else if (col === 'endDate') {
+        av = a.endDate || '';
+        bv = b.endDate || '';
+      } else if (col === 'duration') {
+        av = a.startDate ? daysBetween(a.startDate, a.endDate || todayStr()) : 0;
+        bv = b.startDate ? daysBetween(b.startDate, b.endDate || todayStr()) : 0;
+        return (av - bv) * mul;
+      } else if (col === 'bond') {
+        av = Number(a.bond?.amount) || 0;
+        bv = Number(b.bond?.amount) || 0;
+        return (av - bv) * mul;
+      } else { return 0; }
+      return av.localeCompare(bv) * mul;
+    });
+  };
+
+  const SortTh = ({ col, children }) => {
+    const active = sort.col === col;
+    return (
+      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+        {children}
+        <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
+          {active && sort.dir === 'desc' ? '▼' : '▲'}
+        </span>
+      </th>
+    );
+  };
 
   const RentalRow = ({ r, showEnd }) => {
     const c   = data.customers.find(x => x.id === r.customerId);
@@ -187,6 +261,7 @@ export default function Rentals() {
           <div className="fw-500">{v?.plate || '—'}</div>
           <div className="text-sm text-muted">{v ? (v.name || v.type) : ''}</div>
         </td>
+        <td className="text-muted">{r.contractNumber || '—'}</td>
         <td className="text-muted">{formatDate(r.startDate)}</td>
         <td className="text-muted">{r.status === 'active' ? `${dur}d` : formatDate(r.endDate)}</td>
         <td>
@@ -222,15 +297,31 @@ export default function Rentals() {
         {tab === 'active' && (active.length === 0
           ? <EmptyState message="No active rentals" action={<button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>Create rental</button>} />
           : <table className="table">
-              <thead><tr><th>Customer</th><th>Vehicle</th><th>Started</th><th>Duration</th><th>Bond</th><th></th></tr></thead>
-              <tbody>{active.map(r => <RentalRow key={r.id} r={r} showEnd={true} />)}</tbody>
+              <thead><tr>
+                <SortTh col="customer">Customer</SortTh>
+                <SortTh col="vehicle">Vehicle</SortTh>
+                <SortTh col="contractNumber">Contract No.</SortTh>
+                <SortTh col="startDate">Started</SortTh>
+                <SortTh col="duration">Duration</SortTh>
+                <SortTh col="bond">Bond</SortTh>
+                <th></th>
+              </tr></thead>
+              <tbody>{sortRentals(active).map(r => <RentalRow key={r.id} r={r} showEnd={true} />)}</tbody>
             </table>
         )}
         {tab === 'past' && (past.length === 0
           ? <EmptyState message="No completed rentals yet" />
           : <table className="table">
-              <thead><tr><th>Customer</th><th>Vehicle</th><th>Started</th><th>Ended</th><th>Bond</th><th></th></tr></thead>
-              <tbody>{past.map(r => <RentalRow key={r.id} r={r} showEnd={false} />)}</tbody>
+              <thead><tr>
+                <SortTh col="customer">Customer</SortTh>
+                <SortTh col="vehicle">Vehicle</SortTh>
+                <SortTh col="contractNumber">Contract No.</SortTh>
+                <SortTh col="startDate">Started</SortTh>
+                <SortTh col="endDate">Ended</SortTh>
+                <SortTh col="bond">Bond</SortTh>
+                <th></th>
+              </tr></thead>
+              <tbody>{sortRentals(past).map(r => <RentalRow key={r.id} r={r} showEnd={false} />)}</tbody>
             </table>
         )}
       </div>
@@ -324,16 +415,8 @@ export default function Rentals() {
                 <div><div className="label">Vehicle</div><div className="fw-500" style={{ marginTop: 3 }}>{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</div></div>
                 <div><div className="label">Start Date</div><div style={{ marginTop: 3 }}>{formatDate(selected.startDate)}</div></div>
                 <div><div className="label">End Date</div><div style={{ marginTop: 3 }}>{selected.endDate ? formatDate(selected.endDate) : 'Ongoing'}</div></div>
-                {selected.shopifyRef && <div><div className="label">Shopify Order</div><div style={{ marginTop: 3 }}>{selected.shopifyRef}</div></div>}
-                {selected.contractRef && (
-                  <div><div className="label">Contract Ref</div>
-                    <div style={{ marginTop: 3 }}>
-                      {selected.contractRef.startsWith('http')
-                        ? <a href={selected.contractRef} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>View ↗</a>
-                        : selected.contractRef}
-                    </div>
-                  </div>
-                )}
+                {selected.contractNumber && <div><div className="label">Contract No.</div><div style={{ marginTop: 3, fontWeight: 600 }}>{selected.contractNumber}</div></div>}
+                {selected.odometer && <div><div className="label">Odometer at Rental</div><div style={{ marginTop: 3 }}>{Number(selected.odometer).toLocaleString()} km</div></div>}
               </div>
               <div style={{ background: selected.bond?.amount ? (selected.bond.status === 'held' ? 'var(--amber-bg)' : 'var(--accent-light)') : 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
                 <div className="fw-600" style={{ marginBottom: 10, fontSize: 13 }}>Bond / Deposit</div>

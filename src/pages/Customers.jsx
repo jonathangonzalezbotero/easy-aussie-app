@@ -16,12 +16,41 @@ export default function Customers() {
   const [deleteId, setDeleteId] = useState(null);
   const [search, setSearch]     = useState('');
   const [saving, setSaving]     = useState(false);
+  const [sort, setSort]         = useState({ col: 'name', dir: 'asc' });
   const [form, setForm]         = useState(EF);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const customers = data.customers.filter(c => {
+  const toggleSort = (col) =>
+    setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
+
+  const SortTh = ({ col, children }) => {
+    const active = sort.col === col;
+    return (
+      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+        {children}
+        <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
+          {active && sort.dir === 'desc' ? '▼' : '▲'}
+        </span>
+      </th>
+    );
+  };
+
+  const filtered = data.customers.filter(c => {
     const q = search.toLowerCase();
     return !q || c.name.toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q) || (c.phone || '').includes(q);
+  });
+
+  const customers = [...filtered].sort((a, b) => {
+    const mul = sort.dir === 'asc' ? 1 : -1;
+    if (sort.col === 'name')    return a.name.localeCompare(b.name) * mul;
+    if (sort.col === 'phone')   return (a.phone || '').localeCompare(b.phone || '') * mul;
+    if (sort.col === 'email')   return (a.email || '').localeCompare(b.email || '') * mul;
+    if (sort.col === 'rentals') {
+      const ar = data.rentals.filter(r => r.customerId === a.id && r.status === 'active').length;
+      const br = data.rentals.filter(r => r.customerId === b.id && r.status === 'active').length;
+      return (ar - br) * mul;
+    }
+    return 0;
   });
 
   const openEdit = (c, e) => { e?.stopPropagation(); setEditC(c); setForm({ ...EF, ...c }); };
@@ -87,7 +116,13 @@ export default function Customers() {
         {customers.length === 0
           ? <EmptyState message={data.customers.length === 0 ? 'No customers yet' : 'No customers match'} action={data.customers.length === 0 ? <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>Add customer</button> : null} />
           : <table className="table">
-              <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Rentals</th><th></th></tr></thead>
+              <thead><tr>
+                <SortTh col="name">Name</SortTh>
+                <SortTh col="phone">Phone</SortTh>
+                <SortTh col="email">Email</SortTh>
+                <SortTh col="rentals">Rentals</SortTh>
+                <th></th>
+              </tr></thead>
               <tbody>
                 {customers.map(c => {
                   const active = data.rentals.filter(r => r.customerId === c.id && r.status === 'active').length;

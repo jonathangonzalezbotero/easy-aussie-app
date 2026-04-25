@@ -30,6 +30,7 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
 
   const alertCount = data.vehicles.reduce((n, v) => {
+    if (v.status === 'stolen' || v.status === 'sold') return n;
     if (v.regoExpiry) { const d = daysUntil(v.regoExpiry); if (d !== null && d <= 30) n++; }
     if (v.nextServiceDate) { const d = daysUntil(v.nextServiceDate); if (d !== null && d <= 14) n++; }
     return n;

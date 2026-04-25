@@ -6,7 +6,41 @@ import Tabs from '../components/shared/Tabs';
 
 export default function Bonds() {
   const { data, update } = useStore();
-  const [tab, setTab] = useState('held');
+  const [tab, setTab]   = useState('held');
+  const [sort, setSort] = useState({ col: 'amount', dir: 'desc' });
+
+  const toggleSort = (col) =>
+    setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
+
+  const SortTh = ({ col, children }) => {
+    const active = sort.col === col;
+    return (
+      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+        {children}
+        <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
+          {active && sort.dir === 'desc' ? '▼' : '▲'}
+        </span>
+      </th>
+    );
+  };
+
+  const sortBonds = (list) => [...list].sort((a, b) => {
+    const mul = sort.dir === 'asc' ? 1 : -1;
+    if (sort.col === 'customer') {
+      const ac = data.customers.find(x => x.id === a.customerId)?.name || '';
+      const bc = data.customers.find(x => x.id === b.customerId)?.name || '';
+      return ac.localeCompare(bc) * mul;
+    }
+    if (sort.col === 'vehicle') {
+      const av = data.vehicles.find(x => x.id === a.vehicleId)?.plate || '';
+      const bv = data.vehicles.find(x => x.id === b.vehicleId)?.plate || '';
+      return av.localeCompare(bv) * mul;
+    }
+    if (sort.col === 'amount') return ((Number(a.bond?.amount) || 0) - (Number(b.bond?.amount) || 0)) * mul;
+    if (sort.col === 'method') return (a.bond?.method || '').localeCompare(b.bond?.method || '') * mul;
+    if (sort.col === 'rental') return (a.status || '').localeCompare(b.status || '') * mul;
+    return 0;
+  });
 
   const withBond   = data.rentals.filter(r => r.bond?.amount);
   const held       = withBond.filter(r => r.bond.status === 'held');
@@ -59,15 +93,31 @@ export default function Bonds() {
         {tab === 'held' && (held.length === 0
           ? <EmptyState message="No bonds currently held" />
           : <table className="table">
-              <thead><tr><th>Customer</th><th>Vehicle</th><th>Amount</th><th>Method</th><th>Bond</th><th>Rental</th><th></th></tr></thead>
-              <tbody>{held.map(r => <BondRow key={r.id} r={r} />)}</tbody>
+              <thead><tr>
+                <SortTh col="customer">Customer</SortTh>
+                <SortTh col="vehicle">Vehicle</SortTh>
+                <SortTh col="amount">Amount</SortTh>
+                <SortTh col="method">Method</SortTh>
+                <th>Bond</th>
+                <SortTh col="rental">Rental</SortTh>
+                <th></th>
+              </tr></thead>
+              <tbody>{sortBonds(held).map(r => <BondRow key={r.id} r={r} />)}</tbody>
             </table>
         )}
         {tab === 'returned' && (returned.length === 0
           ? <EmptyState message="No bonds returned yet" />
           : <table className="table">
-              <thead><tr><th>Customer</th><th>Vehicle</th><th>Amount</th><th>Method</th><th>Bond</th><th>Rental</th><th></th></tr></thead>
-              <tbody>{returned.map(r => <BondRow key={r.id} r={r} />)}</tbody>
+              <thead><tr>
+                <SortTh col="customer">Customer</SortTh>
+                <SortTh col="vehicle">Vehicle</SortTh>
+                <SortTh col="amount">Amount</SortTh>
+                <SortTh col="method">Method</SortTh>
+                <th>Bond</th>
+                <SortTh col="rental">Rental</SortTh>
+                <th></th>
+              </tr></thead>
+              <tbody>{sortBonds(returned).map(r => <BondRow key={r.id} r={r} />)}</tbody>
             </table>
         )}
       </div>
