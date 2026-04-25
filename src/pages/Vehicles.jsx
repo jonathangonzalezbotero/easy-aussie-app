@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useStore } from '../context/StoreContext';
+import { supabase } from '../lib/supabase';
 import Modal from '../components/shared/Modal';
 import Drawer from '../components/shared/Drawer';
 import Badge from '../components/shared/Badge';
@@ -22,8 +23,10 @@ export default function Vehicles() {
   const [filter, setFilter]     = useState('all');
   const [search, setSearch]     = useState('');
   const [saving, setSaving]     = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [form, setForm]         = useState(EF);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const fileInputRef = useRef(null);
 
   const vehicles = data.vehicles.filter(v => {
     const q = search.toLowerCase();
@@ -49,9 +52,41 @@ export default function Vehicles() {
   };
 
   const doDelete = async () => {
+    const v = data.vehicles.find(x => x.id === deleteId);
+    if (v?.regoDocPath) {
+      await supabase.storage.from('vehicle-docs').remove([v.regoDocPath]);
+    }
     await remove('vehicles', deleteId);
     if (detailV?.id === deleteId) setDetailV(null);
     setDeleteId(null);
+  };
+
+  const uploadRego = async (vehicleId, file) => {
+    const ext  = file.name.split('.').pop().toLowerCase();
+    const path = `${vehicleId}/rego.${ext}`;
+    setUploading(true);
+    try {
+      const { error } = await supabase.storage.from('vehicle-docs').upload(path, file, { upsert: true });
+      if (error) throw error;
+      await update('vehicles', vehicleId, { regoDocPath: path });
+    } catch (err) {
+      alert('Upload failed: ' + err.message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const downloadRego = async (path) => {
+    const { data: urlData, error } = await supabase.storage.from('vehicle-docs').createSignedUrl(path, 120);
+    if (error) { alert('Could not generate download link: ' + error.message); return; }
+    window.open(urlData.signedUrl, '_blank');
+  };
+
+  const removeRego = async (vehicleId, path) => {
+    if (!window.confirm('Remove the registration certificate?')) return;
+    await supabase.storage.from('vehicle-docs').remove([path]);
+    await update('vehicles', vehicleId, { regoDocPath: null });
   };
 
   const statusBadge = (s) => {
@@ -216,6 +251,34 @@ export default function Vehicles() {
               </div>
             )}
             {selected.notes && <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '12px 14px', marginBottom: 20, fontSize: 14, color: 'var(--muted)' }}>{selected.notes}</div>}
+            <div className="drawer-section-title">Registration Certificate</div>
+            <div style={{ marginBottom: 20 }}>
+              {selected.regoDocPath ? (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => downloadRego(selected.regoDocPath)}>
+                    ↓ Download
+                  </button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                    {uploading ? 'Uploading…' : 'Replace'}
+                  </button>
+                  <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => removeRego(selected.id, selected.regoDocPath)}>
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <button className="btn btn-secondary btn-sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                  {uploading ? 'Uploading…' : '+ Upload Certificate'}
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) uploadRego(selected.id, f); }}
+              />
+            </div>
+
             <div className="drawer-section-title">Rental History ({vRentals.length})</div>
             {vRentals.length === 0 ? <p className="text-sm text-muted mb-20">No rentals recorded</p> : (
               <div className="mb-20">

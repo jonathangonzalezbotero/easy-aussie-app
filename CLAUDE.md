@@ -60,7 +60,7 @@ Supabase uses snake_case columns. Conversion happens in `src/context/StoreContex
 
 ## Deployment to Vercel
 
-1. Push the `fleet-manager` folder to a GitHub repo
+1. Push the `easy-aussie-app` folder to a GitHub repo
 2. Import in Vercel, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as environment variables
 3. `vercel.json` rewrites all routes to `/index.html` for client-side routing
 
