@@ -10,7 +10,8 @@ const vehicleFromDb = (v) => ({
   year: v.year, colour: v.colour, status: v.status,
   regoExpiry: v.rego_expiry, nextServiceDate: v.next_service_date,
   engineCapacity: v.engine_capacity, type: v.type, fleetGroup: v.fleet_group,
-  purchaseDate: v.purchase_date, conditionNotes: v.condition_notes, notes: v.notes,
+  purchaseDate: v.purchase_date, purchasePrice: v.purchase_price ? String(v.purchase_price) : '',
+  conditionNotes: v.condition_notes, notes: v.notes,
   regoDocPath: v.rego_doc_path || null,
 });
 
@@ -20,6 +21,7 @@ const vehicleToDb = (v) => ({
   rego_expiry: v.regoExpiry || null, next_service_date: v.nextServiceDate || null,
   engine_capacity: v.engineCapacity || null, type: v.type || 'scooter',
   fleet_group: v.fleetGroup || 'business', purchase_date: v.purchaseDate || null,
+  purchase_price: v.purchasePrice ? Number(v.purchasePrice) : null,
   condition_notes: v.conditionNotes || null, notes: v.notes || null,
   rego_doc_path: v.regoDocPath || null,
 });

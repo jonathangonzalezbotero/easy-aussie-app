@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { supabase } from '../lib/supabase';
 import Modal from '../components/shared/Modal';
@@ -6,12 +6,12 @@ import Drawer from '../components/shared/Drawer';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
-import { formatDate, daysUntil } from '../utils/dates';
+import { formatDate, daysUntil, todayStr } from '../utils/dates';
 
 const EF = {
   plate: '', name: '', make: '', model: '', year: '', colour: '', engineCapacity: '',
-  type: 'scooter', fleetGroup: 'business', purchaseDate: '', status: 'available',
-  regoExpiry: '', nextServiceDate: '', conditionNotes: '', notes: '',
+  type: 'scooter', fleetGroup: 'business', purchaseDate: '', purchasePrice: '', status: 'available',
+  nextServiceDate: '', conditionNotes: '', notes: '',
 };
 
 export default function Vehicles() {
@@ -22,11 +22,78 @@ export default function Vehicles() {
   const [deleteId, setDeleteId] = useState(null);
   const [filter, setFilter]     = useState('all');
   const [search, setSearch]     = useState('');
-  const [saving, setSaving]     = useState(false);
+  const [saving, setSaving]       = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [form, setForm]         = useState(EF);
+  const [form, setForm]           = useState(EF);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const fileInputRef = useRef(null);
+
+  const RF = { renewalDate: todayStr(), expiryDate: '', duration: '1 year', cost: '', notes: '' };
+  const [renewals, setRenewals]           = useState([]);
+  const [showAddRenewal, setShowAddRenewal] = useState(false);
+  const [editRenewal, setEditRenewal]       = useState(null);
+  const [renewalForm, setRenewalForm]       = useState(RF);
+  const [savingRenewal, setSavingRenewal]   = useState(false);
+  const srf = (k, v) => setRenewalForm(f => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    if (!detailV) { setRenewals([]); return; }
+    supabase
+      .from('rego_renewals')
+      .select('*')
+      .eq('vehicle_id', detailV.id)
+      .order('renewal_date', { ascending: false })
+      .then(({ data: rows }) => setRenewals(rows || []));
+  }, [detailV?.id]);
+
+  const openAddRenewal  = () => { setEditRenewal(null); setRenewalForm(RF); setShowAddRenewal(true); };
+  const openEditRenewal = (r) => {
+    setEditRenewal(r);
+    setRenewalForm({
+      renewalDate: r.renewal_date,
+      expiryDate:  r.expiry_date,
+      duration:    r.duration,
+      cost:        r.cost != null ? String(r.cost) : '',
+      notes:       r.notes || '',
+    });
+    setShowAddRenewal(true);
+  };
+
+  const saveRenewal = async () => {
+    if (!renewalForm.expiryDate) { alert('New expiry date is required'); return; }
+    setSavingRenewal(true);
+    try {
+      const payload = {
+        renewal_date: renewalForm.renewalDate,
+        expiry_date:  renewalForm.expiryDate,
+        duration:     renewalForm.duration,
+        cost:         renewalForm.cost ? Number(renewalForm.cost) : null,
+        notes:        renewalForm.notes || null,
+      };
+      if (editRenewal) {
+        const { data: row, error } = await supabase.from('rego_renewals').update(payload).eq('id', editRenewal.id).select().single();
+        if (error) throw error;
+        setRenewals(prev => prev.map(r => r.id === editRenewal.id ? row : r));
+      } else {
+        const { data: row, error } = await supabase.from('rego_renewals').insert({ vehicle_id: selected.id, ...payload }).select().single();
+        if (error) throw error;
+        setRenewals(prev => [row, ...prev]);
+      }
+      // Keep vehicle's regoExpiry in sync with the most recent expiry date
+      const allExpiries = editRenewal
+        ? renewals.map(r => r.id === editRenewal.id ? renewalForm.expiryDate : r.expiry_date)
+        : [...renewals.map(r => r.expiry_date), renewalForm.expiryDate];
+      const latest = allExpiries.reduce((max, d) => d > max ? d : max, '');
+      await update('vehicles', selected.id, { regoExpiry: latest });
+      setShowAddRenewal(false);
+      setRenewalForm(RF);
+      setEditRenewal(null);
+    } catch (err) {
+      alert('Failed to save renewal: ' + err.message);
+    } finally {
+      setSavingRenewal(false);
+    }
+  };
 
   const vehicles = data.vehicles.filter(v => {
     const q = search.toLowerCase();
@@ -134,7 +201,7 @@ export default function Vehicles() {
       </div>
       <div className="grid-2">
         <div className="field"><label className="label">Purchase Date</label><input className="input" type="date" value={form.purchaseDate} onChange={e => sf('purchaseDate', e.target.value)} /></div>
-        <div className="field"><label className="label">Rego Expiry</label><input className="input" type="date" value={form.regoExpiry} onChange={e => sf('regoExpiry', e.target.value)} /></div>
+        <div className="field"><label className="label">Purchase Price ($)</label><input className="input" type="number" min="0" value={form.purchasePrice} onChange={e => sf('purchasePrice', e.target.value)} placeholder="e.g. 3500" /></div>
       </div>
       <div className="field"><label className="label">Next Service Date</label><input className="input" type="date" value={form.nextServiceDate} onChange={e => sf('nextServiceDate', e.target.value)} /></div>
       <div className="form-divider"><span>Condition</span></div>
@@ -169,7 +236,7 @@ export default function Vehicles() {
           ? <EmptyState message={data.vehicles.length === 0 ? 'No vehicles yet — add your first one' : 'No vehicles match your filter'}
               action={data.vehicles.length === 0 ? <button className="btn btn-primary btn-sm" onClick={openAdd}>Add vehicle</button> : null} />
           : <table className="table">
-              <thead><tr><th>Plate</th><th>Make / Model</th><th>Colour</th><th>Fleet</th><th>Status</th><th>Rego Expiry</th><th></th></tr></thead>
+              <thead><tr><th>Plate</th><th>Make / Model</th><th>Colour</th><th>Fleet</th><th>Status</th><th>Rego Expiry (latest)</th><th></th></tr></thead>
               <tbody>
                 {vehicles.map(v => {
                   const rd = v.regoExpiry ? daysUntil(v.regoExpiry) : null;
@@ -177,7 +244,10 @@ export default function Vehicles() {
                   const makeModel = [v.make, v.model].filter(Boolean).join(' ') || v.name || '—';
                   return (
                     <tr key={v.id} onClick={() => setDetailV(v)}>
-                      <td className="fw-600">{v.plate}</td>
+                      <td>
+                        <div className="fw-600">{v.plate}</div>
+                        {v.name && <div className="text-sm text-muted">{v.name}</div>}
+                      </td>
                       <td>
                         <div className="fw-500">{makeModel}</div>
                         <div className="text-sm text-muted">{v.year || ''} · <span style={{ textTransform: 'capitalize' }}>{v.type}</span></div>
@@ -232,11 +302,8 @@ export default function Vehicles() {
               {selected.year && <div><div className="label">Year</div><div style={{ marginTop: 3 }}>{selected.year}</div></div>}
               {selected.colour && <div><div className="label">Colour</div><div style={{ marginTop: 3 }}>{selected.colour}</div></div>}
               {selected.engineCapacity && <div><div className="label">Engine</div><div style={{ marginTop: 3 }}>{selected.engineCapacity}</div></div>}
-              <div><div className="label">Purchase Date</div><div style={{ marginTop: 3 }}>{formatDate(selected.purchaseDate)}</div></div>
-              <div>
-                <div className="label">Rego Expiry</div>
-                <div style={{ marginTop: 3, color: selected.regoExpiry && daysUntil(selected.regoExpiry) <= 30 ? 'var(--red)' : 'inherit' }}>{formatDate(selected.regoExpiry)}</div>
-              </div>
+              {selected.purchaseDate && <div><div className="label">Purchase Date</div><div style={{ marginTop: 3 }}>{formatDate(selected.purchaseDate)}</div></div>}
+              {selected.purchasePrice && <div><div className="label">Purchase Price</div><div style={{ marginTop: 3 }}>${Number(selected.purchasePrice).toLocaleString()}</div></div>}
               {selected.nextServiceDate && (
                 <div>
                   <div className="label">Next Service</div>
@@ -279,6 +346,32 @@ export default function Vehicles() {
               />
             </div>
 
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div className="drawer-section-title" style={{ marginBottom: 0 }}>Rego Renewals ({renewals.length})</div>
+              <button className="btn btn-secondary btn-sm" onClick={openAddRenewal}>+ Add</button>
+            </div>
+            {renewals.length === 0
+              ? <p className="text-sm text-muted mb-20">No renewals recorded</p>
+              : <div className="mb-20">
+                  {renewals.map(r => (
+                    <div key={r.id} className="history-card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div className="fw-500" style={{ fontSize: 14 }}>{r.duration}</div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <div className="text-sm text-muted">{formatDate(r.renewal_date)}</div>
+                          <button className="btn btn-secondary btn-sm" onClick={() => openEditRenewal(r)}>Edit</button>
+                        </div>
+                      </div>
+                      <div className="text-sm text-muted" style={{ marginTop: 3 }}>
+                        Expires {formatDate(r.expiry_date)}
+                        {r.cost ? ` · $${Number(r.cost).toLocaleString()}` : ''}
+                      </div>
+                      {r.notes && <div className="text-sm text-muted" style={{ marginTop: 4, fontStyle: 'italic' }}>{r.notes}</div>}
+                    </div>
+                  ))}
+                </div>
+            }
+
             <div className="drawer-section-title">Rental History ({vRentals.length})</div>
             {vRentals.length === 0 ? <p className="text-sm text-muted mb-20">No rentals recorded</p> : (
               <div className="mb-20">
@@ -314,6 +407,42 @@ export default function Vehicles() {
           </>
         )}
       </Drawer>
+
+      <Modal open={showAddRenewal} onClose={() => { setShowAddRenewal(false); setEditRenewal(null); }} title={editRenewal ? 'Edit Rego Renewal' : 'Add Rego Renewal'} width={480}
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => { setShowAddRenewal(false); setEditRenewal(null); }}>Cancel</button>
+            <button className="btn btn-primary" onClick={saveRenewal} disabled={savingRenewal}>{savingRenewal ? 'Saving…' : editRenewal ? 'Save Changes' : 'Save Renewal'}</button>
+          </>
+        }>
+        <div className="grid-2">
+          <div className="field">
+            <label className="label">Renewal Date *</label>
+            <input className="input" type="date" value={renewalForm.renewalDate} onChange={e => srf('renewalDate', e.target.value)} />
+          </div>
+          <div className="field">
+            <label className="label">New Expiry Date *</label>
+            <input className="input" type="date" value={renewalForm.expiryDate} onChange={e => srf('expiryDate', e.target.value)} />
+          </div>
+        </div>
+        <div className="grid-2">
+          <div className="field">
+            <label className="label">Duration</label>
+            <select className="select" value={renewalForm.duration} onChange={e => srf('duration', e.target.value)}>
+              <option value="6 months">6 months</option>
+              <option value="1 year">1 year</option>
+            </select>
+          </div>
+          <div className="field">
+            <label className="label">Cost ($)</label>
+            <input className="input" type="number" min="0" value={renewalForm.cost} onChange={e => srf('cost', e.target.value)} placeholder="Optional" />
+          </div>
+        </div>
+        <div className="field">
+          <label className="label">Notes</label>
+          <textarea className="textarea" rows={2} value={renewalForm.notes} onChange={e => srf('notes', e.target.value)} placeholder="Optional" />
+        </div>
+      </Modal>
     </div>
   );
 }
