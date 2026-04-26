@@ -53,8 +53,12 @@ create table if not exists rentals (
   shopify_ref   text,
   contract_ref  text,
   notes         text,
+  price         numeric,
   created_at    timestamptz default now()
 );
+
+-- Run this if the table already exists:
+-- alter table rentals add column if not exists price numeric;
 
 create table if not exists maintenance (
   id                uuid primary key default gen_random_uuid(),

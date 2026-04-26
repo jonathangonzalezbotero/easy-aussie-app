@@ -9,7 +9,7 @@ import Tabs from '../components/shared/Tabs';
 import { formatDate, daysBetween, todayStr } from '../utils/dates';
 
 const EF = {
-  customerId: '', vehicleId: '', startDate: todayStr(), endDate: '', contractNumber: '', notes: '', odometer: '',
+  customerId: '', vehicleId: '', startDate: todayStr(), endDate: '', contractNumber: '', notes: '', odometer: '', price: '',
   bond: { amount: '', method: 'cash', status: 'held' },
 };
 
@@ -63,6 +63,7 @@ export default function Rentals() {
       contractNumber: r.contractNumber || '',
       notes:          r.notes          || '',
       odometer:       r.odometer       || '',
+      price:          r.price          || '',
       bond: { amount: r.bond?.amount || '', method: r.bond?.method || 'cash', status: r.bond?.status || 'held' },
     });
   };
@@ -159,14 +160,18 @@ export default function Rentals() {
         <div className="field"><label className="label">Start Date *</label><input className="input" type="date" value={form.startDate} onChange={e => sf('startDate', e.target.value)} /></div>
         <div className="field"><label className="label">End Date (optional)</label><input className="input" type="date" value={form.endDate} onChange={e => sf('endDate', e.target.value)} /></div>
       </div>
-      {data.vehicles.find(v => v.id === form.vehicleId)?.type !== 'ebike' && (
-        <div className="grid-2">
+      <div className="grid-2">
+        {data.vehicles.find(v => v.id === form.vehicleId)?.type !== 'ebike' && (
           <div className="field">
             <label className="label">Odometer (km)</label>
             <input className="input" type="number" min="0" value={form.odometer} onChange={e => sf('odometer', e.target.value)} placeholder="e.g. 4250" />
           </div>
+        )}
+        <div className="field">
+          <label className="label">Weekly Price ($)</label>
+          <input className="input" type="number" min="0" step="0.01" value={form.price} onChange={e => sf('price', e.target.value)} placeholder="e.g. 150" />
         </div>
-      )}
+      </div>
       <div className="form-divider"><span>Bond / Deposit</span></div>
       <div className="grid-2">
         <div className="field">
@@ -229,6 +234,16 @@ export default function Rentals() {
         av = a.startDate ? daysBetween(a.startDate, a.endDate || todayStr()) : 0;
         bv = b.startDate ? daysBetween(b.startDate, b.endDate || todayStr()) : 0;
         return (av - bv) * mul;
+      } else if (col === 'payDay') {
+        const [ay, am, ad] = (a.startDate || '').split('-').map(Number);
+        const [by, bm, bd] = (b.startDate || '').split('-').map(Number);
+        av = a.startDate ? new Date(ay, am - 1, ad).getDay() : -1;
+        bv = b.startDate ? new Date(by, bm - 1, bd).getDay() : -1;
+        return (av - bv) * mul;
+      } else if (col === 'price') {
+        av = Number(a.price) || 0;
+        bv = Number(b.price) || 0;
+        return (av - bv) * mul;
       } else if (col === 'bond') {
         av = Number(a.bond?.amount) || 0;
         bv = Number(b.bond?.amount) || 0;
@@ -238,10 +253,10 @@ export default function Rentals() {
     });
   };
 
-  const SortTh = ({ col, children }) => {
+  const SortTh = ({ col, children, className }) => {
     const active = sort.col === col;
     return (
-      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+      <th className={className} onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
         {children}
         <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
           {active && sort.dir === 'desc' ? '▼' : '▲'}
@@ -250,7 +265,13 @@ export default function Rentals() {
     );
   };
 
-  const RentalRow = ({ r, showEnd }) => {
+  const paymentDay = (startDate) => {
+    if (!startDate) return '—';
+    const [y, m, d] = startDate.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-AU', { weekday: 'long' });
+  };
+
+  const RentalRow = ({ r, showEnd, showPayDay }) => {
     const c   = data.customers.find(x => x.id === r.customerId);
     const v   = data.vehicles.find(x => x.id === r.vehicleId);
     const dur = r.startDate ? daysBetween(r.startDate, r.endDate || todayStr()) : 0;
@@ -261,9 +282,11 @@ export default function Rentals() {
           <div className="fw-500">{v?.plate || '—'}</div>
           <div className="text-sm text-muted">{v ? (v.name || v.type) : ''}</div>
         </td>
-        <td className="text-muted">{r.contractNumber || '—'}</td>
+        <td className="text-muted col-hide-mobile">{r.contractNumber || '—'}</td>
         <td className="text-muted">{formatDate(r.startDate)}</td>
+        {showPayDay && <td className="text-muted">{paymentDay(r.startDate)}</td>}
         <td className="text-muted">{r.status === 'active' ? `${dur}d` : formatDate(r.endDate)}</td>
+        <td className="text-muted">{r.price ? `$${Number(r.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '—'}</td>
         <td>
           {r.bond?.amount
             ? <div><div style={{ fontSize: 13, fontWeight: 600 }}>${r.bond.amount}</div><Badge variant={r.bond.status === 'held' ? 'amber' : 'green'}>{r.bond.status}</Badge></div>
@@ -296,33 +319,36 @@ export default function Rentals() {
       <div className="card">
         {tab === 'active' && (active.length === 0
           ? <EmptyState message="No active rentals" action={<button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>Create rental</button>} />
-          : <table className="table">
+          : <div className="table-wrap"><table className="table">
               <thead><tr>
                 <SortTh col="customer">Customer</SortTh>
                 <SortTh col="vehicle">Vehicle</SortTh>
-                <SortTh col="contractNumber">Contract No.</SortTh>
+                <SortTh col="contractNumber" className="col-hide-mobile">Contract No.</SortTh>
                 <SortTh col="startDate">Started</SortTh>
+                <SortTh col="payDay">Pay Day</SortTh>
                 <SortTh col="duration">Duration</SortTh>
+                <SortTh col="price">Price/wk</SortTh>
                 <SortTh col="bond">Bond</SortTh>
                 <th></th>
               </tr></thead>
-              <tbody>{sortRentals(active).map(r => <RentalRow key={r.id} r={r} showEnd={true} />)}</tbody>
-            </table>
+              <tbody>{sortRentals(active).map(r => <RentalRow key={r.id} r={r} showEnd={true} showPayDay={true} />)}</tbody>
+            </table></div>
         )}
         {tab === 'past' && (past.length === 0
           ? <EmptyState message="No completed rentals yet" />
-          : <table className="table">
+          : <div className="table-wrap"><table className="table">
               <thead><tr>
                 <SortTh col="customer">Customer</SortTh>
                 <SortTh col="vehicle">Vehicle</SortTh>
-                <SortTh col="contractNumber">Contract No.</SortTh>
+                <SortTh col="contractNumber" className="col-hide-mobile">Contract No.</SortTh>
                 <SortTh col="startDate">Started</SortTh>
                 <SortTh col="endDate">Ended</SortTh>
+                <SortTh col="price">Price/wk</SortTh>
                 <SortTh col="bond">Bond</SortTh>
                 <th></th>
               </tr></thead>
               <tbody>{sortRentals(past).map(r => <RentalRow key={r.id} r={r} showEnd={false} />)}</tbody>
-            </table>
+            </table></div>
         )}
       </div>
 
@@ -417,6 +443,7 @@ export default function Rentals() {
                 <div><div className="label">End Date</div><div style={{ marginTop: 3 }}>{selected.endDate ? formatDate(selected.endDate) : 'Ongoing'}</div></div>
                 {selected.contractNumber && <div><div className="label">Contract No.</div><div style={{ marginTop: 3, fontWeight: 600 }}>{selected.contractNumber}</div></div>}
                 {selected.odometer && <div><div className="label">Odometer at Rental</div><div style={{ marginTop: 3 }}>{Number(selected.odometer).toLocaleString()} km</div></div>}
+                {selected.price && <div><div className="label">Weekly Price</div><div style={{ marginTop: 3, fontWeight: 600 }}>${Number(selected.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</div></div>}
               </div>
               <div style={{ background: selected.bond?.amount ? (selected.bond.status === 'held' ? 'var(--amber-bg)' : 'var(--accent-light)') : 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
                 <div className="fw-600" style={{ marginBottom: 10, fontSize: 13 }}>Bond / Deposit</div>

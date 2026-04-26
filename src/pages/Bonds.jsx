@@ -12,10 +12,10 @@ export default function Bonds() {
   const toggleSort = (col) =>
     setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
 
-  const SortTh = ({ col, children }) => {
+  const SortTh = ({ col, children, className }) => {
     const active = sort.col === col;
     return (
-      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+      <th className={className} onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
         {children}
         <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
           {active && sort.dir === 'desc' ? '▼' : '▲'}
@@ -58,7 +58,7 @@ export default function Bonds() {
         <td className="fw-500">{c?.name || '—'}</td>
         <td>{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</td>
         <td><span className="fw-600">${r.bond.amount}</span></td>
-        <td style={{ textTransform: 'capitalize' }}>{r.bond.method}</td>
+        <td className="col-hide-mobile" style={{ textTransform: 'capitalize' }}>{r.bond.method}</td>
         <td><Badge variant={r.bond.status === 'held' ? 'amber' : 'green'}>{r.bond.status}</Badge></td>
         <td><Badge variant={r.status === 'active' ? 'blue' : 'gray'}>{r.status}</Badge></td>
         <td>{r.bond.status === 'held' && <button className="btn btn-secondary btn-sm" onClick={() => markReturned(r)}>Mark Returned</button>}</td>
@@ -92,33 +92,33 @@ export default function Bonds() {
       <div className="card">
         {tab === 'held' && (held.length === 0
           ? <EmptyState message="No bonds currently held" />
-          : <table className="table">
+          : <div className="table-wrap"><table className="table">
               <thead><tr>
                 <SortTh col="customer">Customer</SortTh>
                 <SortTh col="vehicle">Vehicle</SortTh>
                 <SortTh col="amount">Amount</SortTh>
-                <SortTh col="method">Method</SortTh>
+                <SortTh col="method" className="col-hide-mobile">Method</SortTh>
                 <th>Bond</th>
                 <SortTh col="rental">Rental</SortTh>
                 <th></th>
               </tr></thead>
               <tbody>{sortBonds(held).map(r => <BondRow key={r.id} r={r} />)}</tbody>
-            </table>
+            </table></div>
         )}
         {tab === 'returned' && (returned.length === 0
           ? <EmptyState message="No bonds returned yet" />
-          : <table className="table">
+          : <div className="table-wrap"><table className="table">
               <thead><tr>
                 <SortTh col="customer">Customer</SortTh>
                 <SortTh col="vehicle">Vehicle</SortTh>
                 <SortTh col="amount">Amount</SortTh>
-                <SortTh col="method">Method</SortTh>
+                <SortTh col="method" className="col-hide-mobile">Method</SortTh>
                 <th>Bond</th>
                 <SortTh col="rental">Rental</SortTh>
                 <th></th>
               </tr></thead>
               <tbody>{sortBonds(returned).map(r => <BondRow key={r.id} r={r} />)}</tbody>
-            </table>
+            </table></div>
         )}
       </div>
     </div>

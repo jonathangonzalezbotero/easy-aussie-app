@@ -13,10 +13,10 @@ export default function Dashboard() {
   const toggleSort = (col) =>
     setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
 
-  const SortTh = ({ col, children }) => {
+  const SortTh = ({ col, children, className }) => {
     const active = sort.col === col;
     return (
-      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+      <th className={className} onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
         {children}
         <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
           {active && sort.dir === 'desc' ? '▼' : '▲'}
@@ -39,6 +39,11 @@ export default function Dashboard() {
     }
     if (sort.col === 'startDate') return (a.startDate || '').localeCompare(b.startDate || '') * mul;
     if (sort.col === 'bond')      return ((Number(a.bond?.amount) || 0) - (Number(b.bond?.amount) || 0)) * mul;
+    if (sort.col === 'price')     return ((Number(a.price) || 0) - (Number(b.price) || 0)) * mul;
+    if (sort.col === 'payDay') {
+      const day = (d) => { if (!d) return -1; const [y,m,dd] = d.split('-').map(Number); return new Date(y,m-1,dd).getDay(); };
+      return (day(a.startDate) - day(b.startDate)) * mul;
+    }
     return 0;
   });
   const availableVehicles = data.vehicles.filter(v => v.status === 'available');
@@ -113,22 +118,27 @@ export default function Dashboard() {
           ? <EmptyState message="No active rentals" action={
               <button className="btn btn-primary btn-sm" onClick={() => navigate('/rentals')}>Create rental</button>
             } />
-          : <table className="table">
+          : <div className="table-wrap"><table className="table">
               <thead><tr>
                 <SortTh col="customer">Customer</SortTh>
                 <SortTh col="vehicle">Vehicle</SortTh>
-                <SortTh col="startDate">Started</SortTh>
+                <SortTh col="startDate" className="col-hide-mobile">Started</SortTh>
+                <SortTh col="payDay">Pay Day</SortTh>
+                <SortTh col="price">Price/wk</SortTh>
                 <SortTh col="bond">Bond</SortTh>
               </tr></thead>
               <tbody>
                 {activeRentals.map(r => {
                   const c = data.customers.find(x => x.id === r.customerId);
                   const v = data.vehicles.find(x => x.id === r.vehicleId);
+                  const payDay = r.startDate ? (() => { const [y,m,d] = r.startDate.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-AU', { weekday: 'long' }); })() : '—';
                   return (
                     <tr key={r.id} onClick={() => navigate('/rentals')}>
                       <td className="fw-500">{c?.name || '—'}</td>
                       <td>{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</td>
-                      <td className="text-muted">{formatDate(r.startDate)}</td>
+                      <td className="text-muted col-hide-mobile">{formatDate(r.startDate)}</td>
+                      <td className="text-muted">{payDay}</td>
+                      <td className="text-muted">{r.price ? `$${Number(r.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '—'}</td>
                       <td>
                         {r.bond?.amount
                           ? <Badge variant={r.bond.status === 'held' ? 'amber' : 'green'}>{r.bond.status === 'held' ? `Held $${r.bond.amount}` : 'Returned'}</Badge>
@@ -138,7 +148,7 @@ export default function Dashboard() {
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
         }
       </div>
     </div>

@@ -22,10 +22,10 @@ export default function Maintenance() {
   const toggleSort = (col) =>
     setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
 
-  const SortTh = ({ col, children }) => {
+  const SortTh = ({ col, children, className }) => {
     const active = sort.col === col;
     return (
-      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+      <th className={className} onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
         {children}
         <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
           {active && sort.dir === 'desc' ? '▼' : '▲'}
@@ -144,13 +144,13 @@ export default function Maintenance() {
         <div className="card">
           {records.length === 0
             ? <EmptyState message="No maintenance records yet" action={<button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>Log service</button>} />
-            : <table className="table">
+            : <div className="table-wrap"><table className="table">
                 <thead><tr>
                   <SortTh col="vehicle">Vehicle</SortTh>
                   <SortTh col="type">Type</SortTh>
                   <SortTh col="date">Date</SortTh>
-                  <SortTh col="odometer">Odometer</SortTh>
-                  <th>Description</th>
+                  <SortTh col="odometer" className="col-hide-mobile">Odometer</SortTh>
+                  <th className="col-hide-mobile">Description</th>
                   <SortTh col="cost">Cost</SortTh>
                   <th></th>
                 </tr></thead>
@@ -162,8 +162,8 @@ export default function Maintenance() {
                         <td className="fw-500">{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</td>
                         <td><Badge variant={m.type === 'repair' ? 'red' : m.type === 'inspection' ? 'blue' : 'gray'}>{m.type}</Badge></td>
                         <td className="text-muted">{formatDate(m.date)}</td>
-                        <td className="text-muted">{m.odometer ? Number(m.odometer).toLocaleString() + ' km' : '—'}</td>
-                        <td className="text-muted" style={{ maxWidth: 220 }}>{m.description || '—'}</td>
+                        <td className="text-muted col-hide-mobile">{m.odometer ? Number(m.odometer).toLocaleString() + ' km' : '—'}</td>
+                        <td className="text-muted col-hide-mobile" style={{ maxWidth: 220 }}>{m.description || '—'}</td>
                         <td>{m.cost ? '$' + m.cost : '—'}</td>
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
@@ -175,7 +175,7 @@ export default function Maintenance() {
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
           }
         </div>
       )}
@@ -184,7 +184,7 @@ export default function Maintenance() {
         <div className="card">
           {upcoming.length === 0
             ? <EmptyState message="No upcoming services — all vehicles are up to date" />
-            : <table className="table">
+            : <div className="table-wrap"><table className="table">
                 <thead><tr><th>Vehicle</th><th>Type</th><th>Next Service</th><th>Status</th></tr></thead>
                 <tbody>
                   {upcoming.map(v => (
@@ -200,7 +200,7 @@ export default function Maintenance() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
           }
         </div>
       )}

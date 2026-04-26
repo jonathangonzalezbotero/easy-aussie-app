@@ -31,10 +31,10 @@ export default function Vehicles() {
   const toggleSort = (col) =>
     setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
 
-  const SortTh = ({ col, children }) => {
+  const SortTh = ({ col, children, className }) => {
     const active = sort.col === col;
     return (
-      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+      <th className={className} onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
         {children}
         <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
           {active && sort.dir === 'desc' ? '▼' : '▲'}
@@ -262,7 +262,7 @@ export default function Vehicles() {
         <button className="btn btn-primary" onClick={openAdd}>+ Add Vehicle</button>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="filter-toolbar" style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <Tabs tabs={[
           { label: 'All', value: 'all', count: counts.all },
           { label: 'Available', value: 'available', count: counts.available },
@@ -271,22 +271,22 @@ export default function Vehicles() {
           { label: 'Stolen', value: 'stolen', count: counts.stolen },
           { label: 'Sold', value: 'sold', count: counts.sold },
         ]} active={filter} onChange={setFilter} />
-        <input className="input" style={{ width: 220 }} placeholder="Search plate, name, make…" value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="input" style={{ width: '100%', maxWidth: 220 }} placeholder="Search plate, name, make…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
       <div className="card">
         {vehicles.length === 0
           ? <EmptyState message={data.vehicles.length === 0 ? 'No vehicles yet — add your first one' : 'No vehicles match your filter'}
             action={data.vehicles.length === 0 ? <button className="btn btn-primary btn-sm" onClick={openAdd}>Add vehicle</button> : null} />
-          : <table className="table">
+          : <div className="table-wrap"><table className="table">
             <thead><tr>
               <SortTh col="plate">Plate</SortTh>
               <SortTh col="make">Make / Model</SortTh>
-              <SortTh col="colour">Colour</SortTh>
-              <SortTh col="fleetGroup">Fleet</SortTh>
+              <SortTh col="colour" className="col-hide-mobile">Colour</SortTh>
+              <SortTh col="fleetGroup" className="col-hide-mobile">Fleet</SortTh>
               <SortTh col="status">Status</SortTh>
-              <SortTh col="purchaseDate">Purchase Date</SortTh>
-              <SortTh col="regoExpiry">Rego Expiry (latest)</SortTh>
+              <SortTh col="purchaseDate" className="col-hide-mobile">Purchase Date</SortTh>
+              <SortTh col="regoExpiry">Rego Expiry</SortTh>
               <th></th>
             </tr></thead>
             <tbody>
@@ -304,10 +304,10 @@ export default function Vehicles() {
                       <div className="fw-500">{makeModel}</div>
                       <div className="text-sm text-muted">{v.year || ''} · <span style={{ textTransform: 'capitalize' }}>{v.type}</span></div>
                     </td>
-                    <td className="text-muted">{v.colour || '—'}</td>
-                    <td><Badge variant="gray">{v.fleetGroup}</Badge></td>
+                    <td className="text-muted col-hide-mobile">{v.colour || '—'}</td>
+                    <td className="col-hide-mobile"><Badge variant="gray">{v.fleetGroup}</Badge></td>
                     <td>{statusBadge(v.status)}</td>
-                    <td>{v.purchaseDate ? formatDate(v.purchaseDate) : '—'}</td>
+                    <td className="col-hide-mobile">{v.purchaseDate ? formatDate(v.purchaseDate) : '—'}</td>
                     <td style={{ color: regoWarn ? (rd < 0 ? 'var(--red)' : 'var(--amber)') : 'inherit' }}>
                       {(v.status === 'stolen' || v.status === 'sold')
                         ? <span className="text-muted">—</span>
@@ -324,7 +324,7 @@ export default function Vehicles() {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         }
       </div>
 

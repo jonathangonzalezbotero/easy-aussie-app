@@ -48,6 +48,7 @@ const rentalFromDb = (r) => ({
   shopifyRef: r.shopify_ref, contractRef: r.contract_ref, notes: r.notes,
   odometer: r.odometer ? String(r.odometer) : '',
   contractNumber: r.contract_number || '',
+  price: r.price ? String(r.price) : '',
 });
 
 const rentalToDb = (r) => ({
@@ -59,6 +60,7 @@ const rentalToDb = (r) => ({
   shopify_ref: r.shopifyRef || null, contract_ref: r.contractRef || null, notes: r.notes || null,
   odometer: r.odometer ? Number(r.odometer) : null,
   contract_number: r.contractNumber || null,
+  price: r.price ? Number(r.price) : null,
 });
 
 const maintenanceFromDb = (m) => ({

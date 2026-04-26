@@ -23,10 +23,10 @@ export default function Customers() {
   const toggleSort = (col) =>
     setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
 
-  const SortTh = ({ col, children }) => {
+  const SortTh = ({ col, children, className }) => {
     const active = sort.col === col;
     return (
-      <th onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+      <th className={className} onClick={() => toggleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
         {children}
         <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3, fontSize: 11 }}>
           {active && sort.dir === 'desc' ? '▼' : '▲'}
@@ -109,17 +109,17 @@ export default function Customers() {
       </div>
 
       <div className="mb-16">
-        <input className="input" style={{ maxWidth: 320 }} placeholder="Search by name, email or phone…" value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="input" style={{ width: '100%', maxWidth: 320 }} placeholder="Search by name, email or phone…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
       <div className="card">
         {customers.length === 0
           ? <EmptyState message={data.customers.length === 0 ? 'No customers yet' : 'No customers match'} action={data.customers.length === 0 ? <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>Add customer</button> : null} />
-          : <table className="table">
+          : <div className="table-wrap"><table className="table">
               <thead><tr>
                 <SortTh col="name">Name</SortTh>
                 <SortTh col="phone">Phone</SortTh>
-                <SortTh col="email">Email</SortTh>
+                <SortTh col="email" className="col-hide-mobile">Email</SortTh>
                 <SortTh col="rentals">Rentals</SortTh>
                 <th></th>
               </tr></thead>
@@ -131,7 +131,7 @@ export default function Customers() {
                     <tr key={c.id} onClick={() => setDetailC(c)}>
                       <td className="fw-500">{c.name}</td>
                       <td className="text-muted">{c.phone || '—'}</td>
-                      <td className="text-muted">{c.email || '—'}</td>
+                      <td className="text-muted col-hide-mobile">{c.email || '—'}</td>
                       <td>{active > 0 ? <Badge variant="blue">{active} active</Badge> : <span className="text-sm text-muted">{total} total</span>}</td>
                       <td onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 6 }}>
@@ -143,7 +143,7 @@ export default function Customers() {
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
         }
       </div>
 
