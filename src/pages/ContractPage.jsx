@@ -26,6 +26,7 @@ export default function ContractPage() {
   const vehicle  = rental ? data.vehicles.find(v => v.id === rental.vehicleId)   : null;
   const settings = data.settings || {};
   const isEbike  = vehicle?.type === 'ebike';
+  const isCar    = vehicle?.type === 'car';
 
   if (!rental) {
     return (
@@ -55,15 +56,16 @@ export default function ContractPage() {
     endDate:          rental.endDate || '',
     bondAmount:       rental.bond?.amount || settings.defaultBond || '300',
     contractNumber:   rental.contractNumber || '',
+    odometer:         rental.odometer ? Number(rental.odometer).toLocaleString() : '',
   };
 
   const today = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const missing = [];
-  if (!d.vehicleMake) missing.push('vehicle make');
+  if (!d.vehicleMake)  missing.push('vehicle make');
   if (!isEbike && !d.vehicleModel) missing.push('vehicle model');
-  if (!d.renterName) missing.push('renter name');
-  if (!d.startDate)  missing.push('start date');
+  if (!d.renterName)   missing.push('renter name');
+  if (!d.startDate)    missing.push('start date');
 
   const downloadPDF = async () => {
     setDownloading(true);
@@ -242,9 +244,88 @@ export default function ContractPage() {
     { num: '12', title: 'Governing Law',      content: <p style={bodyText}>This Agreement is governed by the laws of Queensland, Australia. Any disputes will be resolved through appropriate legal channels within Queensland.</p> },
   ];
 
-  const sections      = isEbike ? ebikeSections : scooterSections;
+  // ── Car sections ────────────────────────────────────────────────────────────
+  const carSections = [
+    { num: '1', title: 'Vehicle Details', content: (
+      <div style={grid3}>
+        {[['Make', d.vehicleMake || '_______________'], ['Model', d.vehicleModel || '_______________'], ['Year', d.vehicleYear || '_______________'], ['Colour', d.vehicleColour ? d.vehicleColour.toUpperCase() : '_______________'], ['Registration', d.vehicleRego || '_______________'], ['Engine Capacity', d.vehicleEngine || '_______________'], ...(d.odometer ? [['Odometer at Start', d.odometer + ' km']] : [])].map(([l, v]) => <Field key={l} label={l} value={v} />)}
+      </div>
+    )},
+    { num: '2', title: 'Rental Period', content: (
+      <div style={grid3}>
+        {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : 'Ongoing weekly rental']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
+      </div>
+    )},
+    { num: '3', title: 'Payment & Security Bond', content: (
+      <div style={bodyText}>
+        <p style={{ marginBottom: 8 }}>Rental fees must be paid before vehicle key handover.</p>
+        <p style={{ marginBottom: 8 }}>A refundable security bond of <strong>${d.bondAmount} AUD</strong> is required.</p>
+        <p style={{ marginBottom: 4 }}>The bond may be used to cover:</p>
+        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
+          {['Insurance excess', 'Damage, loss, or theft of the vehicle', 'Traffic fines, tolls, or penalties', 'Late return, cleaning, refuelling, or recovery costs'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+        </ul>
+        <p>Bond refunds are processed after inspection to check for damage and outstanding fines, and may take up to 24 hours.</p>
+      </div>
+    )},
+    { num: '4', title: 'Licensing & Eligibility', content: (
+      <div style={bodyText}>
+        <p style={{ marginBottom: 4 }}>The Renter declares that they:</p>
+        <ul style={{ marginLeft: 20 }}>
+          {['Are 18 years of age or older', 'Hold a valid full Australian or international driving licence permitting them to drive this vehicle in Queensland', 'Are medically fit to operate a motor vehicle', 'Will not permit any other person to drive the vehicle without prior written consent from the Owner'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+        </ul>
+      </div>
+    )},
+    { num: '5', title: 'Driver Responsibilities', content: (
+      <div style={bodyText}>
+        <p style={{ marginBottom: 4 }}>The Renter agrees to:</p>
+        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
+          {['Comply with all Queensland and Australian road laws at all times', 'Use the vehicle only on sealed public roads unless otherwise agreed in writing', 'Not drive under the influence of alcohol, drugs, or any impairing substance', 'Wear a seatbelt and ensure all passengers do the same', 'Report any accident, damage, theft, or incident to the Owner and, where required, to Queensland Police immediately'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+        </ul>
+        <p>Failure to comply constitutes a serious breach of this Agreement.</p>
+      </div>
+    )},
+    { num: '6', title: 'Fuel Policy', content: (
+      <div style={bodyText}>
+        <p style={{ marginBottom: 8 }}>The vehicle will be provided with a full tank of fuel. The Renter must return the vehicle with the same level of fuel.</p>
+        <p>If the vehicle is returned with less fuel, the Owner will charge the Renter for the cost of refuelling at current market rates plus a <strong>$20 AUD</strong> refuelling service fee, to be deducted from the bond.</p>
+      </div>
+    )},
+    { num: '7', title: 'Fines, Tolls, Accidents & Insurance', content: (
+      <div style={bodyText}>
+        <div style={{ marginTop: 10 }}><strong>7.1 Traffic Fines and Tolls</strong><p>The Renter is solely responsible for all traffic infringements, parking fines, and toll charges incurred during the rental period.</p></div>
+        <div style={{ marginTop: 10 }}><strong>7.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the vehicle occurring during the rental period. The Renter must immediately notify the Owner and, if applicable, Queensland Police. Rental fees continue until the vehicle is repaired or replaced.</p></div>
+        <div style={{ marginTop: 10 }}><strong>7.3 CTP Insurance</strong><p>The vehicle is covered by Compulsory Third Party (CTP) insurance as required by Queensland law. CTP covers personal injury to third parties only and does not cover damage to the vehicle, damage to third-party property, or personal injury to the Renter.</p></div>
+        <div style={{ marginTop: 10 }}><strong>7.4 Additional Insurance</strong><p>The Renter remains fully liable for any damage or loss not covered by CTP. The Owner strongly recommends the Renter arrange their own comprehensive vehicle or travel insurance for the duration of the rental.</p></div>
+      </div>
+    )},
+    { num: '8', title: 'Condition of the Vehicle', content: (
+      <div style={bodyText}>
+        <p><strong>At the Start:</strong> The Owner confirms the vehicle is in good working and roadworthy condition.</p>
+        <div style={{ border: '1px solid #d0d0cc', borderRadius: 8, padding: '12px 14px', margin: '8px 0' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Existing damage (if any)</div>
+          <div style={{ fontSize: 13.5, minHeight: 28, color: d.vehicleCondition ? '#c05000' : '#999' }}>{d.vehicleCondition || 'None'}</div>
+        </div>
+        <p><strong>At the End:</strong> The Renter must return the vehicle in the same condition, except for fair wear and tear, with a full tank of fuel and all accessories present.</p>
+      </div>
+    )},
+    { num: '9', title: 'Prohibited Uses', content: (
+      <div style={bodyText}>
+        <p style={{ marginBottom: 4 }}>The vehicle must not be used for:</p>
+        <ul style={{ marginLeft: 20 }}>
+          {['Driving on unsealed, off-road, or beach terrain unless specifically authorised in writing', 'Racing, rallying, or any competitive event', 'Towing or pushing another vehicle', 'Carrying more passengers than the vehicle is legally designed for', 'Commercial purposes, ride-sharing, or sub-letting', 'Operation under the influence of alcohol or drugs', 'Any illegal activity'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+        </ul>
+      </div>
+    )},
+    { num: '10', title: 'Insurance Limitations & Exclusions', content: <p style={bodyText}>Insurance does NOT cover: theft or total write-off caused by negligence or unlocked vehicle; damage from prohibited use or illegal driving; driving under the influence; off-road use; mechanical damage caused by misuse; personal injury to the Renter or passengers; damage to personal property; fines, penalties, towing, or recovery costs; or loss of use.</p> },
+    { num: '11', title: 'Personal Insurance Recommendation', content: <p style={bodyText}>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel insurance and/or comprehensive vehicle insurance. The Renter acknowledges that the included CTP does not cover damage to the vehicle or personal injury to the Renter.</p> },
+    { num: '12', title: 'Assumption of Risk',  content: <p style={bodyText}>The Renter acknowledges that driving a motor vehicle involves inherent risks. The Renter voluntarily accepts all risks associated with the use of the vehicle, whether foreseeable or not.</p> },
+    { num: '13', title: 'Indemnity',           content: <p style={bodyText}>The Renter agrees to indemnify and hold harmless the Owner from any claim, loss, or expense (including legal costs) arising out of the Renter's use of the vehicle, except where caused by the Owner's negligence or breach of this Agreement.</p> },
+    { num: '14', title: 'Governing Law',       content: <p style={bodyText}>This Agreement is governed by the laws of Queensland, Australia. Any disputes will be resolved through appropriate legal channels within Queensland.</p> },
+  ];
+
+  const sections      = isCar ? carSections : isEbike ? ebikeSections : scooterSections;
   const signaturesNum = sections.length + 1;
-  const agreementType = isEbike ? 'E-Bike Rental Agreement' : 'Scooter Rental Agreement';
+  const agreementType = isCar ? 'Car Rental Agreement' : isEbike ? 'E-Bike Rental Agreement' : 'Scooter Rental Agreement';
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#f5f4f0', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>

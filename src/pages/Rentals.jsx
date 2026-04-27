@@ -16,16 +16,16 @@ const EF = {
 export default function Rentals() {
   const { data, add, update } = useStore();
   const navigate = useNavigate();
-  const [tab, setTab]             = useState('active');
+  const [tab, setTab] = useState('active');
   const [showCreate, setShowCreate] = useState(false);
-  const [editR, setEditR]         = useState(null);
-  const [detailR, setDetailR]     = useState(null);
-  const [endR, setEndR]           = useState(null);
+  const [editR, setEditR] = useState(null);
+  const [detailR, setDetailR] = useState(null);
+  const [endR, setEndR] = useState(null);
   const [retainedAmount, setRetainedAmount] = useState('');
-  const [retainedNote, setRetainedNote]     = useState('');
-  const [saving, setSaving]       = useState(false);
-  const [form, setForm]           = useState(EF);
-  const [sort, setSort]           = useState({ col: 'startDate', dir: 'desc' });
+  const [retainedNote, setRetainedNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(EF);
+  const [sort, setSort] = useState({ col: 'payDay', dir: 'asc' });
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const sb = (k, v) => setForm(f => ({ ...f, bond: { ...f.bond, [k]: v } }));
 
@@ -34,7 +34,7 @@ export default function Rentals() {
     if (!showCreate || !form.vehicleId) return;
     const vehicle = data.vehicles.find(v => v.id === form.vehicleId);
     if (!vehicle) return;
-    const prefix = vehicle.type === 'ebike' ? 'EB' : 'SC';
+    const prefix = vehicle.type === 'ebike' ? 'EB' : vehicle.type === 'car' ? 'CA' : 'SC';
     const nums = data.rentals
       .map(r => r.contractNumber)
       .filter(n => n && n.startsWith(prefix + '-'))
@@ -44,8 +44,8 @@ export default function Rentals() {
     setForm(f => ({ ...f, contractNumber: `${prefix}-${String(next).padStart(3, '0')}` }));
   }, [form.vehicleId, showCreate]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const active    = data.rentals.filter(r => r.status === 'active');
-  const past      = data.rentals.filter(r => r.status === 'completed');
+  const active = data.rentals.filter(r => r.status === 'active');
+  const past = data.rentals.filter(r => r.status === 'completed');
   const available = data.vehicles.filter(v => v.status === 'available');
 
   const activeCustomerIds = new Set(active.map(r => r.customerId));
@@ -56,22 +56,22 @@ export default function Rentals() {
     e?.stopPropagation();
     setEditR(r);
     setForm({
-      customerId:     r.customerId     || '',
-      vehicleId:      r.vehicleId      || '',
-      startDate:      r.startDate      || '',
-      endDate:        r.endDate        || '',
+      customerId: r.customerId || '',
+      vehicleId: r.vehicleId || '',
+      startDate: r.startDate || '',
+      endDate: r.endDate || '',
       contractNumber: r.contractNumber || '',
-      notes:          r.notes          || '',
-      odometer:       r.odometer       || '',
-      price:          r.price          || '',
+      notes: r.notes || '',
+      odometer: r.odometer || '',
+      price: r.price || '',
       bond: { amount: r.bond?.amount || '', method: r.bond?.method || 'cash', status: r.bond?.status || 'held' },
     });
   };
 
   const createRental = async () => {
     if (!form.customerId) { alert('Please select a customer'); return; }
-    if (!form.vehicleId)  { alert('Please select a vehicle'); return; }
-    if (!form.startDate)  { alert('Start date is required'); return; }
+    if (!form.vehicleId) { alert('Please select a vehicle'); return; }
+    if (!form.startDate) { alert('Start date is required'); return; }
     const bondAmount = form.bond.amount || data.settings?.defaultBond || '300';
     setSaving(true);
     try {
@@ -87,14 +87,14 @@ export default function Rentals() {
 
   const saveRental = async () => {
     if (!form.customerId) { alert('Please select a customer'); return; }
-    if (!form.vehicleId)  { alert('Please select a vehicle'); return; }
-    if (!form.startDate)  { alert('Start date is required'); return; }
+    if (!form.vehicleId) { alert('Please select a vehicle'); return; }
+    if (!form.startDate) { alert('Start date is required'); return; }
     setSaving(true);
     try {
       // If vehicle changed on an active rental, update both vehicle statuses
       if (editR.status === 'active' && editR.vehicleId !== form.vehicleId) {
         await update('vehicles', editR.vehicleId, { status: 'available' });
-        await update('vehicles', form.vehicleId,  { status: 'rented' });
+        await update('vehicles', form.vehicleId, { status: 'rented' });
       }
       await update('rentals', editR.id, { ...form });
       // Refresh the detail drawer if it's open for this rental
@@ -272,8 +272,8 @@ export default function Rentals() {
   };
 
   const RentalRow = ({ r, showEnd, showPayDay }) => {
-    const c   = data.customers.find(x => x.id === r.customerId);
-    const v   = data.vehicles.find(x => x.id === r.vehicleId);
+    const c = data.customers.find(x => x.id === r.customerId);
+    const v = data.vehicles.find(x => x.id === r.vehicleId);
     const dur = r.startDate ? daysBetween(r.startDate, r.endDate || todayStr()) : 0;
     return (
       <tr onClick={() => setDetailR(r)}>
@@ -320,35 +320,35 @@ export default function Rentals() {
         {tab === 'active' && (active.length === 0
           ? <EmptyState message="No active rentals" action={<button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>Create rental</button>} />
           : <div className="table-wrap"><table className="table">
-              <thead><tr>
-                <SortTh col="customer">Customer</SortTh>
-                <SortTh col="vehicle">Vehicle</SortTh>
-                <SortTh col="contractNumber" className="col-hide-mobile">Contract No.</SortTh>
-                <SortTh col="startDate">Started</SortTh>
-                <SortTh col="payDay">Pay Day</SortTh>
-                <SortTh col="duration">Duration</SortTh>
-                <SortTh col="price">Price/wk</SortTh>
-                <SortTh col="bond">Bond</SortTh>
-                <th></th>
-              </tr></thead>
-              <tbody>{sortRentals(active).map(r => <RentalRow key={r.id} r={r} showEnd={true} showPayDay={true} />)}</tbody>
-            </table></div>
+            <thead><tr>
+              <SortTh col="customer">Customer</SortTh>
+              <SortTh col="vehicle">Vehicle</SortTh>
+              <SortTh col="contractNumber" className="col-hide-mobile">Contract No.</SortTh>
+              <SortTh col="startDate">Started</SortTh>
+              <SortTh col="payDay">Pay Day</SortTh>
+              <SortTh col="duration">Duration</SortTh>
+              <SortTh col="price">Price/wk</SortTh>
+              <SortTh col="bond">Bond</SortTh>
+              <th></th>
+            </tr></thead>
+            <tbody>{sortRentals(active).map(r => <RentalRow key={r.id} r={r} showEnd={true} showPayDay={true} />)}</tbody>
+          </table></div>
         )}
         {tab === 'past' && (past.length === 0
           ? <EmptyState message="No completed rentals yet" />
           : <div className="table-wrap"><table className="table">
-              <thead><tr>
-                <SortTh col="customer">Customer</SortTh>
-                <SortTh col="vehicle">Vehicle</SortTh>
-                <SortTh col="contractNumber" className="col-hide-mobile">Contract No.</SortTh>
-                <SortTh col="startDate">Started</SortTh>
-                <SortTh col="endDate">Ended</SortTh>
-                <SortTh col="price">Price/wk</SortTh>
-                <SortTh col="bond">Bond</SortTh>
-                <th></th>
-              </tr></thead>
-              <tbody>{sortRentals(past).map(r => <RentalRow key={r.id} r={r} showEnd={false} />)}</tbody>
-            </table></div>
+            <thead><tr>
+              <SortTh col="customer">Customer</SortTh>
+              <SortTh col="vehicle">Vehicle</SortTh>
+              <SortTh col="contractNumber" className="col-hide-mobile">Contract No.</SortTh>
+              <SortTh col="startDate">Started</SortTh>
+              <SortTh col="endDate">Ended</SortTh>
+              <SortTh col="price">Price/wk</SortTh>
+              <SortTh col="bond">Bond</SortTh>
+              <th></th>
+            </tr></thead>
+            <tbody>{sortRentals(past).map(r => <RentalRow key={r.id} r={r} showEnd={false} />)}</tbody>
+          </table></div>
         )}
       </div>
 

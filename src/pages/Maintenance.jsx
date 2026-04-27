@@ -10,13 +10,13 @@ const EF = { vehicleId: '', type: 'service', description: '', date: todayStr(), 
 
 export default function Maintenance() {
   const { data, add, update, remove } = useStore();
-  const [tab, setTab]           = useState('log');
-  const [showAdd, setShowAdd]   = useState(false);
-  const [editM, setEditM]       = useState(null);
+  const [tab, setTab] = useState('log');
+  const [showAdd, setShowAdd] = useState(false);
+  const [editM, setEditM] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
-  const [saving, setSaving]     = useState(false);
-  const [sort, setSort]         = useState({ col: 'date', dir: 'desc' });
-  const [form, setForm]         = useState(EF);
+  const [saving, setSaving] = useState(false);
+  const [sort, setSort] = useState({ col: 'vehicle', dir: 'desc' });
+  const [form, setForm] = useState(EF);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const toggleSort = (col) =>
@@ -37,13 +37,13 @@ export default function Maintenance() {
   const openEdit = (m) => {
     setEditM(m);
     setForm({
-      vehicleId:       m.vehicleId      || '',
-      type:            m.type           || 'service',
-      description:     m.description   || '',
-      date:            m.date           || todayStr(),
+      vehicleId: m.vehicleId || '',
+      type: m.type || 'service',
+      description: m.description || '',
+      date: m.date || todayStr(),
       nextServiceDate: m.nextServiceDate || '',
-      cost:            m.cost           || '',
-      odometer:        m.odometer       || '',
+      cost: m.cost || '',
+      odometer: m.odometer || '',
     });
   };
 
@@ -54,10 +54,10 @@ export default function Maintenance() {
       const bv = data.vehicles.find(x => x.id === b.vehicleId)?.plate || '';
       return av.localeCompare(bv) * mul;
     }
-    if (sort.col === 'type')     return (a.type || '').localeCompare(b.type || '') * mul;
-    if (sort.col === 'date')     return (a.date || '').localeCompare(b.date || '') * mul;
+    if (sort.col === 'type') return (a.type || '').localeCompare(b.type || '') * mul;
+    if (sort.col === 'date') return (a.date || '').localeCompare(b.date || '') * mul;
     if (sort.col === 'odometer') return ((Number(a.odometer) || 0) - (Number(b.odometer) || 0)) * mul;
-    if (sort.col === 'cost')     return ((Number(a.cost) || 0) - (Number(b.cost) || 0)) * mul;
+    if (sort.col === 'cost') return ((Number(a.cost) || 0) - (Number(b.cost) || 0)) * mul;
     return 0;
   });
   const upcoming = data.vehicles
@@ -145,37 +145,37 @@ export default function Maintenance() {
           {records.length === 0
             ? <EmptyState message="No maintenance records yet" action={<button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>Log service</button>} />
             : <div className="table-wrap"><table className="table">
-                <thead><tr>
-                  <SortTh col="vehicle">Vehicle</SortTh>
-                  <SortTh col="type">Type</SortTh>
-                  <SortTh col="date">Date</SortTh>
-                  <SortTh col="odometer" className="col-hide-mobile">Odometer</SortTh>
-                  <th className="col-hide-mobile">Description</th>
-                  <SortTh col="cost">Cost</SortTh>
-                  <th></th>
-                </tr></thead>
-                <tbody>
-                  {records.map(m => {
-                    const v = data.vehicles.find(x => x.id === m.vehicleId);
-                    return (
-                      <tr key={m.id}>
-                        <td className="fw-500">{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</td>
-                        <td><Badge variant={m.type === 'repair' ? 'red' : m.type === 'inspection' ? 'blue' : 'gray'}>{m.type}</Badge></td>
-                        <td className="text-muted">{formatDate(m.date)}</td>
-                        <td className="text-muted col-hide-mobile">{m.odometer ? Number(m.odometer).toLocaleString() + ' km' : '—'}</td>
-                        <td className="text-muted col-hide-mobile" style={{ maxWidth: 220 }}>{m.description || '—'}</td>
-                        <td>{m.cost ? '$' + m.cost : '—'}</td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn btn-secondary btn-sm" onClick={() => openEdit(m)}>Edit</button>
-                            <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(m.id)}>Delete</button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table></div>
+              <thead><tr>
+                <SortTh col="vehicle">Vehicle</SortTh>
+                <SortTh col="type">Type</SortTh>
+                <SortTh col="date">Date</SortTh>
+                <SortTh col="odometer" className="col-hide-mobile">Odometer</SortTh>
+                <th className="col-hide-mobile">Description</th>
+                <SortTh col="cost">Cost</SortTh>
+                <th></th>
+              </tr></thead>
+              <tbody>
+                {records.map(m => {
+                  const v = data.vehicles.find(x => x.id === m.vehicleId);
+                  return (
+                    <tr key={m.id}>
+                      <td className="fw-500">{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</td>
+                      <td><Badge variant={m.type === 'repair' ? 'red' : m.type === 'inspection' ? 'blue' : 'gray'}>{m.type}</Badge></td>
+                      <td className="text-muted">{formatDate(m.date)}</td>
+                      <td className="text-muted col-hide-mobile">{m.odometer ? Number(m.odometer).toLocaleString() + ' km' : '—'}</td>
+                      <td className="text-muted col-hide-mobile" style={{ maxWidth: 220 }}>{m.description || '—'}</td>
+                      <td>{m.cost ? '$' + m.cost : '—'}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn-secondary btn-sm" onClick={() => openEdit(m)}>Edit</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => setDeleteId(m.id)}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table></div>
           }
         </div>
       )}
@@ -185,22 +185,22 @@ export default function Maintenance() {
           {upcoming.length === 0
             ? <EmptyState message="No upcoming services — all vehicles are up to date" />
             : <div className="table-wrap"><table className="table">
-                <thead><tr><th>Vehicle</th><th>Type</th><th>Next Service</th><th>Status</th></tr></thead>
-                <tbody>
-                  {upcoming.map(v => (
-                    <tr key={v.id}>
-                      <td className="fw-500">{v.plate}{v.name ? ' · ' + v.name : ''}</td>
-                      <td><Badge variant="gray">{v.type}</Badge></td>
-                      <td>{formatDate(v.nextServiceDate)}</td>
-                      <td>
-                        {v.days < 0 ? <Badge variant="red">Overdue {Math.abs(v.days)}d</Badge>
-                          : v.days === 0 ? <Badge variant="red">Due today</Badge>
+              <thead><tr><th>Vehicle</th><th>Type</th><th>Next Service</th><th>Status</th></tr></thead>
+              <tbody>
+                {upcoming.map(v => (
+                  <tr key={v.id}>
+                    <td className="fw-500">{v.plate}{v.name ? ' · ' + v.name : ''}</td>
+                    <td><Badge variant="gray">{v.type}</Badge></td>
+                    <td>{formatDate(v.nextServiceDate)}</td>
+                    <td>
+                      {v.days < 0 ? <Badge variant="red">Overdue {Math.abs(v.days)}d</Badge>
+                        : v.days === 0 ? <Badge variant="red">Due today</Badge>
                           : <Badge variant="amber">In {v.days}d</Badge>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table></div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
           }
         </div>
       )}

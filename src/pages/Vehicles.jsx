@@ -24,7 +24,7 @@ export default function Vehicles() {
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [sort, setSort] = useState({ col: 'plate', dir: 'asc' });
+  const [sort, setSort] = useState({ col: 'status', dir: 'asc' });
   const [form, setForm] = useState(EF);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -219,7 +219,9 @@ export default function Vehicles() {
         )}
         <div className="field"><label className="label">Type</label>
           <select className="select" value={form.type} onChange={e => sf('type', e.target.value)}>
-            <option value="scooter">Scooter</option><option value="ebike">E-bike</option>
+            <option value="scooter">Scooter</option>
+            <option value="ebike">E-bike</option>
+            <option value="car">Car</option>
           </select>
         </div>
       </div>

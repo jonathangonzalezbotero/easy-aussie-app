@@ -8,7 +8,7 @@ import { formatDate, daysUntil } from '../utils/dates';
 export default function Dashboard() {
   const { data } = useStore();
   const navigate = useNavigate();
-  const [sort, setSort] = useState({ col: 'startDate', dir: 'desc' });
+  const [sort, setSort] = useState({ col: 'payDay', dir: 'asc' });
 
   const toggleSort = (col) =>
     setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' });
@@ -38,17 +38,19 @@ export default function Dashboard() {
       return av.localeCompare(bv) * mul;
     }
     if (sort.col === 'startDate') return (a.startDate || '').localeCompare(b.startDate || '') * mul;
-    if (sort.col === 'bond')      return ((Number(a.bond?.amount) || 0) - (Number(b.bond?.amount) || 0)) * mul;
-    if (sort.col === 'price')     return ((Number(a.price) || 0) - (Number(b.price) || 0)) * mul;
+    if (sort.col === 'bond') return ((Number(a.bond?.amount) || 0) - (Number(b.bond?.amount) || 0)) * mul;
+    if (sort.col === 'price') return ((Number(a.price) || 0) - (Number(b.price) || 0)) * mul;
     if (sort.col === 'payDay') {
-      const day = (d) => { if (!d) return -1; const [y,m,dd] = d.split('-').map(Number); return new Date(y,m-1,dd).getDay(); };
+      const day = (d) => { if (!d) return -1; const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).getDay(); };
       return (day(a.startDate) - day(b.startDate)) * mul;
     }
     return 0;
   });
   const availableVehicles = data.vehicles.filter(v => v.status === 'available');
-  const heldBonds         = data.rentals.filter(r => r.bond?.status === 'held');
-  const totalBondHeld     = heldBonds.reduce((s, r) => s + (Number(r.bond.amount) || 0), 0);
+  const heldBonds = data.rentals.filter(r => r.bond?.status === 'held');
+  const totalBondHeld = heldBonds.reduce((s, r) => s + (Number(r.bond.amount) || 0), 0);
+  const weeklyRevenue = activeRentals.reduce((s, r) => s + (Number(r.price) || 0), 0);
+  const rentalsWithPrice = activeRentals.filter(r => r.price).length;
 
   const alerts = [];
   data.vehicles.forEach(v => {
@@ -66,10 +68,10 @@ export default function Dashboard() {
   });
 
   const stats = [
-    { label: 'Vehicles',      value: data.vehicles.length,  sub: `${availableVehicles.length} available`,                                          color: 'var(--accent)', to: '/vehicles' },
-    { label: 'Active Rentals', value: activeRentals.length,  sub: `${data.rentals.filter(r => r.status === 'completed').length} completed total`,   color: 'var(--blue)',   to: '/rentals' },
-    { label: 'Bonds Held',    value: `$${totalBondHeld.toLocaleString()}`, sub: `${heldBonds.length} outstanding`,                                  color: 'var(--amber)',  to: '/bonds' },
-    { label: 'Alerts',        value: alerts.length,          sub: alerts.length ? 'Needs attention' : 'All clear', color: alerts.length ? 'var(--red)' : 'var(--accent)', to: '/' },
+    { label: 'Vehicles', value: data.vehicles.length, sub: `${availableVehicles.length} available`, color: 'var(--accent)', to: '/vehicles' },
+    { label: 'Weekly Revenue', value: `$${weeklyRevenue.toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, sub: `${activeRentals.length} active · ${rentalsWithPrice} priced`, color: 'var(--blue)', to: '/rentals' },
+    { label: 'Bonds Held', value: `$${totalBondHeld.toLocaleString()}`, sub: `${heldBonds.length} outstanding`, color: 'var(--amber)', to: '/bonds' },
+    { label: 'Alerts', value: alerts.length, sub: alerts.length ? 'Needs attention' : 'All clear', color: alerts.length ? 'var(--red)' : 'var(--accent)', to: '/' },
   ];
 
   return (
@@ -99,13 +101,13 @@ export default function Dashboard() {
         {alerts.length === 0
           ? <EmptyState message="No alerts — everything is up to date" />
           : <div>
-              {alerts.map((a, i) => (
-                <div key={i} className={`alert-row alert-${a.type}`} onClick={() => navigate(a.to)}>
-                  <div style={{ flex: 1, fontSize: 14 }}>{a.text}</div>
-                  <span style={{ color: 'var(--muted)', fontSize: 13 }}>→</span>
-                </div>
-              ))}
-            </div>
+            {alerts.map((a, i) => (
+              <div key={i} className={`alert-row alert-${a.type}`} onClick={() => navigate(a.to)}>
+                <div style={{ flex: 1, fontSize: 14 }}>{a.text}</div>
+                <span style={{ color: 'var(--muted)', fontSize: 13 }}>→</span>
+              </div>
+            ))}
+          </div>
         }
       </div>
 
@@ -116,39 +118,39 @@ export default function Dashboard() {
         </div>
         {activeRentals.length === 0
           ? <EmptyState message="No active rentals" action={
-              <button className="btn btn-primary btn-sm" onClick={() => navigate('/rentals')}>Create rental</button>
-            } />
+            <button className="btn btn-primary btn-sm" onClick={() => navigate('/rentals')}>Create rental</button>
+          } />
           : <div className="table-wrap"><table className="table">
-              <thead><tr>
-                <SortTh col="customer">Customer</SortTh>
-                <SortTh col="vehicle">Vehicle</SortTh>
-                <SortTh col="startDate" className="col-hide-mobile">Started</SortTh>
-                <SortTh col="payDay">Pay Day</SortTh>
-                <SortTh col="price">Price/wk</SortTh>
-                <SortTh col="bond">Bond</SortTh>
-              </tr></thead>
-              <tbody>
-                {activeRentals.map(r => {
-                  const c = data.customers.find(x => x.id === r.customerId);
-                  const v = data.vehicles.find(x => x.id === r.vehicleId);
-                  const payDay = r.startDate ? (() => { const [y,m,d] = r.startDate.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-AU', { weekday: 'long' }); })() : '—';
-                  return (
-                    <tr key={r.id} onClick={() => navigate('/rentals')}>
-                      <td className="fw-500">{c?.name || '—'}</td>
-                      <td>{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</td>
-                      <td className="text-muted col-hide-mobile">{formatDate(r.startDate)}</td>
-                      <td className="text-muted">{payDay}</td>
-                      <td className="text-muted">{r.price ? `$${Number(r.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '—'}</td>
-                      <td>
-                        {r.bond?.amount
-                          ? <Badge variant={r.bond.status === 'held' ? 'amber' : 'green'}>{r.bond.status === 'held' ? `Held $${r.bond.amount}` : 'Returned'}</Badge>
-                          : <span className="text-muted text-sm">None</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table></div>
+            <thead><tr>
+              <SortTh col="customer">Customer</SortTh>
+              <SortTh col="vehicle">Vehicle</SortTh>
+              <SortTh col="startDate" className="col-hide-mobile">Started</SortTh>
+              <SortTh col="payDay">Pay Day</SortTh>
+              <SortTh col="price">Price/wk</SortTh>
+              <SortTh col="bond">Bond</SortTh>
+            </tr></thead>
+            <tbody>
+              {activeRentals.map(r => {
+                const c = data.customers.find(x => x.id === r.customerId);
+                const v = data.vehicles.find(x => x.id === r.vehicleId);
+                const payDay = r.startDate ? (() => { const [y, m, d] = r.startDate.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-AU', { weekday: 'long' }); })() : '—';
+                return (
+                  <tr key={r.id} onClick={() => navigate('/rentals')}>
+                    <td className="fw-500">{c?.name || '—'}</td>
+                    <td>{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</td>
+                    <td className="text-muted col-hide-mobile">{formatDate(r.startDate)}</td>
+                    <td className="text-muted">{payDay}</td>
+                    <td className="text-muted">{r.price ? `$${Number(r.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '—'}</td>
+                    <td>
+                      {r.bond?.amount
+                        ? <Badge variant={r.bond.status === 'held' ? 'amber' : 'green'}>{r.bond.status === 'held' ? `Held $${r.bond.amount}` : 'Returned'}</Badge>
+                        : <span className="text-muted text-sm">None</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table></div>
         }
       </div>
     </div>
