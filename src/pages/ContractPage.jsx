@@ -19,6 +19,7 @@ export default function ContractPage() {
   const navigate  = useNavigate();
   const { data }  = useStore();
   const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
   const contractRef = useRef(null);
 
   const rental   = data.rentals.find(r => r.id === state?.rentalId);
@@ -69,20 +70,60 @@ export default function ContractPage() {
 
   const downloadPDF = async () => {
     setDownloading(true);
+    setDownloadError('');
+
+    // html2canvas cannot parse oklch — temporarily replace all CSS custom
+    // properties that use oklch with hex equivalents, then restore after capture.
+    const hexOverrides = {
+      '--bg':           '#f8f7f2',
+      '--sidebar':      '#1c1a17',
+      '--accent':       '#2d8a5a',
+      '--accent-hover': '#236b47',
+      '--accent-light': '#d4f0e0',
+      '--text':         '#1e1b16',
+      '--muted':        '#737067',
+      '--border':       '#e3e1da',
+      '--red':          '#b33020',
+      '--red-bg':       '#fce8e5',
+      '--amber':        '#d97706',
+      '--amber-bg':     '#fef3c7',
+      '--blue':         '#2d5aad',
+      '--blue-bg':      '#e8eef8',
+    };
+    const root = document.documentElement;
+    const saved = {};
+    Object.entries(hexOverrides).forEach(([k, v]) => {
+      saved[k] = root.style.getPropertyValue(k);
+      root.style.setProperty(k, v);
+    });
+
     try {
       const html2pdf = (await import('html2pdf.js')).default;
-      const filename = `contract-${d.renterName.replace(/\s+/g, '-')}-${d.vehicleRego}-${rental.startDate}.pdf`.toLowerCase();
+      const namePart = d.renterName ? d.renterName.replace(/\s+/g, '-') : 'customer';
+      const regoPart = d.vehicleRego || 'vehicle';
+      const datePart = rental.startDate || 'date';
+      const filename = `contract-${namePart}-${regoPart}-${datePart}.pdf`.toLowerCase();
       await html2pdf()
         .set({
           margin:      [10, 10, 10, 10],
           filename,
-          image:       { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
+          image:       { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
           jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
         })
         .from(contractRef.current)
         .save();
-    } finally { setDownloading(false); }
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      setDownloadError("PDF generation failed. Try again or use your browser's print function (Ctrl+P / Cmd+P).");
+    } finally {
+      // Restore original CSS variable values
+      Object.entries(saved).forEach(([k, v]) => {
+        if (v) root.style.setProperty(k, v);
+        else root.style.removeProperty(k);
+      });
+      setDownloading(false);
+    }
   };
 
   const sectionStyle      = { marginBottom: 22 };
@@ -403,12 +444,19 @@ export default function ContractPage() {
             {agreementType} · {d.renterName || '—'}{d.vehicleRego ? ' · ' + d.vehicleRego : ''}{d.contractNumber ? ' · ' + d.contractNumber : ''}
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={() => navigate(-1)}>← Back</button>
-          <button className="btn btn-primary" onClick={downloadPDF} disabled={downloading}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            {downloading ? 'Generating PDF…' : 'Download PDF'}
-          </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary" onClick={() => navigate(-1)}>← Back</button>
+            <button className="btn btn-primary" onClick={downloadPDF} disabled={downloading}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              {downloading ? 'Generating PDF…' : 'Download PDF'}
+            </button>
+          </div>
+          {downloadError && (
+            <div style={{ fontSize: 12, color: 'var(--red, #c00)', maxWidth: 320, textAlign: 'right', lineHeight: 1.4 }}>
+              {downloadError}
+            </div>
+          )}
         </div>
       </div>
 
@@ -417,7 +465,7 @@ export default function ContractPage() {
         <div ref={contractRef} style={{ background: 'white', borderRadius: 12, padding: '48px 56px', boxShadow: '0 2px 20px rgba(0,0,0,0.06)', fontFamily: "'DM Sans', sans-serif" }}>
 
           {missing.length > 0 && (
-            <div style={{ background: 'oklch(0.96 0.05 70)', border: '1px solid oklch(0.58 0.14 70)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'oklch(0.40 0.14 70)', marginBottom: 20, fontWeight: 500 }}>
+            <div style={{ background: '#fef3c7', border: '1px solid #d97706', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#92400e', marginBottom: 20, fontWeight: 500 }}>
               Some fields are incomplete: {missing.join(', ')}. Update vehicle and customer records for a complete contract.
             </div>
           )}
