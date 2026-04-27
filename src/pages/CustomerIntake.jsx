@@ -2,9 +2,10 @@ import { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 const EF = {
-  name: '', dateOfBirth: '', phone: '', email: '', address: '', occupation: '',
-  emergencyContact: '', emergencyPhone: '', hotelAddress: '', licenseRef: '',
-  licencePhoto: '', licenceFileName: '',
+  name: '', dateOfBirth: '', phone: '', email: '',
+  addressStreet: '', addressSuburb: '', addressState: '', addressPostCode: '',
+  occupation: '', emergencyContact: '', emergencyPhone: '', hotelAddress: '',
+  licenseRef: '', licencePhoto: '', licenceFileName: '',
 };
 
 export default function CustomerIntake() {
@@ -32,7 +33,10 @@ export default function CustomerIntake() {
     if (!form.dateOfBirth)       { setError('Date of birth is required'); return; }
     if (!form.phone.trim())      { setError('Phone number is required'); return; }
     if (!form.email.trim())      { setError('Email address is required'); return; }
-    if (!form.address.trim())    { setError('Residential address is required'); return; }
+    if (!form.addressStreet.trim()) { setError('Street address is required'); return; }
+    if (!form.addressSuburb.trim()) { setError('Suburb is required'); return; }
+    if (!form.addressState.trim())  { setError('State is required'); return; }
+    if (!form.addressPostCode.trim()) { setError('Postcode is required'); return; }
     if (!form.occupation.trim()) { setError('Occupation is required'); return; }
     if (!form.licencePhoto)      { setError('A photo or scan of your licence is required'); return; }
     setError('');
@@ -43,7 +47,7 @@ export default function CustomerIntake() {
         date_of_birth:     form.dateOfBirth || null,
         phone:             form.phone || null,
         email:             form.email || null,
-        address:           form.address || null,
+        address:           [form.addressStreet, form.addressSuburb, form.addressState, form.addressPostCode].filter(Boolean).join(', ') || null,
         occupation:        form.occupation || null,
         emergency_contact: form.emergencyContact || null,
         emergency_phone:   form.emergencyPhone || null,
@@ -126,8 +130,25 @@ export default function CustomerIntake() {
                 <input style={inputStyle} type="email" value={form.email} onChange={e => sf('email', e.target.value)} required />
               </div>
               <div style={fieldStyle} className="intake-full">
-                <label style={labelStyle}>Residential Address *</label>
-                <input style={inputStyle} value={form.address} onChange={e => sf('address', e.target.value)} required placeholder="Your home address" />
+                <label style={labelStyle}>Street Address *</label>
+                <input style={inputStyle} value={form.addressStreet} onChange={e => sf('addressStreet', e.target.value)} required placeholder="e.g. 12 Ocean Drive" />
+              </div>
+              <div style={fieldStyle} className="intake-full">
+                <label style={labelStyle}>Suburb *</label>
+                <input style={inputStyle} value={form.addressSuburb} onChange={e => sf('addressSuburb', e.target.value)} required placeholder="e.g. Surfers Paradise" />
+              </div>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>State *</label>
+                <select style={inputStyle} value={form.addressState} onChange={e => sf('addressState', e.target.value)} required>
+                  <option value="">Select…</option>
+                  <option>QLD</option><option>NSW</option><option>VIC</option>
+                  <option>WA</option><option>SA</option><option>TAS</option>
+                  <option>ACT</option><option>NT</option>
+                </select>
+              </div>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Postcode *</label>
+                <input style={inputStyle} value={form.addressPostCode} onChange={e => sf('addressPostCode', e.target.value)} required placeholder="e.g. 4217" inputMode="numeric" maxLength={4} />
               </div>
               <div style={fieldStyle}>
                 <label style={labelStyle}>Occupation *</label>

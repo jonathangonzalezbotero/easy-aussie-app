@@ -91,6 +91,81 @@ export default function ContractPage() {
   const bodyText          = { fontSize: 13.5, lineHeight: 1.7, color: '#333' };
   const grid3             = { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px 16px' };
 
+  const CheckItem = ({ children }) => (
+    <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'flex-start' }}>
+      <div style={{ width: 20, height: 20, border: '2px solid #1a1a1a', borderRadius: 3, flexShrink: 0, marginTop: 1 }} />
+      <span style={{ fontSize: 13.5, lineHeight: 1.6, color: '#333' }}>{children}</span>
+    </div>
+  );
+
+  const safetyContentScooter = (
+    <div>
+      <p style={{ ...bodyText, marginBottom: 12 }}>The Renter confirms they have read and agree to each of the following. Please tick and initial each item:</p>
+      <CheckItem>Wear an approved helmet at all times while operating the scooter</CheckItem>
+      <CheckItem>Comply with all Queensland road laws and regulations</CheckItem>
+      <CheckItem>Ride only on permitted public roads</CheckItem>
+      <CheckItem><strong>NOT</strong> ride on footpaths, beaches, boardwalks, bike paths, or pedestrian areas</CheckItem>
+      <CheckItem>Only the named Renter will operate the scooter — no other riders permitted</CheckItem>
+      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #d0d0cc', display: 'flex', alignItems: 'center', gap: 24 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 28 }}>Renter&apos;s Initials</div>
+          <div style={{ borderBottom: '1.5px solid #1a1a1a', width: '100%' }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 28 }}>Date</div>
+          <div style={{ borderBottom: '1.5px solid #1a1a1a', width: '100%' }} />
+        </div>
+      </div>
+      <p style={{ ...bodyText, marginTop: 12, fontStyle: 'italic' }}>Failure to comply with any of the above constitutes a serious breach of this Agreement.</p>
+    </div>
+  );
+
+  const safetyContentEbike = (
+    <div>
+      <p style={{ ...bodyText, marginBottom: 12 }}>The Renter confirms they have read and agree to each of the following. Please tick and initial each item:</p>
+      <CheckItem>Wear an approved helmet at all times while riding the e-bike</CheckItem>
+      <CheckItem>Comply with all Queensland road laws applicable to e-bikes</CheckItem>
+      <CheckItem>Ride only in permitted areas — public roads, bike lanes, and shared paths</CheckItem>
+      <CheckItem><strong>NOT</strong> ride on footpaths or pedestrian-only areas unless otherwise signed</CheckItem>
+      <CheckItem><strong>NOT</strong> ride on beaches, boardwalks, or restricted areas</CheckItem>
+      <CheckItem>Only the named Renter will operate the e-bike — no other riders permitted</CheckItem>
+      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #d0d0cc', display: 'flex', alignItems: 'center', gap: 24 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 28 }}>Renter&apos;s Initials</div>
+          <div style={{ borderBottom: '1.5px solid #1a1a1a', width: '100%' }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 28 }}>Date</div>
+          <div style={{ borderBottom: '1.5px solid #1a1a1a', width: '100%' }} />
+        </div>
+      </div>
+      <p style={{ ...bodyText, marginTop: 12, fontStyle: 'italic' }}>Failure to comply with any of the above constitutes a serious breach of this Agreement.</p>
+    </div>
+  );
+
+  const safetyContentCar = (
+    <div>
+      <p style={{ ...bodyText, marginBottom: 12 }}>The Renter confirms they have read and agree to each of the following. Please tick and initial each item:</p>
+      <CheckItem>Comply with all Queensland and Australian road laws at all times</CheckItem>
+      <CheckItem>Use the vehicle only on sealed public roads unless otherwise agreed in writing</CheckItem>
+      <CheckItem><strong>NOT</strong> drive under the influence of alcohol, drugs, or any impairing substance</CheckItem>
+      <CheckItem>Wear a seatbelt and ensure all passengers do the same</CheckItem>
+      <CheckItem>Report any accident, damage, theft, or incident to the Owner and Queensland Police immediately</CheckItem>
+      <CheckItem>Only the named Renter will drive the vehicle — no other drivers without prior written consent</CheckItem>
+      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #d0d0cc', display: 'flex', alignItems: 'center', gap: 24 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 28 }}>Renter&apos;s Initials</div>
+          <div style={{ borderBottom: '1.5px solid #1a1a1a', width: '100%' }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 28 }}>Date</div>
+          <div style={{ borderBottom: '1.5px solid #1a1a1a', width: '100%' }} />
+        </div>
+      </div>
+      <p style={{ ...bodyText, marginTop: 12, fontStyle: 'italic' }}>Failure to comply with any of the above constitutes a serious breach of this Agreement.</p>
+    </div>
+  );
+
   // ── Scooter sections ─────────────────────────────────────────────────────────
   const scooterSections = [
     { num: '1', title: 'Scooter Details', content: (
@@ -122,20 +197,11 @@ export default function ContractPage() {
         </ul>
       </div>
     )},
-    { num: '5', title: 'Safety & Road Rules (Mandatory)', content: (
+    { num: '5', title: 'Fines, Tolls, Accidents & Insurance', content: (
       <div style={bodyText}>
-        <p style={{ marginBottom: 4 }}>The Renter agrees to:</p>
-        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
-          {['Wear an approved helmet at all times', 'Comply with Queensland road laws', 'Ride only on permitted public roads', 'NOT ride on footpaths, beaches, boardwalks, bike paths, or pedestrian areas'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
-        </ul>
-        <p>Failure to comply constitutes a serious breach of this Agreement.</p>
-      </div>
-    )},
-    { num: '6', title: 'Fines, Tolls, Accidents & Insurance', content: (
-      <div style={bodyText}>
-        <div style={{ marginTop: 10 }}><strong>6.1 Traffic Fines and Tolls</strong><p>The Renter is responsible for all traffic infringements, parking fines, and toll charges during the rental period.</p></div>
-        <div style={{ marginTop: 10 }}><strong>6.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the moped occurring during the rental period. The Renter must immediately notify the Owner and, if applicable, the police of any accident, theft, or incident. Rental fees continue until the moped is repaired or replaced.</p></div>
-        <div style={{ marginTop: 10 }}><strong>6.3 Insurance</strong><p>The moped is covered by CTP insurance as required by Queensland law. CTP does not cover damage to the moped, damage to third-party property, or personal injury to the Renter. The Renter remains fully liable for any damage or loss not covered by CTP.</p></div>
+        <div style={{ marginTop: 10 }}><strong>5.1 Traffic Fines and Tolls</strong><p>The Renter is responsible for all traffic infringements, parking fines, and toll charges during the rental period.</p></div>
+        <div style={{ marginTop: 10 }}><strong>5.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the moped occurring during the rental period. The Renter must immediately notify the Owner and, if applicable, the police of any accident, theft, or incident. Rental fees continue until the moped is repaired or replaced.</p></div>
+        <div style={{ marginTop: 10 }}><strong>5.3 Insurance</strong><p>The moped is covered by CTP insurance as required by Queensland law. CTP does not cover damage to the moped, damage to third-party property, or personal injury to the Renter. The Renter remains fully liable for any damage or loss not covered by CTP.</p></div>
       </div>
     )},
     { num: '7', title: 'Condition of the Scooter', content: (
@@ -161,7 +227,8 @@ export default function ContractPage() {
     { num: '11', title: 'Personal Insurance Recommendation', content: <p style={bodyText}>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel insurance and personal health or accident insurance. The Renter acknowledges the included insurance does not cover personal injury, medical costs, or loss of personal belongings.</p> },
     { num: '12', title: 'Assumption of Risk',               content: <p style={bodyText}>The Renter acknowledges that riding a scooter involves inherent risks, including serious injury or death. The Renter voluntarily accepts all risks, whether foreseeable or not.</p> },
     { num: '13', title: 'Indemnity',                        content: <p style={bodyText}>The Renter agrees to indemnify and hold harmless the Owner from any claim, loss, or expense (including legal costs) arising out of the Renter's use of the scooter, except where caused by the Owner's negligence or breach of this Agreement.</p> },
-    { num: '14', title: 'Governing Law',                    content: <p style={bodyText}>This Agreement is governed by the laws of Queensland, Australia. Any disputes will be resolved through appropriate legal channels within Queensland.</p> },
+    { num: '14', title: 'Safety & Road Rules — Renter Acknowledgement', content: safetyContentScooter },
+    { num: '15', title: 'Governing Law',                    content: <p style={bodyText}>This Agreement is governed by the laws of Queensland, Australia. Any disputes will be resolved through appropriate legal channels within Queensland.</p> },
   ];
 
   // ── E-bike sections ──────────────────────────────────────────────────────────
@@ -195,20 +262,11 @@ export default function ContractPage() {
         </ul>
       </div>
     )},
-    { num: '5', title: 'Safety & Road Rules (Mandatory)', content: (
+    { num: '5', title: 'Fines, Accidents & Damage', content: (
       <div style={bodyText}>
-        <p style={{ marginBottom: 4 }}>The Renter agrees to:</p>
-        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
-          {['Wear an approved helmet at all times', 'Comply with all Queensland road laws applicable to e-bikes', 'Ride only in permitted areas — public roads, bike lanes, and shared paths', 'NOT ride on footpaths or pedestrian-only areas unless otherwise signed', 'NOT ride on beaches, boardwalks, or restricted areas'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
-        </ul>
-        <p>Failure to comply constitutes a serious breach of this Agreement.</p>
-      </div>
-    )},
-    { num: '6', title: 'Fines, Accidents & Damage', content: (
-      <div style={bodyText}>
-        <div style={{ marginTop: 10 }}><strong>6.1 Traffic Fines and Penalties</strong><p>The Renter is responsible for all traffic infringements, fines, and penalties incurred during the rental period.</p></div>
-        <div style={{ marginTop: 10 }}><strong>6.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the e-bike or its accessories occurring during the rental period. The Renter must immediately notify the Owner and, where applicable, the police of any accident, theft, or incident. Rental fees continue until the e-bike is repaired or replaced.</p></div>
-        <div style={{ marginTop: 10 }}><strong>6.3 Battery and Charging</strong><p>The Renter must not attempt to modify, tamper with, or use third-party chargers on the e-bike battery. Damage resulting from improper charging or battery misuse is the Renter's full financial responsibility.</p></div>
+        <div style={{ marginTop: 10 }}><strong>5.1 Traffic Fines and Penalties</strong><p>The Renter is responsible for all traffic infringements, fines, and penalties incurred during the rental period.</p></div>
+        <div style={{ marginTop: 10 }}><strong>5.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the e-bike or its accessories occurring during the rental period. The Renter must immediately notify the Owner and, where applicable, the police of any accident, theft, or incident. Rental fees continue until the e-bike is repaired or replaced.</p></div>
+        <div style={{ marginTop: 10 }}><strong>5.3 Battery and Charging</strong><p>The Renter must not attempt to modify, tamper with, or use third-party chargers on the e-bike battery. Damage resulting from improper charging or battery misuse is the Renter's full financial responsibility.</p></div>
       </div>
     )},
     { num: '7', title: 'Condition of the E-Bike', content: (
@@ -241,7 +299,8 @@ export default function ContractPage() {
     )},
     { num: '10', title: 'Assumption of Risk', content: <p style={bodyText}>The Renter acknowledges that riding an e-bike involves inherent risks, including serious injury or death. The Renter voluntarily accepts all risks associated with the use of the e-bike, whether foreseeable or not.</p> },
     { num: '11', title: 'Indemnity',          content: <p style={bodyText}>The Renter agrees to indemnify and hold harmless the Owner from any claim, loss, or expense (including legal costs) arising out of the Renter's use of the e-bike, except where caused by the Owner's negligence or breach of this Agreement.</p> },
-    { num: '12', title: 'Governing Law',      content: <p style={bodyText}>This Agreement is governed by the laws of Queensland, Australia. Any disputes will be resolved through appropriate legal channels within Queensland.</p> },
+    { num: '12', title: 'Safety & Road Rules — Renter Acknowledgement', content: safetyContentEbike },
+    { num: '13', title: 'Governing Law',      content: <p style={bodyText}>This Agreement is governed by the laws of Queensland, Australia. Any disputes will be resolved through appropriate legal channels within Queensland.</p> },
   ];
 
   // ── Car sections ────────────────────────────────────────────────────────────
@@ -275,16 +334,7 @@ export default function ContractPage() {
         </ul>
       </div>
     )},
-    { num: '5', title: 'Driver Responsibilities', content: (
-      <div style={bodyText}>
-        <p style={{ marginBottom: 4 }}>The Renter agrees to:</p>
-        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
-          {['Comply with all Queensland and Australian road laws at all times', 'Use the vehicle only on sealed public roads unless otherwise agreed in writing', 'Not drive under the influence of alcohol, drugs, or any impairing substance', 'Wear a seatbelt and ensure all passengers do the same', 'Report any accident, damage, theft, or incident to the Owner and, where required, to Queensland Police immediately'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
-        </ul>
-        <p>Failure to comply constitutes a serious breach of this Agreement.</p>
-      </div>
-    )},
-    { num: '6', title: 'Fuel Policy', content: (
+    { num: '5', title: 'Fuel Policy', content: (
       <div style={bodyText}>
         <p style={{ marginBottom: 8 }}>The vehicle will be provided with a full tank of fuel. The Renter must return the vehicle with the same level of fuel.</p>
         <p>If the vehicle is returned with less fuel, the Owner will charge the Renter for the cost of refuelling at current market rates plus a <strong>$20 AUD</strong> refuelling service fee, to be deducted from the bond.</p>
@@ -292,10 +342,10 @@ export default function ContractPage() {
     )},
     { num: '7', title: 'Fines, Tolls, Accidents & Insurance', content: (
       <div style={bodyText}>
-        <div style={{ marginTop: 10 }}><strong>7.1 Traffic Fines and Tolls</strong><p>The Renter is solely responsible for all traffic infringements, parking fines, and toll charges incurred during the rental period.</p></div>
-        <div style={{ marginTop: 10 }}><strong>7.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the vehicle occurring during the rental period. The Renter must immediately notify the Owner and, if applicable, Queensland Police. Rental fees continue until the vehicle is repaired or replaced.</p></div>
-        <div style={{ marginTop: 10 }}><strong>7.3 CTP Insurance</strong><p>The vehicle is covered by Compulsory Third Party (CTP) insurance as required by Queensland law. CTP covers personal injury to third parties only and does not cover damage to the vehicle, damage to third-party property, or personal injury to the Renter.</p></div>
-        <div style={{ marginTop: 10 }}><strong>7.4 Additional Insurance</strong><p>The Renter remains fully liable for any damage or loss not covered by CTP. The Owner strongly recommends the Renter arrange their own comprehensive vehicle or travel insurance for the duration of the rental.</p></div>
+        <div style={{ marginTop: 10 }}><strong>6.1 Traffic Fines and Tolls</strong><p>The Renter is solely responsible for all traffic infringements, parking fines, and toll charges incurred during the rental period.</p></div>
+        <div style={{ marginTop: 10 }}><strong>6.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the vehicle occurring during the rental period. The Renter must immediately notify the Owner and, if applicable, Queensland Police. Rental fees continue until the vehicle is repaired or replaced.</p></div>
+        <div style={{ marginTop: 10 }}><strong>6.3 CTP Insurance</strong><p>The vehicle is covered by Compulsory Third Party (CTP) insurance as required by Queensland law. CTP covers personal injury to third parties only and does not cover damage to the vehicle, damage to third-party property, or personal injury to the Renter.</p></div>
+        <div style={{ marginTop: 10 }}><strong>6.4 Additional Insurance</strong><p>The Renter remains fully liable for any damage or loss not covered by CTP. The Owner strongly recommends the Renter arrange their own comprehensive vehicle or travel insurance for the duration of the rental.</p></div>
       </div>
     )},
     { num: '8', title: 'Condition of the Vehicle', content: (
@@ -320,11 +370,13 @@ export default function ContractPage() {
     { num: '11', title: 'Personal Insurance Recommendation', content: <p style={bodyText}>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel insurance and/or comprehensive vehicle insurance. The Renter acknowledges that the included CTP does not cover damage to the vehicle or personal injury to the Renter.</p> },
     { num: '12', title: 'Assumption of Risk',  content: <p style={bodyText}>The Renter acknowledges that driving a motor vehicle involves inherent risks. The Renter voluntarily accepts all risks associated with the use of the vehicle, whether foreseeable or not.</p> },
     { num: '13', title: 'Indemnity',           content: <p style={bodyText}>The Renter agrees to indemnify and hold harmless the Owner from any claim, loss, or expense (including legal costs) arising out of the Renter's use of the vehicle, except where caused by the Owner's negligence or breach of this Agreement.</p> },
-    { num: '14', title: 'Governing Law',       content: <p style={bodyText}>This Agreement is governed by the laws of Queensland, Australia. Any disputes will be resolved through appropriate legal channels within Queensland.</p> },
+    { num: '14', title: 'Driver Responsibilities — Renter Acknowledgement', content: safetyContentCar },
+    { num: '15', title: 'Governing Law',       content: <p style={bodyText}>This Agreement is governed by the laws of Queensland, Australia. Any disputes will be resolved through appropriate legal channels within Queensland.</p> },
   ];
 
   const sections      = isCar ? carSections : isEbike ? ebikeSections : scooterSections;
   const signaturesNum = sections.length + 1;
+
   const agreementType = isCar ? 'Car Rental Agreement' : isEbike ? 'E-Bike Rental Agreement' : 'Scooter Rental Agreement';
 
   return (
@@ -390,10 +442,10 @@ export default function ContractPage() {
           </div>
 
           {/* Sections */}
-          {sections.map(s => (
-            <div key={s.num} style={sectionStyle}>
+          {sections.map((s, i) => (
+            <div key={s.title} style={sectionStyle}>
               <div style={sectionTitleStyle}>
-                <span style={numBadge}>{s.num}</span>
+                <span style={numBadge}>{i + 1}</span>
                 {s.title}
               </div>
               {s.content}
