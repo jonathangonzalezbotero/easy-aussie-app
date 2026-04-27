@@ -7,10 +7,10 @@ const EF = {
 };
 
 export default function CustomerIntake() {
-  const [form, setForm]       = useState(EF);
+  const [form, setForm]             = useState(EF);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted]   = useState(false);
-  const [error, setError]     = useState('');
+  const [error, setError]           = useState('');
   const fileInputRef = useRef(null);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -25,7 +25,13 @@ export default function CustomerIntake() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Full name is required'); return; }
+    if (!form.name.trim())       { setError('Full name is required'); return; }
+    if (!form.dateOfBirth)       { setError('Date of birth is required'); return; }
+    if (!form.phone.trim())      { setError('Phone number is required'); return; }
+    if (!form.email.trim())      { setError('Email address is required'); return; }
+    if (!form.address.trim())    { setError('Residential address is required'); return; }
+    if (!form.occupation.trim()) { setError('Occupation is required'); return; }
+    if (!form.licencePhoto)      { setError('A photo of your licence is required'); return; }
     setError('');
     setSubmitting(true);
     try {
@@ -70,9 +76,9 @@ export default function CustomerIntake() {
     );
   }
 
-  const inputStyle = { fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: '#1a1a1a', background: '#f7f6f2', border: '1.5px solid #e0dfd8', borderRadius: 9, padding: '11px 14px', outline: 'none', width: '100%', boxSizing: 'border-box' };
-  const labelStyle = { fontSize: 12, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 5, display: 'block' };
-  const fieldStyle = { display: 'flex', flexDirection: 'column', gap: 5 };
+  const inputStyle  = { fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: '#1a1a1a', background: '#f7f6f2', border: '1.5px solid #e0dfd8', borderRadius: 9, padding: '11px 14px', outline: 'none', width: '100%', boxSizing: 'border-box' };
+  const labelStyle  = { fontSize: 12, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 5, display: 'block' };
+  const fieldStyle  = { display: 'flex', flexDirection: 'column', gap: 5 };
   const dividerStyle = { display: 'flex', alignItems: 'center', gap: 10, color: '#999', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '4px 0 2px' };
 
   return (
@@ -81,12 +87,7 @@ export default function CustomerIntake() {
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ width: 52, height: 52, background: 'oklch(0.50 0.14 150)', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-            <svg width="26" height="26" viewBox="0 0 18 18" fill="none" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <ellipse cx="4.5" cy="13.5" rx="1.8" ry="1.8"/><ellipse cx="13.5" cy="13.5" rx="1.8" ry="1.8"/>
-              <path d="M2.7 13.5H1.5V9L4.5 4.5h7.5L14.5 9h2v4.5h-1.3"/><path d="M6.3 13.5h5.4"/><path d="M4.5 4.5v4.5h9"/>
-            </svg>
-          </div>
+          <img src="/logo.png" alt="Easy Aussie" style={{ height: 72, objectFit: 'contain', marginBottom: 16 }} />
           <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 8, color: '#1a1a1a' }}>Customer Intake Form</h1>
           <p style={{ fontSize: 14, color: '#666', lineHeight: 1.6 }}>
             Please fill in your details before your rental. All information is kept securely and used only for your rental agreement.
@@ -103,24 +104,24 @@ export default function CustomerIntake() {
                 <input style={inputStyle} value={form.name} onChange={e => sf('name', e.target.value)} required placeholder="As shown on your licence" />
               </div>
               <div style={fieldStyle}>
-                <label style={labelStyle}>Date of Birth</label>
-                <input style={inputStyle} type="date" value={form.dateOfBirth} onChange={e => sf('dateOfBirth', e.target.value)} />
+                <label style={labelStyle}>Date of Birth *</label>
+                <input style={inputStyle} type="date" value={form.dateOfBirth} onChange={e => sf('dateOfBirth', e.target.value)} required />
               </div>
               <div style={fieldStyle}>
-                <label style={labelStyle}>Phone</label>
-                <input style={inputStyle} type="tel" value={form.phone} onChange={e => sf('phone', e.target.value)} placeholder="+61 4xx xxx xxx" />
+                <label style={labelStyle}>Phone *</label>
+                <input style={inputStyle} type="tel" value={form.phone} onChange={e => sf('phone', e.target.value)} required placeholder="+61 4xx xxx xxx" />
               </div>
               <div style={{ ...fieldStyle, gridColumn: '1/-1' }}>
-                <label style={labelStyle}>Email</label>
-                <input style={inputStyle} type="email" value={form.email} onChange={e => sf('email', e.target.value)} />
+                <label style={labelStyle}>Email *</label>
+                <input style={inputStyle} type="email" value={form.email} onChange={e => sf('email', e.target.value)} required />
               </div>
               <div style={{ ...fieldStyle, gridColumn: '1/-1' }}>
-                <label style={labelStyle}>Residential Address</label>
-                <input style={inputStyle} value={form.address} onChange={e => sf('address', e.target.value)} placeholder="Your home address" />
+                <label style={labelStyle}>Residential Address *</label>
+                <input style={inputStyle} value={form.address} onChange={e => sf('address', e.target.value)} required placeholder="Your home address" />
               </div>
               <div style={fieldStyle}>
-                <label style={labelStyle}>Occupation</label>
-                <input style={inputStyle} value={form.occupation} onChange={e => sf('occupation', e.target.value)} />
+                <label style={labelStyle}>Occupation *</label>
+                <input style={inputStyle} value={form.occupation} onChange={e => sf('occupation', e.target.value)} required />
               </div>
               <div style={fieldStyle}>
                 <label style={labelStyle}>Hotel / Airbnb (if applicable)</label>
@@ -156,7 +157,7 @@ export default function CustomerIntake() {
               <input style={inputStyle} value={form.licenseRef} onChange={e => sf('licenseRef', e.target.value)} placeholder="Your driver's licence number" />
             </div>
             <div style={fieldStyle}>
-              <label style={labelStyle}>Licence Photo (optional)</label>
+              <label style={labelStyle}>Licence Photo *</label>
               <p style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>Take a clear photo of the front of your licence. Max 5MB.</p>
               {form.licencePhoto ? (
                 <div>
