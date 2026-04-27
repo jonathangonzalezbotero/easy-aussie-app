@@ -201,7 +201,7 @@ export default function ContractPage() {
       <div style={bodyText}>
         <div style={{ marginTop: 10 }}><strong>5.1 Traffic Fines and Tolls</strong><p>The Renter is responsible for all traffic infringements, parking fines, and toll charges during the rental period.</p></div>
         <div style={{ marginTop: 10 }}><strong>5.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the moped occurring during the rental period. The Renter must immediately notify the Owner and, if applicable, the police of any accident, theft, or incident. Rental fees continue until the moped is repaired or replaced.</p></div>
-        <div style={{ marginTop: 10 }}><strong>5.3 Insurance</strong><p>The moped is covered by CTP insurance as required by Queensland law. CTP does not cover damage to the moped, damage to third-party property, or personal injury to the Renter. The Renter remains fully liable for any damage or loss not covered by CTP.</p></div>
+        <div style={{ marginTop: 10 }}><strong>5.3 Insurance</strong><p>The moped is covered by <strong>Compulsory Third Party (CTP)</strong> insurance, which covers bodily injury to other people, and <strong>Third Party Property Damage</strong> insurance, which covers damage to other people's property caused by the Renter. Neither policy covers damage to or theft of the moped itself. The Renter remains fully liable for any loss or damage to the moped.</p></div>
       </div>
     )},
     { num: '7', title: 'Condition of the Scooter', content: (
@@ -222,9 +222,18 @@ export default function ContractPage() {
         </ul>
       </div>
     )},
-    { num: '9',  title: 'Insurance Included',               content: <p style={bodyText}>The rental price includes comprehensive insurance, subject to the terms, limitations, and exclusions outlined in this Agreement. The included insurance includes CTP as required by Queensland law and limited damage protection.</p> },
-    { num: '10', title: 'Insurance Limitations & Exclusions', content: <p style={bodyText}>The included insurance does NOT cover: theft, loss, or total write-off; damage caused by reckless or illegal use; riding under the influence; riding outside permitted areas; mechanical damage caused by misuse; personal injury to the Renter; damage to personal property; fines, penalties, towing, or recovery costs; or loss of use.</p> },
-    { num: '11', title: 'Personal Insurance Recommendation', content: <p style={bodyText}>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel insurance and personal health or accident insurance. The Renter acknowledges the included insurance does not cover personal injury, medical costs, or loss of personal belongings.</p> },
+    { num: '9',  title: 'Insurance Cover Provided',          content: (
+      <div style={bodyText}>
+        <p style={{ marginBottom: 8 }}>The following insurance cover is included with this rental:</p>
+        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
+          <li style={{ marginBottom: 6 }}><strong>Compulsory Third Party (CTP):</strong> Covers bodily injury to other people caused by the Renter's use of the moped, as required by Queensland law.</li>
+          <li style={{ marginBottom: 6 }}><strong>Third Party Property Damage:</strong> Covers damage caused to other people's property (e.g. another vehicle, a fence) as a result of an accident.</li>
+        </ul>
+        <p><strong>No comprehensive insurance is included.</strong> The Renter is fully liable for any damage to, or theft of, the moped itself.</p>
+      </div>
+    )},
+    { num: '10', title: 'Insurance Exclusions',              content: <p style={bodyText}>The included insurance does NOT cover: damage to or theft of the moped; personal injury to the Renter; damage caused by reckless or illegal use; riding under the influence of alcohol or drugs; riding outside permitted areas; mechanical damage caused by misuse; traffic fines, penalties, towing, or recovery costs; or loss of use of the vehicle.</p> },
+    { num: '11', title: 'Personal Insurance Recommendation', content: <p style={bodyText}>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel insurance and personal accident or health insurance. As no comprehensive vehicle insurance is provided, the Renter is solely responsible for the cost of repairing or replacing the moped in the event of damage or theft.</p> },
     { num: '12', title: 'Assumption of Risk',               content: <p style={bodyText}>The Renter acknowledges that riding a scooter involves inherent risks, including serious injury or death. The Renter voluntarily accepts all risks, whether foreseeable or not.</p> },
     { num: '13', title: 'Indemnity',                        content: <p style={bodyText}>The Renter agrees to indemnify and hold harmless the Owner from any claim, loss, or expense (including legal costs) arising out of the Renter's use of the scooter, except where caused by the Owner's negligence or breach of this Agreement.</p> },
     { num: '14', title: 'Safety & Road Rules — Renter Acknowledgement', content: safetyContentScooter },
@@ -344,8 +353,8 @@ export default function ContractPage() {
       <div style={bodyText}>
         <div style={{ marginTop: 10 }}><strong>6.1 Traffic Fines and Tolls</strong><p>The Renter is solely responsible for all traffic infringements, parking fines, and toll charges incurred during the rental period.</p></div>
         <div style={{ marginTop: 10 }}><strong>6.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the vehicle occurring during the rental period. The Renter must immediately notify the Owner and, if applicable, Queensland Police. Rental fees continue until the vehicle is repaired or replaced.</p></div>
-        <div style={{ marginTop: 10 }}><strong>6.3 CTP Insurance</strong><p>The vehicle is covered by Compulsory Third Party (CTP) insurance as required by Queensland law. CTP covers personal injury to third parties only and does not cover damage to the vehicle, damage to third-party property, or personal injury to the Renter.</p></div>
-        <div style={{ marginTop: 10 }}><strong>6.4 Additional Insurance</strong><p>The Renter remains fully liable for any damage or loss not covered by CTP. The Owner strongly recommends the Renter arrange their own comprehensive vehicle or travel insurance for the duration of the rental.</p></div>
+        <div style={{ marginTop: 10 }}><strong>6.3 Insurance Cover Provided</strong><p>The following insurance is included with this rental: <strong>Compulsory Third Party (CTP)</strong> — covers bodily injury to other people as required by Queensland law; and <strong>Third Party Property Damage</strong> — covers damage caused to other people's property (e.g. another vehicle) in an accident. <strong>No comprehensive insurance is included.</strong> The Renter is fully liable for any damage to or theft of the rental vehicle itself.</p></div>
+        <div style={{ marginTop: 10 }}><strong>6.4 Renter's Liability</strong><p>The Renter is fully liable for the cost of repairing or replacing the vehicle in the event of damage or theft not covered by the included insurance. The Owner strongly recommends the Renter arrange their own comprehensive vehicle or travel insurance before taking possession of the vehicle.</p></div>
       </div>
     )},
     { num: '8', title: 'Condition of the Vehicle', content: (
@@ -366,8 +375,8 @@ export default function ContractPage() {
         </ul>
       </div>
     )},
-    { num: '10', title: 'Insurance Limitations & Exclusions', content: <p style={bodyText}>Insurance does NOT cover: theft or total write-off caused by negligence or unlocked vehicle; damage from prohibited use or illegal driving; driving under the influence; off-road use; mechanical damage caused by misuse; personal injury to the Renter or passengers; damage to personal property; fines, penalties, towing, or recovery costs; or loss of use.</p> },
-    { num: '11', title: 'Personal Insurance Recommendation', content: <p style={bodyText}>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel insurance and/or comprehensive vehicle insurance. The Renter acknowledges that the included CTP does not cover damage to the vehicle or personal injury to the Renter.</p> },
+    { num: '10', title: 'Insurance Exclusions',              content: <p style={bodyText}>The included insurance does NOT cover: damage to or theft of the rental vehicle; personal injury to the Renter or passengers; damage caused by prohibited use or illegal driving; driving under the influence of alcohol or drugs; off-road use; mechanical damage caused by misuse; traffic fines, penalties, towing, or recovery costs; or loss of use of the vehicle.</p> },
+    { num: '11', title: 'Personal Insurance Recommendation', content: <p style={bodyText}>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel insurance and/or comprehensive vehicle insurance. As no comprehensive vehicle insurance is provided, the Renter is solely responsible for the cost of repairing or replacing the vehicle in the event of damage or theft.</p> },
     { num: '12', title: 'Assumption of Risk',  content: <p style={bodyText}>The Renter acknowledges that driving a motor vehicle involves inherent risks. The Renter voluntarily accepts all risks associated with the use of the vehicle, whether foreseeable or not.</p> },
     { num: '13', title: 'Indemnity',           content: <p style={bodyText}>The Renter agrees to indemnify and hold harmless the Owner from any claim, loss, or expense (including legal costs) arising out of the Renter's use of the vehicle, except where caused by the Owner's negligence or breach of this Agreement.</p> },
     { num: '14', title: 'Driver Responsibilities — Renter Acknowledgement', content: safetyContentCar },
