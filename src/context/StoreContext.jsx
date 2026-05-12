@@ -13,6 +13,7 @@ const vehicleFromDb = (v) => ({
   purchaseDate: v.purchase_date, purchasePrice: v.purchase_price ? String(v.purchase_price) : '',
   conditionNotes: v.condition_notes, notes: v.notes,
   regoDocPath: v.rego_doc_path || null,
+  odometer: v.odometer ? String(v.odometer) : '',
 });
 
 const vehicleToDb = (v) => ({
@@ -24,6 +25,7 @@ const vehicleToDb = (v) => ({
   purchase_price: v.purchasePrice ? Number(v.purchasePrice) : null,
   condition_notes: v.conditionNotes || null, notes: v.notes || null,
   rego_doc_path: v.regoDocPath || null,
+  odometer: v.odometer ? Number(v.odometer) : null,
 });
 
 const customerFromDb = (c) => ({
@@ -47,6 +49,7 @@ const rentalFromDb = (r) => ({
   bond: { amount: r.bond_amount ? String(r.bond_amount) : '', method: r.bond_method || 'cash', status: r.bond_status || 'held' },
   shopifyRef: r.shopify_ref, contractRef: r.contract_ref, notes: r.notes,
   odometer: r.odometer ? String(r.odometer) : '',
+  odometerReturn: r.odometer_return ? String(r.odometer_return) : '',
   contractNumber: r.contract_number || '',
   price: r.price ? String(r.price) : '',
 });
@@ -59,6 +62,7 @@ const rentalToDb = (r) => ({
   bond_method: r.bond?.method || 'cash', bond_status: r.bond?.status || 'held',
   shopify_ref: r.shopifyRef || null, contract_ref: r.contractRef || null, notes: r.notes || null,
   odometer: r.odometer ? Number(r.odometer) : null,
+  odometer_return: r.odometerReturn ? Number(r.odometerReturn) : null,
   contract_number: r.contractNumber || null,
   price: r.price ? Number(r.price) : null,
 });

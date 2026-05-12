@@ -22,7 +22,8 @@ export default function Rentals() {
   const [detailR, setDetailR] = useState(null);
   const [endR, setEndR] = useState(null);
   const [retainedAmount, setRetainedAmount] = useState('');
-  const [retainedNote, setRetainedNote] = useState('');
+  const [retainedNote, setRetainedNote]     = useState('');
+  const [odometerReturn, setOdometerReturn] = useState('');
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EF);
   const [sort, setSort] = useState({ col: 'payDay', dir: 'asc' });
@@ -43,6 +44,14 @@ export default function Rentals() {
     const next = Math.max(20, ...nums) + 1;
     setForm(f => ({ ...f, contractNumber: `${prefix}-${String(next).padStart(3, '0')}` }));
   }, [form.vehicleId, showCreate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pre-fill start odometer from vehicle's current odometer when creating
+  useEffect(() => {
+    if (!showCreate || !form.vehicleId) return;
+    const vehicle = data.vehicles.find(v => v.id === form.vehicleId);
+    if (vehicle?.odometer) setForm(f => ({ ...f, odometer: vehicle.odometer }));
+  }, [form.vehicleId, showCreate]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   const active = data.rentals.filter(r => r.status === 'active');
   const past = data.rentals.filter(r => r.status === 'completed');
@@ -119,11 +128,15 @@ export default function Rentals() {
     const noteAppend = retainedNote.trim()
       ? (r.notes ? `${r.notes}\nBond retained: ${retainedNote.trim()}` : `Bond retained: ${retainedNote.trim()}`)
       : r.notes;
-    await update('rentals', r.id, { status: 'completed', endDate: todayStr(), bond: bondUpdate, notes: noteAppend });
-    await update('vehicles', r.vehicleId, { status: 'available' });
+    const returnKm = odometerReturn.trim();
+    await update('rentals', r.id, { status: 'completed', endDate: todayStr(), bond: bondUpdate, notes: noteAppend, odometerReturn: returnKm || null });
+    const vehicleUpdate = { status: 'available' };
+    if (returnKm) vehicleUpdate.odometer = returnKm;
+    await update('vehicles', r.vehicleId, vehicleUpdate);
     setEndR(null);
     setRetainedAmount('');
     setRetainedNote('');
+    setOdometerReturn('');
     if (detailR?.id === r.id) setDetailR(null);
   };
 
@@ -365,10 +378,10 @@ export default function Rentals() {
       </Modal>
 
       {/* End rental */}
-      <Modal open={!!endR} onClose={() => { setEndR(null); setRetainedAmount(''); setRetainedNote(''); }} title="End Rental"
+      <Modal open={!!endR} onClose={() => { setEndR(null); setRetainedAmount(''); setRetainedNote(''); setOdometerReturn(''); }} title="End Rental"
         footer={endR && (
           <>
-            <button className="btn btn-secondary" onClick={() => { setEndR(null); setRetainedAmount(''); setRetainedNote(''); }}>Cancel</button>
+            <button className="btn btn-secondary" onClick={() => { setEndR(null); setRetainedAmount(''); setRetainedNote(''); setOdometerReturn(''); }}>Cancel</button>
             {endR.bond?.amount && endR.bond.status === 'held' && (
               <button className="btn btn-secondary" onClick={() => endRental('partial')}>End — Keep Partial</button>
             )}
@@ -387,10 +400,27 @@ export default function Rentals() {
           return (
             <div>
               <p style={{ fontSize: 14, marginBottom: 16, color: 'var(--muted)' }}>This will mark the rental as completed and set the vehicle back to available.</p>
-              <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: hasBond ? 16 : 0 }}>
+              <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
                 <div className="fw-500" style={{ marginBottom: 4 }}>{c?.name || '—'} · {v?.plate || '—'}{v?.name ? ' · ' + v.name : ''}</div>
                 <div className="text-sm text-muted">Started {formatDate(endR.startDate)} · {daysBetween(endR.startDate, todayStr())}d</div>
+                {endR.odometer && <div className="text-sm text-muted" style={{ marginTop: 4 }}>Start odometer: {Number(endR.odometer).toLocaleString()} km</div>}
               </div>
+              {v?.type !== 'ebike' && (
+                <div className="field" style={{ marginBottom: 16 }}>
+                  <label className="label">Return Odometer (km)</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    value={odometerReturn}
+                    onChange={e => setOdometerReturn(e.target.value)}
+                    placeholder={endR.odometer ? `e.g. ${Number(endR.odometer) + 100}` : 'e.g. 4350'}
+                  />
+                  {odometerReturn && endR.odometer && Number(odometerReturn) > Number(endR.odometer) && (
+                    <span className="field-hint">{(Number(odometerReturn) - Number(endR.odometer)).toLocaleString()} km this rental · vehicle odometer will be updated</span>
+                  )}
+                </div>
+              )}
               {hasBond && (
                 <div style={{ padding: '14px 16px', background: 'var(--amber-bg)', borderRadius: 10 }}>
                   <div className="fw-600" style={{ fontSize: 13, marginBottom: 10 }}>Bond — ${endR.bond.amount} via {endR.bond.method}</div>
@@ -442,7 +472,8 @@ export default function Rentals() {
                 <div><div className="label">Start Date</div><div style={{ marginTop: 3 }}>{formatDate(selected.startDate)}</div></div>
                 <div><div className="label">End Date</div><div style={{ marginTop: 3 }}>{selected.endDate ? formatDate(selected.endDate) : 'Ongoing'}</div></div>
                 {selected.contractNumber && <div><div className="label">Contract No.</div><div style={{ marginTop: 3, fontWeight: 600 }}>{selected.contractNumber}</div></div>}
-                {selected.odometer && <div><div className="label">Odometer at Rental</div><div style={{ marginTop: 3 }}>{Number(selected.odometer).toLocaleString()} km</div></div>}
+                {selected.odometer && <div><div className="label">Odometer at Start</div><div style={{ marginTop: 3 }}>{Number(selected.odometer).toLocaleString()} km</div></div>}
+                {selected.odometerReturn && <div><div className="label">Odometer at Return</div><div style={{ marginTop: 3, fontWeight: 600 }}>{Number(selected.odometerReturn).toLocaleString()} km{selected.odometer ? ` (+${(Number(selected.odometerReturn) - Number(selected.odometer)).toLocaleString()} km)` : ''}</div></div>}
                 {selected.price && <div><div className="label">Weekly Price</div><div style={{ marginTop: 3, fontWeight: 600 }}>${Number(selected.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</div></div>}
               </div>
               <div style={{ background: selected.bond?.amount ? (selected.bond.status === 'held' ? 'var(--amber-bg)' : 'var(--accent-light)') : 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>

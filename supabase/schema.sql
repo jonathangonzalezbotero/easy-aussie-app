@@ -20,8 +20,12 @@ create table if not exists vehicles (
   purchase_date    date,
   condition_notes  text,
   notes            text,
+  odometer         numeric,
   created_at       timestamptz default now()
 );
+
+-- Run this if the table already exists:
+-- alter table vehicles add column if not exists odometer numeric;
 
 create table if not exists customers (
   id                uuid primary key default gen_random_uuid(),
@@ -50,15 +54,17 @@ create table if not exists rentals (
   bond_amount   numeric,
   bond_method   text default 'cash',
   bond_status   text default 'held' check (bond_status in ('held','returned')),
-  shopify_ref   text,
-  contract_ref  text,
-  notes         text,
-  price         numeric,
-  created_at    timestamptz default now()
+  shopify_ref      text,
+  contract_ref     text,
+  notes            text,
+  price            numeric,
+  odometer_return  numeric,
+  created_at       timestamptz default now()
 );
 
--- Run this if the table already exists:
+-- Run this if the tables already exist:
 -- alter table rentals add column if not exists price numeric;
+-- alter table rentals add column if not exists odometer_return numeric;
 
 create table if not exists maintenance (
   id                uuid primary key default gen_random_uuid(),

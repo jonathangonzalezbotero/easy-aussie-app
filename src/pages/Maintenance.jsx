@@ -72,7 +72,10 @@ export default function Maintenance() {
     setSaving(true);
     try {
       await add('maintenance', { ...form });
-      if (form.nextServiceDate) await update('vehicles', form.vehicleId, { nextServiceDate: form.nextServiceDate });
+      const vehicleUpdate = {};
+      if (form.nextServiceDate) vehicleUpdate.nextServiceDate = form.nextServiceDate;
+      if (form.odometer) vehicleUpdate.odometer = form.odometer;
+      if (Object.keys(vehicleUpdate).length) await update('vehicles', form.vehicleId, vehicleUpdate);
       setShowAdd(false);
       setForm(EF);
     } finally { setSaving(false); }
@@ -84,7 +87,10 @@ export default function Maintenance() {
     setSaving(true);
     try {
       await update('maintenance', editM.id, { ...form });
-      if (form.nextServiceDate) await update('vehicles', form.vehicleId, { nextServiceDate: form.nextServiceDate });
+      const vehicleUpdate = {};
+      if (form.nextServiceDate) vehicleUpdate.nextServiceDate = form.nextServiceDate;
+      if (form.odometer) vehicleUpdate.odometer = form.odometer;
+      if (Object.keys(vehicleUpdate).length) await update('vehicles', form.vehicleId, vehicleUpdate);
       setEditM(null);
       setForm(EF);
     } finally { setSaving(false); }

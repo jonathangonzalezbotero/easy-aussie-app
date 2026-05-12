@@ -11,7 +11,7 @@ import { formatDate, daysUntil, todayStr } from '../utils/dates';
 const EF = {
   plate: '', name: '', make: '', model: '', year: '', colour: '', engineCapacity: '',
   type: 'scooter', fleetGroup: 'business', purchaseDate: '', purchasePrice: '', status: 'available',
-  nextServiceDate: '', conditionNotes: '', notes: '',
+  nextServiceDate: '', conditionNotes: '', notes: '', odometer: '',
 };
 
 export default function Vehicles() {
@@ -121,7 +121,7 @@ export default function Vehicles() {
     if (sort.col === 'plate') return a.plate.localeCompare(b.plate) * mul;
     if (sort.col === 'make') return ([a.make, a.model].filter(Boolean).join(' ')).localeCompare([b.make, b.model].filter(Boolean).join(' ')) * mul;
     if (sort.col === 'colour') return (a.colour || '').localeCompare(b.colour || '') * mul;
-    if (sort.col === 'fleetGroup') return (a.fleetGroup || '').localeCompare(b.fleetGroup || '') * mul;
+    if (sort.col === 'odometer') return ((Number(a.odometer) || 0) - (Number(b.odometer) || 0)) * mul;
     if (sort.col === 'status') return (a.status || '').localeCompare(b.status || '') * mul;
     if (sort.col === 'purchaseDate') return (a.purchaseDate || '').localeCompare(b.purchaseDate || '') * mul;
     if (sort.col === 'regoExpiry') return (a.regoExpiry || '').localeCompare(b.regoExpiry || '') * mul;
@@ -246,7 +246,10 @@ export default function Vehicles() {
         <div className="field"><label className="label">Purchase Date</label><input className="input" type="date" value={form.purchaseDate} onChange={e => sf('purchaseDate', e.target.value)} /></div>
         <div className="field"><label className="label">Purchase Price ($)</label><input className="input" type="number" min="0" value={form.purchasePrice} onChange={e => sf('purchasePrice', e.target.value)} placeholder="e.g. 3500" /></div>
       </div>
-      <div className="field"><label className="label">Next Service Date</label><input className="input" type="date" value={form.nextServiceDate} onChange={e => sf('nextServiceDate', e.target.value)} /></div>
+      <div className="grid-2">
+        <div className="field"><label className="label">Current Odometer (km)</label><input className="input" type="number" min="0" value={form.odometer} onChange={e => sf('odometer', e.target.value)} placeholder="e.g. 4250" /></div>
+        <div className="field"><label className="label">Next Service Date</label><input className="input" type="date" value={form.nextServiceDate} onChange={e => sf('nextServiceDate', e.target.value)} /></div>
+      </div>
       <div className="form-divider"><span>Condition</span></div>
       <div className="field"><label className="label">Condition / Existing Damage Notes</label><textarea className="textarea" rows={3} value={form.conditionNotes} onChange={e => sf('conditionNotes', e.target.value)} placeholder="e.g. Front panel cracked, minor scratch on left side." /></div>
       <div className="field"><label className="label">Internal Notes</label><textarea className="textarea" rows={2} value={form.notes} onChange={e => sf('notes', e.target.value)} /></div>
@@ -285,7 +288,7 @@ export default function Vehicles() {
               <SortTh col="plate">Plate</SortTh>
               <SortTh col="make">Make / Model</SortTh>
               <SortTh col="colour" className="col-hide-mobile">Colour</SortTh>
-              <SortTh col="fleetGroup" className="col-hide-mobile">Fleet</SortTh>
+              <SortTh col="odometer" className="col-hide-mobile">Odometer</SortTh>
               <SortTh col="status">Status</SortTh>
               <SortTh col="purchaseDate" className="col-hide-mobile">Purchase Date</SortTh>
               <SortTh col="regoExpiry">Rego Expiry</SortTh>
@@ -307,7 +310,7 @@ export default function Vehicles() {
                       <div className="text-sm text-muted">{v.year || ''} · <span style={{ textTransform: 'capitalize' }}>{v.type}</span></div>
                     </td>
                     <td className="text-muted col-hide-mobile">{v.colour || '—'}</td>
-                    <td className="col-hide-mobile"><Badge variant="gray">{v.fleetGroup}</Badge></td>
+                    <td className="text-muted col-hide-mobile">{v.odometer ? Number(v.odometer).toLocaleString() + ' km' : '—'}</td>
                     <td>{statusBadge(v.status)}</td>
                     <td className="col-hide-mobile">{v.purchaseDate ? formatDate(v.purchaseDate) : '—'}</td>
                     <td style={{ color: regoWarn ? (rd < 0 ? 'var(--red)' : 'var(--amber)') : 'inherit' }}>
@@ -359,6 +362,7 @@ export default function Vehicles() {
               {selected.year && <div><div className="label">Year</div><div style={{ marginTop: 3 }}>{selected.year}</div></div>}
               {selected.colour && <div><div className="label">Colour</div><div style={{ marginTop: 3 }}>{selected.colour}</div></div>}
               {selected.engineCapacity && <div><div className="label">Engine</div><div style={{ marginTop: 3 }}>{selected.engineCapacity}</div></div>}
+              {selected.odometer && <div><div className="label">Current Odometer</div><div style={{ marginTop: 3, fontWeight: 600 }}>{Number(selected.odometer).toLocaleString()} km</div></div>}
               {selected.purchaseDate && <div><div className="label">Purchase Date</div><div style={{ marginTop: 3 }}>{formatDate(selected.purchaseDate)}</div></div>}
               {selected.purchasePrice && <div><div className="label">Purchase Price</div><div style={{ marginTop: 3 }}>${Number(selected.purchasePrice).toLocaleString()}</div></div>}
               {selected.nextServiceDate && (
