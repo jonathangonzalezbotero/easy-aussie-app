@@ -27,8 +27,37 @@ export default function Rentals() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EF);
   const [sort, setSort] = useState({ col: 'payDay', dir: 'asc' });
+  const [sendingSign, setSendingSign] = useState(false);
+  const [signEmailAddr, setSignEmailAddr] = useState('');
+  const [signResult, setSignResult] = useState(null); // 'sent' | 'error'
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const sb = (k, v) => setForm(f => ({ ...f, bond: { ...f.bond, [k]: v } }));
+
+  const getSignReq = (rentalId) =>
+    (data.signingRequests || []).filter(s => s.rentalId === rentalId)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0] ?? null;
+
+  const sendSigningEmail = async (rental, email) => {
+    if (!email?.trim()) return;
+    const customer = data.customers.find(c => c.id === rental.customerId);
+    setSendingSign(true);
+    setSignResult(null);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-signing-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
+        body: JSON.stringify({ rental_id: rental.id, customer_email: email.trim(), customer_name: customer?.name || '' }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
+      setSignResult('sent');
+      // Refresh to pick up new signing_request row
+      setTimeout(() => { window.location.reload(); }, 1500);
+    } catch {
+      setSignResult('error');
+    } finally {
+      setSendingSign(false);
+    }
+  };
 
   // Auto-suggest contract number when vehicle is selected in create form
   useEffect(() => {
@@ -288,8 +317,9 @@ export default function Rentals() {
     const c = data.customers.find(x => x.id === r.customerId);
     const v = data.vehicles.find(x => x.id === r.vehicleId);
     const dur = r.startDate ? daysBetween(r.startDate, r.endDate || todayStr()) : 0;
+    const sigReq = getSignReq(r.id);
     return (
-      <tr onClick={() => setDetailR(r)}>
+      <tr onClick={() => { setDetailR(r); const cu = data.customers.find(x => x.id === r.customerId); setSignEmailAddr(cu?.email || ''); setSignResult(null); }}>
         <td className="fw-500">{c?.name || '—'}</td>
         <td>
           <div className="fw-500">{v?.plate || '—'}</div>
@@ -304,6 +334,13 @@ export default function Rentals() {
           {r.bond?.amount
             ? <div><div style={{ fontSize: 13, fontWeight: 600 }}>${r.bond.amount}</div><Badge variant={r.bond.status === 'held' ? 'amber' : 'green'}>{r.bond.status}</Badge></div>
             : <span className="text-sm text-muted">None</span>}
+        </td>
+        <td>
+          {sigReq?.status === 'signed'
+            ? <Badge variant="green">Signed</Badge>
+            : sigReq
+              ? <Badge variant="amber">Awaiting</Badge>
+              : null}
         </td>
         <td onClick={e => e.stopPropagation()}>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -342,6 +379,7 @@ export default function Rentals() {
               <SortTh col="duration">Duration</SortTh>
               <SortTh col="price">Price/wk</SortTh>
               <SortTh col="bond">Bond</SortTh>
+              <th>Signature</th>
               <th></th>
             </tr></thead>
             <tbody>{sortRentals(active).map(r => <RentalRow key={r.id} r={r} showEnd={true} showPayDay={true} />)}</tbody>
@@ -358,6 +396,7 @@ export default function Rentals() {
               <SortTh col="endDate">Ended</SortTh>
               <SortTh col="price">Price/wk</SortTh>
               <SortTh col="bond">Bond</SortTh>
+              <th>Signature</th>
               <th></th>
             </tr></thead>
             <tbody>{sortRentals(past).map(r => <RentalRow key={r.id} r={r} showEnd={false} />)}</tbody>
@@ -492,6 +531,55 @@ export default function Rentals() {
                 ) : <div className="text-sm text-muted">No bond recorded</div>}
               </div>
               {selected.notes && <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 14, color: 'var(--muted)' }}>{selected.notes}</div>}
+              {/* E-Signature */}
+              {(() => {
+                const sigReq = getSignReq(selected.id);
+                const customer = data.customers.find(x => x.id === selected.customerId);
+                return (
+                  <div style={{ background: sigReq?.status === 'signed' ? '#f0fdf4' : '#f7f6f2', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+                    <div className="fw-600" style={{ fontSize: 13, marginBottom: 8 }}>E-Signature</div>
+                    {sigReq?.status === 'signed' ? (
+                      <div>
+                        <Badge variant="green">Signed</Badge>
+                        <div className="text-sm text-muted" style={{ marginTop: 6 }}>
+                          Signed by <strong>{sigReq.signerName}</strong> on {new Date(sigReq.signedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </div>
+                      </div>
+                    ) : sigReq ? (
+                      <div>
+                        <Badge variant="amber">Awaiting signature</Badge>
+                        <div className="text-sm text-muted" style={{ marginTop: 6 }}>Link sent · expires {new Date(sigReq.expiresAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>
+                        <button className="btn btn-secondary btn-sm" style={{ marginTop: 10 }} onClick={() => { setSignEmailAddr(customer?.email || ''); setSignResult(null); }}>Resend Link</button>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted">Not sent yet</div>
+                    )}
+                    {sigReq?.status !== 'signed' && (
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <input
+                            type="email"
+                            placeholder={customer?.email || 'customer@email.com'}
+                            value={signEmailAddr}
+                            onChange={e => setSignEmailAddr(e.target.value)}
+                            style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none' }}
+                          />
+                          <button
+                            className="btn btn-primary btn-sm"
+                            disabled={sendingSign || !signEmailAddr.trim()}
+                            onClick={() => sendSigningEmail(selected, signEmailAddr)}
+                          >
+                            {sendingSign ? 'Sending…' : 'Send'}
+                          </button>
+                        </div>
+                        {signResult === 'sent' && <div className="text-sm" style={{ color: '#166534', marginTop: 6 }}>Signing link sent!</div>}
+                        {signResult === 'error' && <div className="text-sm" style={{ color: 'var(--red)', marginTop: 6 }}>Failed to send. Try again.</div>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                 <button className="btn btn-secondary" style={{ justifyContent: 'center' }} onClick={() => navigate('/contract', { state: { rentalId: selected.id } })}>Generate Contract</button>
                 <button className="btn btn-secondary" style={{ justifyContent: 'center' }} onClick={() => { setDetailR(null); openEdit(selected, null); }}>Edit Rental</button>

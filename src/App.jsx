@@ -12,6 +12,7 @@ import Bonds from './pages/Bonds';
 import Settings from './pages/Settings';
 import ContractPage from './pages/ContractPage';
 import CustomerIntake from './pages/CustomerIntake';
+import SigningPage from './pages/SigningPage';
 
 function AdminApp() {
   return (
@@ -43,9 +44,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login"  element={<Login />} />
-        <Route path="/intake" element={<CustomerIntake />} />
-        <Route path="/*"      element={<AdminApp />} />
+        <Route path="/login"       element={<Login />} />
+        <Route path="/intake"      element={<CustomerIntake />} />
+        <Route path="/sign/:token" element={<SigningPage />} />
+        <Route path="/*"           element={<AdminApp />} />
       </Routes>
     </BrowserRouter>
   );

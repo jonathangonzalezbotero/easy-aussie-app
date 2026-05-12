@@ -99,24 +99,32 @@ const DEFAULT_SETTINGS = {
   ownerResponsible: 'Jonathan Alexander Gonzalez Botero', defaultBond: '300',
 };
 
+const signingFromDb = (s) => ({
+  id: s.id, rentalId: s.rental_id, token: s.token, status: s.status,
+  signerName: s.signer_name, signerIp: s.signer_ip,
+  signedAt: s.signed_at, createdAt: s.created_at, expiresAt: s.expires_at,
+});
+
 export function StoreProvider({ children }) {
-  const [data, setData] = useState({ vehicles: [], customers: [], rentals: [], maintenance: [], settings: DEFAULT_SETTINGS });
+  const [data, setData] = useState({ vehicles: [], customers: [], rentals: [], maintenance: [], settings: DEFAULT_SETTINGS, signingRequests: [] });
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [vehicles, customers, rentals, maintenance, settings] = await Promise.all([
+    const [vehicles, customers, rentals, maintenance, settings, signingRequests] = await Promise.all([
       supabase.from('vehicles').select('*').order('created_at'),
       supabase.from('customers').select('*').order('created_at'),
       supabase.from('rentals').select('*').order('created_at'),
       supabase.from('maintenance').select('*').order('created_at'),
       supabase.from('settings').select('*').eq('id', 1).single(),
+      supabase.from('signing_requests').select('*').order('created_at', { ascending: false }),
     ]);
     setData({
-      vehicles:    (vehicles.data    || []).map(vehicleFromDb),
-      customers:   (customers.data   || []).map(customerFromDb),
-      rentals:     (rentals.data     || []).map(rentalFromDb),
-      maintenance: (maintenance.data || []).map(maintenanceFromDb),
-      settings:    settings.data ? settingsFromDb(settings.data) : DEFAULT_SETTINGS,
+      vehicles:        (vehicles.data        || []).map(vehicleFromDb),
+      customers:       (customers.data       || []).map(customerFromDb),
+      rentals:         (rentals.data         || []).map(rentalFromDb),
+      maintenance:     (maintenance.data     || []).map(maintenanceFromDb),
+      settings:        settings.data ? settingsFromDb(settings.data) : DEFAULT_SETTINGS,
+      signingRequests: (signingRequests.data || []).map(signingFromDb),
     });
     setLoading(false);
   }, []);
