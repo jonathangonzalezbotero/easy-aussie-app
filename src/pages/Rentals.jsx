@@ -45,7 +45,7 @@ export default function Rentals() {
     try {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-signing-email`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
         body: JSON.stringify({ rental_id: rental.id, customer_email: email.trim(), customer_name: customer?.name || '' }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }

@@ -47,7 +47,7 @@ export default function SigningPage() {
 
   useEffect(() => {
     fetch(`${SUPABASE_URL}/functions/v1/get-contract-data?token=${token}`, {
-      headers: { 'apikey': ANON_KEY },
+      headers: { 'Authorization': `Bearer ${ANON_KEY}` },
     })
       .then(async (res) => {
         const json = await res.json();
@@ -74,7 +74,7 @@ export default function SigningPage() {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/complete-signing`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
         body: JSON.stringify({ token, signer_name: signerName.trim() }),
       });
       const json = await res.json();

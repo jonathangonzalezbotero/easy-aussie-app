@@ -121,7 +121,7 @@ export default function ContractPage() {
     try {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-signing-email`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
         body: JSON.stringify({ rental_id: rental.id, customer_email: emailAddr.trim(), customer_name: customer?.name || '' }),
       });
       if (!res.ok) {
