@@ -4,6 +4,7 @@ import Modal from '../components/shared/Modal';
 import Drawer from '../components/shared/Drawer';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
+import Tabs from '../components/shared/Tabs';
 import { formatDate } from '../utils/dates';
 
 const EF = { name: '', dateOfBirth: '', phone: '', email: '', address: '', occupation: '', emergencyContact: '', emergencyPhone: '', hotelAddress: '', licenseRef: '', licencePhoto: '', notes: '' };
@@ -14,6 +15,7 @@ export default function Customers() {
   const [editC, setEditC]       = useState(null);
   const [detailC, setDetailC]   = useState(null);
   const [deleteId, setDeleteId] = useState(null);
+  const [tab, setTab]           = useState('active');
   const [search, setSearch]     = useState('');
   const [saving, setSaving]     = useState(false);
   const [sort, setSort]         = useState({ col: 'name', dir: 'asc' });
@@ -35,7 +37,11 @@ export default function Customers() {
     );
   };
 
-  const filtered = data.customers.filter(c => {
+  const hasActiveRental = (c) => data.rentals.some(r => r.customerId === c.id && r.status === 'active');
+  const activeCustomers = data.customers.filter(hasActiveRental);
+  const pastCustomers   = data.customers.filter(c => !hasActiveRental(c));
+
+  const filtered = (tab === 'active' ? activeCustomers : pastCustomers).filter(c => {
     const q = search.toLowerCase();
     return !q || c.name.toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q) || (c.phone || '').includes(q);
   });
@@ -109,12 +115,30 @@ export default function Customers() {
       </div>
 
       <div className="mb-16">
+        <Tabs
+          tabs={[
+            { label: 'Active', value: 'active', count: activeCustomers.length },
+            { label: 'Past', value: 'past', count: pastCustomers.length },
+          ]}
+          active={tab}
+          onChange={(t) => { setTab(t); setSearch(''); }}
+        />
+      </div>
+
+      <div className="mb-16">
         <input className="input" style={{ width: '100%', maxWidth: 320 }} placeholder="Search by name, email or phone…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
       <div className="card">
         {customers.length === 0
-          ? <EmptyState message={data.customers.length === 0 ? 'No customers yet' : 'No customers match'} action={data.customers.length === 0 ? <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>Add customer</button> : null} />
+          ? <EmptyState
+              message={
+                data.customers.length === 0 ? 'No customers yet' :
+                tab === 'active' ? 'No active customers' :
+                search ? 'No past customers match' : 'No past customers yet'
+              }
+              action={data.customers.length === 0 ? <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>Add customer</button> : null}
+            />
           : <div className="table-wrap"><table className="table">
               <thead><tr>
                 <SortTh col="name">Name</SortTh>
