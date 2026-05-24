@@ -106,6 +106,13 @@ export default function Rentals() {
     });
   };
 
+  const callEdgeFunction = (path, body) =>
+    fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+      body: JSON.stringify(body),
+    }).catch(() => {});
+
   const createRental = async () => {
     if (!form.customerId) { alert('Please select a customer'); return; }
     if (!form.vehicleId) { alert('Please select a vehicle'); return; }
@@ -162,6 +169,10 @@ export default function Rentals() {
     const vehicleUpdate = { status: 'available' };
     if (returnKm) vehicleUpdate.odometer = returnKm;
     await update('vehicles', r.vehicleId, vehicleUpdate);
+    const endedCustomer = data.customers.find(c => c.id === r.customerId);
+    if (endedCustomer?.email) {
+      callEdgeFunction('send-review-email', { rental_id: r.id, customer_email: endedCustomer.email, customer_name: endedCustomer.name });
+    }
     setEndR(null);
     setRetainedAmount('');
     setRetainedNote('');
