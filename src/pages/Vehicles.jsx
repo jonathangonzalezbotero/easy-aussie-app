@@ -413,24 +413,38 @@ export default function Vehicles() {
             </div>
             {renewals.length === 0
               ? <p className="text-sm text-muted mb-20">No renewals recorded</p>
-              : <div className="mb-20">
-                {renewals.map(r => (
-                  <div key={r.id} className="history-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div className="fw-500" style={{ fontSize: 14 }}>{r.duration}</div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <div className="text-sm text-muted">{formatDate(r.renewal_date)}</div>
-                        <button className="btn btn-secondary btn-sm" onClick={() => openEditRenewal(r)}>Edit</button>
-                      </div>
+              : (() => {
+                  const today = todayStr();
+                  const latestExpiry = renewals.reduce((max, r) => r.expiry_date > max ? r.expiry_date : max, '');
+                  return (
+                    <div className="mb-20">
+                      {renewals.map(r => {
+                        const isExpired = r.expiry_date < today;
+                        const isCurrent = r.expiry_date === latestExpiry && !isExpired;
+                        return (
+                          <div key={r.id} className="history-card" style={{ opacity: isExpired ? 0.6 : 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <div className="fw-500" style={{ fontSize: 14 }}>{r.duration}</div>
+                                {isCurrent && <Badge variant="green">Current</Badge>}
+                                {isExpired && <Badge variant="gray">Expired</Badge>}
+                              </div>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <div className="text-sm text-muted">{formatDate(r.renewal_date)}</div>
+                                <button className="btn btn-secondary btn-sm" onClick={() => openEditRenewal(r)}>Edit</button>
+                              </div>
+                            </div>
+                            <div className="text-sm text-muted" style={{ marginTop: 3 }}>
+                              {isExpired ? 'Expired' : 'Expires'} {formatDate(r.expiry_date)}
+                              {r.cost ? ` · $${Number(r.cost).toLocaleString()}` : ''}
+                            </div>
+                            {r.notes && <div className="text-sm text-muted" style={{ marginTop: 4, fontStyle: 'italic' }}>{r.notes}</div>}
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="text-sm text-muted" style={{ marginTop: 3 }}>
-                      Expires {formatDate(r.expiry_date)}
-                      {r.cost ? ` · $${Number(r.cost).toLocaleString()}` : ''}
-                    </div>
-                    {r.notes && <div className="text-sm text-muted" style={{ marginTop: 4, fontStyle: 'italic' }}>{r.notes}</div>}
-                  </div>
-                ))}
-              </div>
+                  );
+                })()
             }
 
             <div className="drawer-section-title">Rental History ({vRentals.length})</div>
