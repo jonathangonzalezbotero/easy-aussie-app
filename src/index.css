@@ -100,6 +100,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .table tbody tr { cursor: pointer; transition: background 0.1s; }
 .table tbody tr:hover { background: oklch(0.97 0.006 80); }
 
+/* Picker (customer/vehicle combobox) */
+.picker-option { padding: 8px 12px; cursor: pointer; }
+.picker-option:hover, .picker-option.active { background: oklch(0.97 0.006 80); }
+.picker-group-label { padding: 6px 12px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(2px); }
 .modal { background: white; border-radius: 16px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }

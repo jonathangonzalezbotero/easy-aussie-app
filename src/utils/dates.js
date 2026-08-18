@@ -3,6 +3,13 @@ export const formatDate = (d) => {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+// For full ISO timestamps (e.g. Supabase created_at), unlike formatDate which
+// expects a plain YYYY-MM-DD string.
+export const formatTimestamp = (ts) => {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 export const daysUntil = (dateStr) => {
   if (!dateStr) return null;
   const today = new Date(); today.setHours(0, 0, 0, 0);

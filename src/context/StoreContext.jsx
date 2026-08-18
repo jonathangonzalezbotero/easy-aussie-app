@@ -37,6 +37,7 @@ const customerFromDb = (c) => ({
   address: c.address, occupation: c.occupation, emergencyContact: c.emergency_contact,
   emergencyPhone: c.emergency_phone, hotelAddress: c.hotel_address,
   licenseRef: c.license_ref, licencePhoto: c.licence_photo, notes: c.notes,
+  createdAt: c.created_at,
 });
 
 const customerToDb = (c) => ({

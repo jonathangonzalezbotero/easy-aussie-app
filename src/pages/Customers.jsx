@@ -5,7 +5,7 @@ import Drawer from '../components/shared/Drawer';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
-import { formatDate } from '../utils/dates';
+import { formatDate, formatTimestamp } from '../utils/dates';
 
 const EF = { name: '', dateOfBirth: '', phone: '', email: '', address: '', occupation: '', emergencyContact: '', emergencyPhone: '', hotelAddress: '', licenseRef: '', licencePhoto: '', notes: '' };
 
@@ -16,11 +16,11 @@ export default function Customers() {
   const [detailC, setDetailC]   = useState(null);
   const [detailPhoto, setDetailPhoto] = useState('');
   const [deleteId, setDeleteId] = useState(null);
-  const [tab, setTab]           = useState('active');
+  const [tab, setTab]           = useState('new');
   const [search, setSearch]     = useState('');
   const [saving, setSaving]     = useState(false);
   const [loadingPhoto, setLoadingPhoto] = useState(false);
-  const [sort, setSort]         = useState({ col: 'name', dir: 'asc' });
+  const [sort, setSort]         = useState({ col: 'createdAt', dir: 'desc' });
   const [form, setForm]         = useState(EF);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -39,20 +39,29 @@ export default function Customers() {
     );
   };
 
+  const rentalCount = (c) => data.rentals.filter(r => r.customerId === c.id).length;
   const hasActiveRental = (c) => data.rentals.some(r => r.customerId === c.id && r.status === 'active');
-  const activeCustomers = data.customers.filter(hasActiveRental);
-  const pastCustomers   = data.customers.filter(c => !hasActiveRental(c));
 
-  const filtered = (tab === 'active' ? activeCustomers : pastCustomers).filter(c => {
+  // New = signed up (e.g. via the intake link) but never had a rental yet.
+  // Active = currently has a rental in progress.
+  // Past = has had at least one rental, none currently active.
+  const newCustomers    = data.customers.filter(c => rentalCount(c) === 0);
+  const activeCustomers = data.customers.filter(hasActiveRental);
+  const pastCustomers   = data.customers.filter(c => rentalCount(c) > 0 && !hasActiveRental(c));
+
+  const tabCustomers = tab === 'new' ? newCustomers : tab === 'active' ? activeCustomers : pastCustomers;
+
+  const filtered = tabCustomers.filter(c => {
     const q = search.toLowerCase();
     return !q || c.name.toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q) || (c.phone || '').includes(q);
   });
 
   const customers = [...filtered].sort((a, b) => {
     const mul = sort.dir === 'asc' ? 1 : -1;
-    if (sort.col === 'name')    return a.name.localeCompare(b.name) * mul;
-    if (sort.col === 'phone')   return (a.phone || '').localeCompare(b.phone || '') * mul;
-    if (sort.col === 'email')   return (a.email || '').localeCompare(b.email || '') * mul;
+    if (sort.col === 'name')      return a.name.localeCompare(b.name) * mul;
+    if (sort.col === 'phone')     return (a.phone || '').localeCompare(b.phone || '') * mul;
+    if (sort.col === 'email')     return (a.email || '').localeCompare(b.email || '') * mul;
+    if (sort.col === 'createdAt') return ((new Date(a.createdAt || 0)) - (new Date(b.createdAt || 0))) * mul;
     if (sort.col === 'rentals') {
       const ar = data.rentals.filter(r => r.customerId === a.id && r.status === 'active').length;
       const br = data.rentals.filter(r => r.customerId === b.id && r.status === 'active').length;
@@ -142,6 +151,7 @@ export default function Customers() {
       <div className="mb-16">
         <Tabs
           tabs={[
+            { label: 'New', value: 'new', count: newCustomers.length },
             { label: 'Active', value: 'active', count: activeCustomers.length },
             { label: 'Past', value: 'past', count: pastCustomers.length },
           ]}
@@ -159,8 +169,9 @@ export default function Customers() {
           ? <EmptyState
               message={
                 data.customers.length === 0 ? 'No customers yet' :
-                tab === 'active' ? 'No active customers' :
-                search ? 'No past customers match' : 'No past customers yet'
+                search ? 'No customers match' :
+                tab === 'new' ? 'No new sign-ups without a rental yet' :
+                tab === 'active' ? 'No active customers' : 'No past customers yet'
               }
               action={data.customers.length === 0 ? <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>Add customer</button> : null}
             />
@@ -169,6 +180,7 @@ export default function Customers() {
                 <SortTh col="name">Name</SortTh>
                 <SortTh col="phone">Phone</SortTh>
                 <SortTh col="email" className="col-hide-mobile">Email</SortTh>
+                <SortTh col="createdAt">Registered</SortTh>
                 <SortTh col="rentals">Rentals</SortTh>
                 <th></th>
               </tr></thead>
@@ -181,7 +193,8 @@ export default function Customers() {
                       <td className="fw-500">{c.name}</td>
                       <td className="text-muted">{c.phone || '—'}</td>
                       <td className="text-muted col-hide-mobile">{c.email || '—'}</td>
-                      <td>{active > 0 ? <Badge variant="blue">{active} active</Badge> : <span className="text-sm text-muted">{total} total</span>}</td>
+                      <td className="text-muted">{formatTimestamp(c.createdAt)}</td>
+                      <td>{active > 0 ? <Badge variant="blue">{active} active</Badge> : total > 0 ? <span className="text-sm text-muted">{total} total</span> : <Badge variant="amber">New</Badge>}</td>
                       <td onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button className="btn btn-secondary btn-sm" onClick={e => openEdit(c, e)}>Edit</button>

@@ -61,7 +61,7 @@ export default function Maintenance() {
     return 0;
   });
   const upcoming = data.vehicles
-    .filter(v => v.nextServiceDate)
+    .filter(v => v.nextServiceDate && v.status !== 'stolen' && v.status !== 'sold')
     .map(v => ({ ...v, days: daysUntil(v.nextServiceDate) }))
     .filter(v => v.days !== null && v.days <= 30)
     .sort((a, b) => a.days - b.days);
@@ -96,13 +96,15 @@ export default function Maintenance() {
     } finally { setSaving(false); }
   };
 
+  const vehicleOptions = data.vehicles.filter(v => (v.status !== 'stolen' && v.status !== 'sold') || v.id === form.vehicleId);
+
   const renderForm = () => (
     <>
       <div className="grid-2">
         <div className="field"><label className="label">Vehicle *</label>
           <select className="select" value={form.vehicleId} onChange={e => sf('vehicleId', e.target.value)}>
             <option value="">Select vehicle…</option>
-            {data.vehicles.map(v => <option key={v.id} value={v.id}>{v.plate}{v.name ? ' · ' + v.name : ''}</option>)}
+            {vehicleOptions.map(v => <option key={v.id} value={v.id}>{v.plate}{v.name ? ' · ' + v.name : ''}</option>)}
           </select>
         </div>
         <div className="field"><label className="label">Type</label>

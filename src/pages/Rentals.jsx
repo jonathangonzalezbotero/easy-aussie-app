@@ -13,6 +13,55 @@ const EF = {
   bond: { amount: '', method: 'cash', status: 'held' },
 };
 
+// Searchable customer combobox: with no query, shows the 5 most-recently-created
+// customers (the ones a shared intake link would just have added) instead of
+// dumping the entire customer list into a plain <select>.
+const RECENT_COUNT = 5;
+const MAX_RESULTS = 20;
+
+function CustomerPicker({ customers, value, onChange }) {
+  const [query, setQuery]   = useState('');
+  const [open, setOpen]     = useState(false);
+  const selected = customers.find(c => c.id === value);
+
+  const recent = [...customers]
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    .slice(0, RECENT_COUNT);
+
+  const q = query.trim().toLowerCase();
+  const results = q
+    ? customers.filter(c =>
+        c.name.toLowerCase().includes(q) || (c.phone || '').includes(q) || (c.email || '').toLowerCase().includes(q)
+      ).slice(0, MAX_RESULTS)
+    : recent;
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        className="input"
+        placeholder="Search by name, phone or email…"
+        value={open ? query : (selected?.name || '')}
+        onFocus={() => setQuery('')}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onClick={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {open && (
+        <div style={{ position: 'absolute', zIndex: 20, top: '100%', left: 0, right: 0, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 4, maxHeight: 260, overflowY: 'auto', boxShadow: '0 6px 20px rgba(0,0,0,0.1)' }}>
+          {!q && <div className="picker-group-label">Recently added</div>}
+          {results.length === 0 && <div style={{ padding: '10px 12px', fontSize: 13 }} className="text-muted">No matches</div>}
+          {results.map(c => (
+            <div key={c.id} className="picker-option" onMouseDown={() => { onChange(c.id); setQuery(''); setOpen(false); }}>
+              <div className="fw-500" style={{ fontSize: 14 }}>{c.name}</div>
+              <div className="text-sm text-muted">{c.phone || c.email || ''}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Rentals() {
   const { data, add, update } = useStore();
   const navigate = useNavigate();
@@ -194,10 +243,7 @@ export default function Rentals() {
       <div className="grid-2">
         <div className="field">
           <label className="label">Customer *</label>
-          <select className="select" value={form.customerId} onChange={e => sf('customerId', e.target.value)}>
-            <option value="">Select customer…</option>
-            {customerOpts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <CustomerPicker customers={customerOpts} value={form.customerId} onChange={id => sf('customerId', id)} />
           {data.customers.length === 0 && <span className="field-hint">No customers yet — add one first</span>}
         </div>
         <div className="field">
