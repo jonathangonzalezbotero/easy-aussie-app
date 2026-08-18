@@ -28,6 +28,10 @@ const vehicleToDb = (v) => ({
   odometer: v.odometer ? Number(v.odometer) : null,
 });
 
+// licence_photo is a base64 data URL and can be several MB per row — never fetched in bulk,
+// only lazily per-customer via getCustomerPhoto().
+const CUSTOMER_LIST_COLUMNS = 'id, name, date_of_birth, phone, email, address, occupation, emergency_contact, emergency_phone, hotel_address, license_ref, notes, created_at';
+
 const customerFromDb = (c) => ({
   id: c.id, name: c.name, dateOfBirth: c.date_of_birth, phone: c.phone, email: c.email,
   address: c.address, occupation: c.occupation, emergencyContact: c.emergency_contact,
@@ -108,11 +112,13 @@ const signingFromDb = (s) => ({
 export function StoreProvider({ children }) {
   const [data, setData] = useState({ vehicles: [], customers: [], rentals: [], maintenance: [], settings: DEFAULT_SETTINGS, signingRequests: [] });
   const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState({});
 
   const refresh = useCallback(async () => {
+    setErrors({});
     const fetches = [
       { key: 'vehicles',        fromDb: vehicleFromDb,     query: supabase.from('vehicles').select('*').order('created_at') },
-      { key: 'customers',       fromDb: customerFromDb,    query: supabase.from('customers').select('*').order('created_at') },
+      { key: 'customers',       fromDb: customerFromDb,    query: supabase.from('customers').select(CUSTOMER_LIST_COLUMNS).order('created_at') },
       { key: 'rentals',         fromDb: rentalFromDb,      query: supabase.from('rentals').select('*').order('created_at') },
       { key: 'maintenance',     fromDb: maintenanceFromDb, query: supabase.from('maintenance').select('*').order('created_at') },
       { key: 'settings',        fromDb: settingsFromDb,    query: supabase.from('settings').select('*').eq('id', 1).single() },
@@ -120,7 +126,7 @@ export function StoreProvider({ children }) {
     ];
     await Promise.allSettled(fetches.map(async ({ key, fromDb, query }) => {
       const { data: rows, error } = await query;
-      if (error) { console.error(`Failed to load ${key}:`, error); return; }
+      if (error) { console.error(`Failed to load ${key}:`, error); setErrors(e => ({ ...e, [key]: error.message })); return; }
       if (key === 'settings') {
         setData(d => ({ ...d, settings: rows ? fromDb(rows) : DEFAULT_SETTINGS }));
       } else {
@@ -129,6 +135,14 @@ export function StoreProvider({ children }) {
     }));
     setLoading(false);
   }, []);
+
+  // licence_photo is excluded from the bulk customers fetch (see CUSTOMER_LIST_COLUMNS) —
+  // fetch it on demand when a single customer's photo actually needs to be shown/edited.
+  const getCustomerPhoto = async (id) => {
+    const { data: row, error } = await supabase.from('customers').select('licence_photo').eq('id', id).single();
+    if (error) throw error;
+    return row?.licence_photo || '';
+  };
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -165,7 +179,7 @@ export function StoreProvider({ children }) {
   };
 
   return (
-    <StoreContext.Provider value={{ data, loading, add, update, remove, updateSettings, refresh }}>
+    <StoreContext.Provider value={{ data, loading, errors, add, update, remove, updateSettings, refresh, getCustomerPhoto }}>
       {children}
     </StoreContext.Provider>
   );

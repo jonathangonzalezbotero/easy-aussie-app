@@ -26,8 +26,9 @@ function Icon({ id }) {
 }
 
 export default function Layout({ children }) {
-  const { data } = useStore();
+  const { data, loading, errors, refresh } = useStore();
   const navigate = useNavigate();
+  const failedTables = Object.keys(errors || {});
 
   const alertCount = data.vehicles.reduce((n, v) => {
     if (v.status === 'stolen' || v.status === 'sold') return n;
@@ -94,6 +95,17 @@ export default function Layout({ children }) {
 
       <main className="main">
         <div className="content">
+          {loading && (
+            <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px', marginBottom: 14, fontSize: 13, color: 'var(--muted)' }}>
+              Loading data…
+            </div>
+          )}
+          {failedTables.length > 0 && (
+            <div style={{ background: '#fdeceb', border: '1px solid #f3b5ae', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 13, color: '#8a2c22', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <span>Failed to load: {failedTables.join(', ')}</span>
+              <button className="btn btn-secondary btn-sm" onClick={refresh}>Retry</button>
+            </div>
+          )}
           {children}
         </div>
       </main>

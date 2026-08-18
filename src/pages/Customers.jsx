@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import Modal from '../components/shared/Modal';
 import Drawer from '../components/shared/Drawer';
@@ -10,14 +10,16 @@ import { formatDate } from '../utils/dates';
 const EF = { name: '', dateOfBirth: '', phone: '', email: '', address: '', occupation: '', emergencyContact: '', emergencyPhone: '', hotelAddress: '', licenseRef: '', licencePhoto: '', notes: '' };
 
 export default function Customers() {
-  const { data, add, update, remove } = useStore();
+  const { data, add, update, remove, getCustomerPhoto } = useStore();
   const [showAdd, setShowAdd]   = useState(false);
   const [editC, setEditC]       = useState(null);
   const [detailC, setDetailC]   = useState(null);
+  const [detailPhoto, setDetailPhoto] = useState('');
   const [deleteId, setDeleteId] = useState(null);
   const [tab, setTab]           = useState('active');
   const [search, setSearch]     = useState('');
   const [saving, setSaving]     = useState(false);
+  const [loadingPhoto, setLoadingPhoto] = useState(false);
   const [sort, setSort]         = useState({ col: 'name', dir: 'asc' });
   const [form, setForm]         = useState(EF);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -59,7 +61,20 @@ export default function Customers() {
     return 0;
   });
 
-  const openEdit = (c, e) => { e?.stopPropagation(); setEditC(c); setForm({ ...EF, ...c }); };
+  const openEdit = async (c, e) => {
+    e?.stopPropagation();
+    setEditC(c);
+    setForm({ ...EF, ...c, licencePhoto: '' });
+    setLoadingPhoto(true);
+    try {
+      const photo = await getCustomerPhoto(c.id);
+      setForm(f => ({ ...f, licencePhoto: photo }));
+    } catch (err) {
+      console.error('Failed to load licence photo:', err);
+    } finally {
+      setLoadingPhoto(false);
+    }
+  };
 
   const save = async () => {
     if (!form.name.trim()) { alert('Name is required'); return; }
@@ -93,6 +108,7 @@ export default function Customers() {
       </div>
       <div className="form-divider"><span>Driver's Licence</span></div>
       <div className="field"><label className="label">Licence Number / Reference</label><input className="input" value={form.licenseRef} onChange={e => sf('licenseRef', e.target.value)} /></div>
+      {loadingPhoto && editC && <p className="text-sm text-muted">Loading photo…</p>}
       {form.licencePhoto && (
         <div>
           <div className="label" style={{ marginBottom: 6 }}>Licence Photo</div>
@@ -106,6 +122,15 @@ export default function Customers() {
 
   const selected  = detailC ? data.customers.find(c => c.id === detailC.id) : null;
   const cRentals  = selected ? data.rentals.filter(r => r.customerId === selected.id) : [];
+
+  useEffect(() => {
+    if (!selected?.id) { setDetailPhoto(''); return; }
+    let cancelled = false;
+    getCustomerPhoto(selected.id)
+      .then(photo => { if (!cancelled) setDetailPhoto(photo); })
+      .catch(err => console.error('Failed to load licence photo:', err));
+    return () => { cancelled = true; };
+  }, [selected?.id]);
 
   return (
     <div>
@@ -177,7 +202,7 @@ export default function Customers() {
       </Modal>
 
       <Modal open={!!editC} onClose={() => setEditC(null)} title="Edit Customer" width={560}
-        footer={<><button className="btn btn-secondary" onClick={() => setEditC(null)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button></>}>
+        footer={<><button className="btn btn-secondary" onClick={() => setEditC(null)}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={saving || loadingPhoto}>{saving ? 'Saving…' : loadingPhoto ? 'Loading…' : 'Save Changes'}</button></>}>
         {renderForm()}
       </Modal>
 
@@ -202,11 +227,11 @@ export default function Customers() {
                 </div>
               )}
             </div>
-            {(selected.licenseRef || selected.licencePhoto) && (
+            {(selected.licenseRef || detailPhoto) && (
               <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
                 <div className="label" style={{ marginBottom: 8 }}>Driver's Licence</div>
-                {selected.licenseRef && <div style={{ fontSize: 14, marginBottom: selected.licencePhoto ? 10 : 0 }}>{selected.licenseRef}</div>}
-                {selected.licencePhoto && <img src={selected.licencePhoto} alt="Licence" style={{ maxWidth: 200, borderRadius: 8, border: '1px solid var(--border)' }} />}
+                {selected.licenseRef && <div style={{ fontSize: 14, marginBottom: detailPhoto ? 10 : 0 }}>{selected.licenseRef}</div>}
+                {detailPhoto && <img src={detailPhoto} alt="Licence" style={{ maxWidth: 200, borderRadius: 8, border: '1px solid var(--border)' }} />}
               </div>
             )}
             {selected.notes && <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '12px 14px', marginBottom: 20, fontSize: 14, color: 'var(--muted)' }}>{selected.notes}</div>}
