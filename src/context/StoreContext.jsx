@@ -110,22 +110,23 @@ export function StoreProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [vehicles, customers, rentals, maintenance, settings, signingRequests] = await Promise.all([
-      supabase.from('vehicles').select('*').order('created_at'),
-      supabase.from('customers').select('*').order('created_at'),
-      supabase.from('rentals').select('*').order('created_at'),
-      supabase.from('maintenance').select('*').order('created_at'),
-      supabase.from('settings').select('*').eq('id', 1).single(),
-      supabase.from('signing_requests').select('*').order('created_at', { ascending: false }),
-    ]);
-    setData({
-      vehicles:        (vehicles.data        || []).map(vehicleFromDb),
-      customers:       (customers.data       || []).map(customerFromDb),
-      rentals:         (rentals.data         || []).map(rentalFromDb),
-      maintenance:     (maintenance.data     || []).map(maintenanceFromDb),
-      settings:        settings.data ? settingsFromDb(settings.data) : DEFAULT_SETTINGS,
-      signingRequests: (signingRequests.data || []).map(signingFromDb),
-    });
+    const fetches = [
+      { key: 'vehicles',        fromDb: vehicleFromDb,     query: supabase.from('vehicles').select('*').order('created_at') },
+      { key: 'customers',       fromDb: customerFromDb,    query: supabase.from('customers').select('*').order('created_at') },
+      { key: 'rentals',         fromDb: rentalFromDb,      query: supabase.from('rentals').select('*').order('created_at') },
+      { key: 'maintenance',     fromDb: maintenanceFromDb, query: supabase.from('maintenance').select('*').order('created_at') },
+      { key: 'settings',        fromDb: settingsFromDb,    query: supabase.from('settings').select('*').eq('id', 1).single() },
+      { key: 'signingRequests', fromDb: signingFromDb,     query: supabase.from('signing_requests').select('*').order('created_at', { ascending: false }) },
+    ];
+    await Promise.allSettled(fetches.map(async ({ key, fromDb, query }) => {
+      const { data: rows, error } = await query;
+      if (error) { console.error(`Failed to load ${key}:`, error); return; }
+      if (key === 'settings') {
+        setData(d => ({ ...d, settings: rows ? fromDb(rows) : DEFAULT_SETTINGS }));
+      } else {
+        setData(d => ({ ...d, [key]: (rows || []).map(fromDb) }));
+      }
+    }));
     setLoading(false);
   }, []);
 
