@@ -42,7 +42,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invalid signing link' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    if (new Date(sigReq.expires_at) < new Date()) {
+    // Signed agreements stay viewable forever — expiry only gates unsigned links.
+    if (sigReq.status !== 'signed' && new Date(sigReq.expires_at) < new Date()) {
       return new Response(JSON.stringify({ error: 'This signing link has expired' }), { status: 410, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 

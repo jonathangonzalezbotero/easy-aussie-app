@@ -34,14 +34,30 @@ serve(async (req) => {
       getServiceRoleKey(),
     );
 
-    const { data: sigReq, error } = await supabase
+    // If this rental was already signed, reuse that request so the customer gets a
+    // read-only copy of the signed agreement instead of a second chance to sign.
+    const { data: signedReq } = await supabase
       .from('signing_requests')
-      .insert({ rental_id })
-      .select()
-      .single();
+      .select('*')
+      .eq('rental_id', rental_id)
+      .eq('status', 'signed')
+      .order('signed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (error) throw error;
+    let sigReq = signedReq;
 
+    if (!sigReq) {
+      const { data: created, error } = await supabase
+        .from('signing_requests')
+        .insert({ rental_id })
+        .select()
+        .single();
+      if (error) throw error;
+      sigReq = created;
+    }
+
+    const alreadySigned = sigReq.status === 'signed';
     const signingUrl = `https://app.easyaussie.com.au/sign/${sigReq.token}`;
     const firstName = customer_name?.split(' ')[0] || 'there';
 
@@ -56,12 +72,20 @@ serve(async (req) => {
         <tr>
           <td style="background:#2d8a5a;padding:28px 40px;">
             <p style="margin:0;font-size:20px;font-weight:700;color:white;">Easy Aussie AU</p>
-            <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.8);">Rental Agreement · Action Required</p>
+            <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.8);">${alreadySigned ? 'Rental Agreement · Signed Copy' : 'Rental Agreement · Action Required'}</p>
           </td>
         </tr>
         <tr>
           <td style="padding:36px 40px;">
             <p style="margin:0 0 16px;font-size:16px;color:#1a1a1a;">Hi ${firstName},</p>
+            ${alreadySigned ? `
+            <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#444;">
+              Here is a copy of your signed rental agreement with <strong>Easy Aussie AU Pty Ltd</strong>.
+              You can view it any time using the link below — no further action is needed.
+            </p>
+            <p style="margin:0 0 28px;font-size:14px;line-height:1.7;color:#444;">
+              Signed by <strong>${sigReq.signer_name || customer_name || 'you'}</strong>${sigReq.signed_at ? ` on ${new Date(sigReq.signed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}.
+            </p>` : `
             <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#444;">
               Your rental agreement with <strong>Easy Aussie AU Pty Ltd</strong> is ready for your review and signature.
               Please click the button below to read the full contract and sign it electronically.
@@ -69,17 +93,17 @@ serve(async (req) => {
             <p style="margin:0 0 28px;font-size:14px;line-height:1.7;color:#444;">
               Your electronic signature (typed name) is legally binding under the Australian
               <em>Electronic Transactions Act 1999</em>.
-            </p>
+            </p>`}
             <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
               <tr>
                 <td style="background:#2d8a5a;border-radius:8px;">
                   <a href="${signingUrl}" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:white;text-decoration:none;">
-                    Review &amp; Sign Contract →
+                    ${alreadySigned ? 'View Signed Agreement →' : 'Review &amp; Sign Contract →'}
                   </a>
                 </td>
               </tr>
             </table>
-            <p style="margin:0 0 8px;font-size:13px;color:#888;">This link expires in 7 days. If you have any questions, please contact us directly.</p>
+            <p style="margin:0 0 8px;font-size:13px;color:#888;">${alreadySigned ? 'If you have any questions about your agreement, please contact us directly.' : 'This link expires in 7 days. If you have any questions, please contact us directly.'}</p>
             <p style="margin:0;font-size:12px;color:#bbb;word-break:break-all;">Or copy this link: ${signingUrl}</p>
           </td>
         </tr>
@@ -103,7 +127,9 @@ serve(async (req) => {
       body: JSON.stringify({
         from: `Easy Aussie AU <${Deno.env.get('RESEND_FROM_EMAIL') || 'noreply@easyaussie.com.au'}>`,
         to: customer_email,
-        subject: 'Your rental agreement is ready to sign — Easy Aussie AU',
+        subject: alreadySigned
+          ? 'Your signed rental agreement — Easy Aussie AU'
+          : 'Your rental agreement is ready to sign — Easy Aussie AU',
         html,
       }),
     });
@@ -114,7 +140,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, token: sigReq.token }),
+      JSON.stringify({ success: true, token: sigReq.token, signed: alreadySigned }),
       { headers: { ...cors, 'Content-Type': 'application/json' } },
     );
   } catch (err) {

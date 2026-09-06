@@ -54,6 +54,7 @@ export default function ContractPage() {
     startDate:        rental.startDate || '',
     endDate:          rental.endDate || '',
     bondAmount:       rental.bond?.amount || settings.defaultBond || '300',
+    price:            rental.price || '',
     contractNumber:   rental.contractNumber || '',
     odometer:         rental.odometer ? Number(rental.odometer).toLocaleString() : '',
     renterSignedName: sigReq?.status === 'signed' ? sigReq.signerName : null,
@@ -80,6 +81,10 @@ export default function ContractPage() {
       root.style.setProperty(k, v);
     });
 
+    // Pin desktop geometry during capture so a PDF generated from a narrow
+    // window is identical to one generated from a wide one.
+    contractRef.current?.classList.add('pdf-mode');
+
     try {
       const html2pdf = (await import('html2pdf.js')).default;
       const namePart = d.renterName ? d.renterName.replace(/\s+/g, '-') : 'customer';
@@ -100,6 +105,7 @@ export default function ContractPage() {
       console.error('PDF generation failed:', err);
       setDownloadError("PDF generation failed. Try again or use your browser's print function (Ctrl+P / Cmd+P).");
     } finally {
+      contractRef.current?.classList.remove('pdf-mode');
       Object.entries(saved).forEach(([k, v]) => {
         if (v) root.style.setProperty(k, v);
         else root.style.removeProperty(k);
@@ -166,12 +172,10 @@ export default function ContractPage() {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-secondary" onClick={() => navigate(-1)}>← Back</button>
-            {sigReq?.status !== 'signed' && (
-              <button className="btn btn-secondary" onClick={openSendEmail}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                {sigReq ? 'Resend for Signing' : 'Send for Signing'}
-              </button>
-            )}
+            <button className="btn btn-secondary" onClick={openSendEmail}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              {sigReq?.status === 'signed' ? 'Email Signed Copy' : sigReq ? 'Resend for Signing' : 'Send for Signing'}
+            </button>
             <button className="btn btn-primary" onClick={downloadPDF} disabled={downloading}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               {downloading ? 'Generating PDF…' : 'Download PDF'}
@@ -186,7 +190,9 @@ export default function ContractPage() {
       {/* Send for Signing panel */}
       {sendEmailOpen && (
         <div style={{ background: '#f0fdf4', borderBottom: '1px solid #86efac', padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#166534' }}>Send signing link to:</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#166534' }}>
+            {sigReq?.status === 'signed' ? 'Email the signed agreement to:' : 'Send signing link to:'}
+          </span>
           <input
             style={{ border: '1px solid #86efac', borderRadius: 6, padding: '6px 10px', fontSize: 13, width: 240, outline: 'none', background: 'white' }}
             type="email"
@@ -203,7 +209,13 @@ export default function ContractPage() {
           <button className="btn btn-secondary btn-sm" onClick={() => { setSendEmailOpen(false); setSendResult(null); }}>
             {sendResult === 'sent' ? 'Close' : 'Cancel'}
           </button>
-          {sendResult === 'sent' && <span style={{ fontSize: 13, color: '#166534', fontWeight: 600 }}>Email sent! The customer will receive a signing link valid for 7 days.</span>}
+          {sendResult === 'sent' && (
+            <span style={{ fontSize: 13, color: '#166534', fontWeight: 600 }}>
+              {sigReq?.status === 'signed'
+                ? 'Email sent! The customer can view their signed agreement from the link.'
+                : 'Email sent! The customer will receive a signing link valid for 7 days.'}
+            </span>
+          )}
           {sendResult === 'error' && <span style={{ fontSize: 13, color: 'var(--red)' }}>Failed to send. Check the email address and try again.</span>}
         </div>
       )}

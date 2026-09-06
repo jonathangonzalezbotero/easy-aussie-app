@@ -97,10 +97,11 @@ export default function Rentals() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
         body: JSON.stringify({ rental_id: rental.id, customer_email: email.trim(), customer_name: customer?.name || '' }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed');
       setSignResult('sent');
-      // Refresh to pick up new signing_request row
-      setTimeout(() => { window.location.reload(); }, 1500);
+      // Only a fresh signing request changes local state; a signed copy re-uses the existing row.
+      if (!json.signed) setTimeout(() => { window.location.reload(); }, 1500);
     } catch {
       setSignResult('error');
     } finally {
@@ -601,38 +602,45 @@ export default function Rentals() {
                         <div className="text-sm text-muted" style={{ marginTop: 6 }}>
                           Signed by <strong>{sigReq.signerName}</strong> on {new Date(sigReq.signedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
                         </div>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          style={{ marginTop: 10 }}
+                          onClick={() => window.open(`/sign/${sigReq.token}`, '_blank')}
+                        >
+                          View Signed Contract
+                        </button>
                       </div>
                     ) : sigReq ? (
                       <div>
                         <Badge variant="amber">Awaiting signature</Badge>
                         <div className="text-sm text-muted" style={{ marginTop: 6 }}>Link sent · expires {new Date(sigReq.expiresAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>
-                        <button className="btn btn-secondary btn-sm" style={{ marginTop: 10 }} onClick={() => { setSignEmailAddr(customer?.email || ''); setSignResult(null); }}>Resend Link</button>
                       </div>
                     ) : (
                       <div className="text-sm text-muted">Not sent yet</div>
                     )}
-                    {sigReq?.status !== 'signed' && (
-                      <div style={{ marginTop: 12 }}>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <input
-                            type="email"
-                            placeholder={customer?.email || 'customer@email.com'}
-                            value={signEmailAddr}
-                            onChange={e => setSignEmailAddr(e.target.value)}
-                            style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none' }}
-                          />
-                          <button
-                            className="btn btn-primary btn-sm"
-                            disabled={sendingSign || !signEmailAddr.trim()}
-                            onClick={() => sendSigningEmail(selected, signEmailAddr)}
-                          >
-                            {sendingSign ? 'Sending…' : 'Send'}
-                          </button>
-                        </div>
-                        {signResult === 'sent' && <div className="text-sm" style={{ color: '#166534', marginTop: 6 }}>Signing link sent!</div>}
-                        {signResult === 'error' && <div className="text-sm" style={{ color: 'var(--red)', marginTop: 6 }}>Failed to send. Try again.</div>}
+                    <div style={{ marginTop: 12 }}>
+                      <div className="label" style={{ marginBottom: 6 }}>
+                        {sigReq?.status === 'signed' ? 'Email the signed agreement to' : 'Email a signing link to'}
                       </div>
-                    )}
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <input
+                          type="email"
+                          placeholder={customer?.email || 'customer@email.com'}
+                          value={signEmailAddr}
+                          onChange={e => setSignEmailAddr(e.target.value)}
+                          style={{ flex: '1 1 160px', minWidth: 0, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 13, outline: 'none' }}
+                        />
+                        <button
+                          className="btn btn-primary btn-sm"
+                          disabled={sendingSign || !signEmailAddr.trim()}
+                          onClick={() => sendSigningEmail(selected, signEmailAddr)}
+                        >
+                          {sendingSign ? 'Sending…' : sigReq?.status === 'signed' ? 'Send Copy' : 'Send'}
+                        </button>
+                      </div>
+                      {signResult === 'sent' && <div className="text-sm" style={{ color: '#166534', marginTop: 6 }}>{sigReq?.status === 'signed' ? 'Signed copy sent!' : 'Signing link sent!'}</div>}
+                      {signResult === 'error' && <div className="text-sm" style={{ color: 'var(--red)', marginTop: 6 }}>Failed to send. Try again.</div>}
+                    </div>
                   </div>
                 );
               })()}

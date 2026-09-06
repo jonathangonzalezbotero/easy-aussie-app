@@ -3,6 +3,41 @@ const fmtDate = (s) => {
   return new Date(s + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 };
 
+export const fmtMoney = (v) =>
+  Number(v).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+// Screen-responsive layout for the contract. Every rule is reverted by `.pdf-mode`
+// so an A4 PDF captured from a narrow window looks identical to a desktop one.
+const contractCss = `
+.contract-doc { padding: 48px 56px; }
+.contract-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 16px; }
+.contract-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.contract-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.contract-sig-block { min-width: 0; }
+.contract-sig-name { font-family: Georgia, serif; font-size: 26px; color: #1a1a1a; letter-spacing: 0.02em; margin-bottom: 2px; overflow-wrap: anywhere; }
+.contract-sig-slot { height: 80px; display: flex; align-items: flex-end; }
+.contract-sig-img-wrap { width: 220px; max-width: 100%; height: 75px; overflow: hidden; position: relative; }
+.contract-header-meta { display: flex; justify-content: center; gap: 24px; font-size: 14px; flex-wrap: wrap; }
+
+@media (max-width: 700px) {
+  .contract-doc:not(.pdf-mode) { padding: 28px 20px; border-radius: 10px; }
+  .contract-doc:not(.pdf-mode) .contract-grid-3 { grid-template-columns: repeat(2, 1fr); }
+  .contract-doc:not(.pdf-mode) .contract-parties { grid-template-columns: 1fr; gap: 20px; }
+  .contract-doc:not(.pdf-mode) .contract-signatures { grid-template-columns: 1fr; gap: 28px; }
+  .contract-doc:not(.pdf-mode) .contract-sig-slot { height: auto; min-height: 80px; }
+  .contract-doc:not(.pdf-mode) .contract-sig-name { font-size: 22px; }
+  /* !important: the list items carry inline margins that would otherwise win */
+  .contract-doc:not(.pdf-mode) ul { margin-left: 0 !important; padding-left: 20px; }
+}
+@media (max-width: 420px) {
+  .contract-doc:not(.pdf-mode) { padding: 22px 16px; }
+  .contract-doc:not(.pdf-mode) .contract-grid-3 { grid-template-columns: 1fr; }
+}
+
+/* PDF capture: pin desktop geometry regardless of viewport width. */
+.contract-doc.pdf-mode { width: 800px !important; max-width: none !important; padding: 48px 56px !important; }
+`;
+
 const Field = ({ label, value }) => (
   <div>
     <div style={{ fontSize: 11, color: '#666', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>{label}</div>
@@ -23,7 +58,21 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
   const sectionTitleStyle = { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#2d8a5a', marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid #d0d0cc', display: 'flex', alignItems: 'center', gap: 8 };
   const numBadge          = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#2d8a5a', color: 'white', width: 20, height: 20, borderRadius: '50%', fontSize: 11, fontWeight: 700, flexShrink: 0 };
   const bodyText          = { fontSize: 13.5, lineHeight: 1.7, color: '#333' };
-  const grid3             = { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px 16px' };
+
+  // Rental fee — highlighted at the top of the Payment section (weekly rate)
+  const RateBlock = () => (
+    <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '12px 16px', marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#166534', marginBottom: 4 }}>Rental Fee</div>
+      {d.price ? (
+        <div style={{ fontSize: 20, fontWeight: 700, color: '#14532d' }}>
+          ${fmtMoney(d.price)} AUD <span style={{ fontSize: 13.5, fontWeight: 600, color: '#166534' }}>per week</span>
+        </div>
+      ) : (
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#166534' }}>$_______________ AUD per week</div>
+      )}
+      <div style={{ fontSize: 12, color: '#166534', marginTop: 4 }}>Charged weekly for the duration of the rental period. Separate from the refundable security bond below.</div>
+    </div>
+  );
 
   const CheckItem = ({ children }) => (
     <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'flex-start' }}>
@@ -74,17 +123,18 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
 
   const scooterSections = [
     { num: '1', title: 'Scooter Details', content: (
-      <div style={grid3}>
+      <div className="contract-grid-3">
         {[['Make and Model', [d.vehicleMake, d.vehicleModel].filter(Boolean).join(' ') || '_______________'], ['Year', d.vehicleYear || '_______________'], ['Colour', d.vehicleColour ? d.vehicleColour.toUpperCase() : '_______________'], ['Registration', d.vehicleRego || '_______________'], ['Engine Capacity', d.vehicleEngine || '_______________']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
     { num: '2', title: 'Rental Period (Weekly Basis)', content: (
-      <div style={grid3}>
+      <div className="contract-grid-3">
         {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : 'Ongoing weekly rental']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
     { num: '3', title: 'Payment & Security Bond', content: (
       <div style={bodyText}>
+        <RateBlock />
         <p style={{ marginBottom: 8 }}>Rental fees must be paid before scooter key handover.</p>
         <p style={{ marginBottom: 8 }}>A refundable security bond of <strong>${d.bondAmount} AUD</strong> is required.</p>
         <p style={{ marginBottom: 4 }}>The bond may be used to cover:</p>
@@ -147,17 +197,18 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
 
   const ebikeSections = [
     { num: '1', title: 'E-Bike Details', content: (
-      <div style={grid3}>
+      <div className="contract-grid-3">
         {[['Make', d.vehicleMake || '_______________'], ['Year', d.vehicleYear || '_______________'], ['Colour', d.vehicleColour ? d.vehicleColour.toUpperCase() : '_______________'], ['Registration / ID', d.vehicleRego || '_______________']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
     { num: '2', title: 'Rental Period (Weekly Basis)', content: (
-      <div style={grid3}>
+      <div className="contract-grid-3">
         {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : 'Ongoing weekly rental']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
     { num: '3', title: 'Payment & Security Bond', content: (
       <div style={bodyText}>
+        <RateBlock />
         <p style={{ marginBottom: 8 }}>Rental fees must be paid prior to e-bike handover.</p>
         <p style={{ marginBottom: 8 }}>A refundable security bond of <strong>${d.bondAmount} AUD</strong> is required.</p>
         <p style={{ marginBottom: 4 }}>The bond may be used to cover:</p>
@@ -218,17 +269,18 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
 
   const carSections = [
     { num: '1', title: 'Vehicle Details', content: (
-      <div style={grid3}>
+      <div className="contract-grid-3">
         {[['Make', d.vehicleMake || '_______________'], ['Model', d.vehicleModel || '_______________'], ['Year', d.vehicleYear || '_______________'], ['Colour', d.vehicleColour ? d.vehicleColour.toUpperCase() : '_______________'], ['Registration', d.vehicleRego || '_______________'], ['Engine Capacity', d.vehicleEngine || '_______________'], ...(d.odometer ? [['Odometer at Start', d.odometer + ' km']] : [])].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
     { num: '2', title: 'Rental Period', content: (
-      <div style={grid3}>
+      <div className="contract-grid-3">
         {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : 'Ongoing weekly rental']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
     { num: '3', title: 'Payment & Security Bond', content: (
       <div style={bodyText}>
+        <RateBlock />
         <p style={{ marginBottom: 8 }}>Rental fees must be paid before vehicle key handover.</p>
         <p style={{ marginBottom: 8 }}>A refundable security bond of <strong>${d.bondAmount} AUD</strong> is required.</p>
         <p style={{ marginBottom: 4 }}>The bond may be used to cover:</p>
@@ -291,7 +343,8 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
   const agreementType = isCar ? 'Car Rental Agreement' : isEbike ? 'E-Bike Rental Agreement' : 'Scooter Rental Agreement';
 
   return (
-    <div ref={contractRef} style={{ background: 'white', borderRadius: 12, padding: '48px 56px', boxShadow: '0 2px 20px rgba(0,0,0,0.06)', fontFamily: "'DM Sans', sans-serif" }}>
+    <div ref={contractRef} className="contract-doc" style={{ background: 'white', borderRadius: 12, boxShadow: '0 2px 20px rgba(0,0,0,0.06)', fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{contractCss}</style>
 
       {missing.length > 0 && (
         <div style={{ background: '#fef3c7', border: '1px solid #d97706', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#92400e', marginBottom: 20, fontWeight: 500 }}>
@@ -303,14 +356,14 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
       <div style={{ textAlign: 'center', marginBottom: 32, paddingBottom: 24, borderBottom: '2px solid #1a1a1a' }}>
         <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>{d.ownerCompany}</div>
         <div style={{ fontSize: 16, fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>{agreementType}</div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 24, fontSize: 14 }}>
+        <div className="contract-header-meta">
           <span>Date: <strong>{today}</strong></span>
           {d.contractNumber && <span>Contract No.: <strong>{d.contractNumber}</strong></span>}
         </div>
       </div>
 
       {/* Parties */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 28, padding: '20px 24px', background: '#f7f6f2', borderRadius: 10 }}>
+      <div className="contract-parties" style={{ marginBottom: 28, padding: '20px 24px', background: '#f7f6f2', borderRadius: 10 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#666', marginBottom: 10 }}>The Owner</div>
           <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{d.ownerCompany}</div>
@@ -347,13 +400,13 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
         <p style={{ fontSize: 13.5, lineHeight: 1.7, color: '#333', marginBottom: 24 }}>
           By signing this Agreement, the Renter confirms that they have read and understood all terms, accept financial responsibility where applicable, and agree to comply with all relevant Queensland road laws and regulations.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
+        <div className="contract-signatures">
           {/* Owner */}
-          <div>
+          <div className="contract-sig-block">
             <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Owner</div>
-            <div style={{ height: 80, display: 'flex', alignItems: 'flex-end' }}>
+            <div className="contract-sig-slot">
               {ownerSignature && (
-                <div style={{ width: 220, height: 75, overflow: 'hidden', position: 'relative' }}>
+                <div className="contract-sig-img-wrap">
                   <img src="/signature.jpg" alt="Owner signature" style={{ height: 220, width: 75, objectFit: 'contain', position: 'absolute', top: 0, left: 0, transform: 'rotate(-90deg) translateX(-100%)', transformOrigin: 'left top' }} />
                 </div>
               )}
@@ -367,12 +420,12 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
             </div>
           </div>
           {/* Renter */}
-          <div>
+          <div className="contract-sig-block">
             <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Renter</div>
-            <div style={{ height: 80, display: 'flex', alignItems: 'flex-end' }}>
+            <div className="contract-sig-slot">
               {d.renterSignedName ? (
-                <div>
-                  <div style={{ fontFamily: 'Georgia, serif', fontSize: 26, color: '#1a1a1a', letterSpacing: '0.02em', marginBottom: 2 }}>{d.renterSignedName}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div className="contract-sig-name">{d.renterSignedName}</div>
                   {d.renterSignedAt && <div style={{ fontSize: 11, color: '#999' }}>Signed electronically {new Date(d.renterSignedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>}
                 </div>
               ) : null}
