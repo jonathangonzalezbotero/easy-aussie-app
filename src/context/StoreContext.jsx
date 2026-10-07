@@ -57,6 +57,7 @@ const rentalFromDb = (r) => ({
   odometerReturn: r.odometer_return ? String(r.odometer_return) : '',
   contractNumber: r.contract_number || '',
   price: r.price ? String(r.price) : '',
+  billingPeriod: r.billing_period || 'weekly',
 });
 
 const rentalToDb = (r) => ({
@@ -70,6 +71,7 @@ const rentalToDb = (r) => ({
   odometer_return: r.odometerReturn ? Number(r.odometerReturn) : null,
   contract_number: r.contractNumber || null,
   price: r.price ? Number(r.price) : null,
+  billing_period: r.billingPeriod || 'weekly',
 });
 
 const maintenanceFromDb = (m) => ({

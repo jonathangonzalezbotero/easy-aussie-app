@@ -49,6 +49,7 @@ function buildD(rental, settings, signedName = null, signedAt = null) {
     endDate:          rental.end_date     || '',
     bondAmount:       rental.bond_amount  ? String(rental.bond_amount) : (s.default_bond || '300'),
     price:            rental.price        || '',
+    billingPeriod:    rental.billing_period || 'weekly',
     contractNumber:   rental.contract_number || '',
     odometer:         rental.odometer     ? Number(rental.odometer).toLocaleString() : '',
     renterSignedName: signedName,
@@ -217,10 +218,10 @@ export default function SigningPage() {
             <SummaryItem
               label="Rental fee"
               value={d.price ? `$${fmtMoney(d.price)}` : '—'}
-              sub={d.price ? 'per week' : 'To be confirmed'}
+              sub={d.price ? (d.billingPeriod === 'fixed' ? 'per rental period' : 'per week') : 'To be confirmed'}
               highlight
             />
-            <SummaryItem label="Rental period" value={period || '—'} sub={d.endDate ? null : 'Weekly, ongoing'} />
+            <SummaryItem label="Rental period" value={period || '—'} sub={d.endDate ? null : (d.billingPeriod === 'fixed' ? 'As agreed' : 'Weekly, ongoing')} />
             <SummaryItem label="Refundable bond" value={`$${fmtMoney(d.bondAmount)}`} sub="Returned after inspection" />
           </div>
         </div>

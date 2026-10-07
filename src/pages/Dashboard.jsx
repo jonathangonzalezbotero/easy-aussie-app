@@ -49,8 +49,11 @@ export default function Dashboard() {
   const availableVehicles = data.vehicles.filter(v => v.status === 'available');
   const heldBonds = data.rentals.filter(r => r.bond?.status === 'held');
   const totalBondHeld = heldBonds.reduce((s, r) => s + (Number(r.bond.amount) || 0), 0);
-  const weeklyRevenue = activeRentals.reduce((s, r) => s + (Number(r.price) || 0), 0);
-  const rentalsWithPrice = activeRentals.filter(r => r.price).length;
+  // Fixed-price rentals are excluded: their price is a one-off amount for the whole period, not per week.
+  const weeklyRentals = activeRentals.filter(r => r.billingPeriod !== 'fixed');
+  const fixedCount = activeRentals.length - weeklyRentals.length;
+  const weeklyRevenue = weeklyRentals.reduce((s, r) => s + (Number(r.price) || 0), 0);
+  const rentalsWithPrice = weeklyRentals.filter(r => r.price).length;
 
   const alerts = [];
   data.vehicles.forEach(v => {
@@ -69,7 +72,7 @@ export default function Dashboard() {
 
   const stats = [
     { label: 'Vehicles', value: data.vehicles.length, sub: `${availableVehicles.length} available`, color: 'var(--accent)', to: '/vehicles' },
-    { label: 'Weekly Revenue', value: `$${weeklyRevenue.toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, sub: `${activeRentals.length} active · ${rentalsWithPrice} priced`, color: 'var(--blue)', to: '/rentals' },
+    { label: 'Weekly Revenue', value: `$${weeklyRevenue.toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, sub: `${weeklyRentals.length} weekly · ${rentalsWithPrice} priced${fixedCount ? ` · ${fixedCount} fixed-price excluded` : ''}`, color: 'var(--blue)', to: '/rentals' },
     { label: 'Bonds Held', value: `$${totalBondHeld.toLocaleString()}`, sub: `${heldBonds.length} outstanding`, color: 'var(--amber)', to: '/bonds' },
     { label: 'Alerts', value: alerts.length, sub: alerts.length ? 'Needs attention' : 'All clear', color: alerts.length ? 'var(--red)' : 'var(--accent)', to: '/' },
   ];
@@ -126,7 +129,7 @@ export default function Dashboard() {
               <SortTh col="vehicle">Vehicle</SortTh>
               <SortTh col="startDate" className="col-hide-mobile">Started</SortTh>
               <SortTh col="payDay">Pay Day</SortTh>
-              <SortTh col="price">Price/wk</SortTh>
+              <SortTh col="price">Price</SortTh>
               <SortTh col="bond">Bond</SortTh>
             </tr></thead>
             <tbody>
@@ -140,7 +143,7 @@ export default function Dashboard() {
                     <td>{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</td>
                     <td className="text-muted col-hide-mobile">{formatDate(r.startDate)}</td>
                     <td className="text-muted">{payDay}</td>
-                    <td className="text-muted">{r.price ? `$${Number(r.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '—'}</td>
+                    <td className="text-muted">{r.price ? `$${Number(r.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}${r.billingPeriod === 'fixed' ? ' total' : '/wk'}` : '—'}</td>
                     <td>
                       {r.bond?.amount
                         ? <Badge variant={r.bond.status === 'held' ? 'amber' : 'green'}>{r.bond.status === 'held' ? `Held $${r.bond.amount}` : 'Returned'}</Badge>

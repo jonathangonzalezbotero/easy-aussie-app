@@ -58,6 +58,7 @@ create table if not exists rentals (
   contract_ref     text,
   notes            text,
   price            numeric,
+  billing_period   text default 'weekly' check (billing_period in ('weekly','fixed')),
   odometer_return  numeric,
   created_at       timestamptz default now()
 );
@@ -65,6 +66,7 @@ create table if not exists rentals (
 -- Run this if the tables already exist:
 -- alter table rentals add column if not exists price numeric;
 -- alter table rentals add column if not exists odometer_return numeric;
+-- alter table rentals add column if not exists billing_period text default 'weekly' check (billing_period in ('weekly','fixed'));
 
 create table if not exists maintenance (
   id                uuid primary key default gen_random_uuid(),

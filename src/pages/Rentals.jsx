@@ -9,7 +9,7 @@ import Tabs from '../components/shared/Tabs';
 import { formatDate, daysBetween, todayStr } from '../utils/dates';
 
 const EF = {
-  customerId: '', vehicleId: '', startDate: todayStr(), endDate: '', contractNumber: '', notes: '', odometer: '', price: '',
+  customerId: '', vehicleId: '', startDate: todayStr(), endDate: '', contractNumber: '', notes: '', odometer: '', price: '', billingPeriod: 'weekly',
   bond: { amount: '', method: 'cash', status: 'held' },
 };
 
@@ -152,6 +152,7 @@ export default function Rentals() {
       notes: r.notes || '',
       odometer: r.odometer || '',
       price: r.price || '',
+      billingPeriod: r.billingPeriod || 'weekly',
       bond: { amount: r.bond?.amount || '', method: r.bond?.method || 'cash', status: r.bond?.status || 'held' },
     });
   };
@@ -260,16 +261,26 @@ export default function Rentals() {
         <div className="field"><label className="label">Start Date *</label><input className="input" type="date" value={form.startDate} onChange={e => sf('startDate', e.target.value)} /></div>
         <div className="field"><label className="label">End Date (optional)</label><input className="input" type="date" value={form.endDate} onChange={e => sf('endDate', e.target.value)} /></div>
       </div>
-      <div className="grid-2">
-        {data.vehicles.find(v => v.id === form.vehicleId)?.type !== 'ebike' && (
+      {data.vehicles.find(v => v.id === form.vehicleId)?.type !== 'ebike' && (
+        <div className="grid-2">
           <div className="field">
             <label className="label">Odometer (km)</label>
             <input className="input" type="number" min="0" value={form.odometer} onChange={e => sf('odometer', e.target.value)} placeholder="e.g. 4250" />
           </div>
-        )}
+        </div>
+      )}
+      <div className="grid-2">
         <div className="field">
-          <label className="label">Weekly Price ($)</label>
-          <input className="input" type="number" min="0" step="0.01" value={form.price} onChange={e => sf('price', e.target.value)} placeholder="e.g. 150" />
+          <label className="label">Billing Basis</label>
+          <select className="select" value={form.billingPeriod} onChange={e => sf('billingPeriod', e.target.value)}>
+            <option value="weekly">Weekly (price per week)</option>
+            <option value="fixed">Fixed amount for the rental period</option>
+          </select>
+          <span className="field-hint">Weekly: the contract says "per week". Fixed: a single amount for the whole period, e.g. $105 for 2 days — the contract says "per rental period"</span>
+        </div>
+        <div className="field">
+          <label className="label">{form.billingPeriod === 'fixed' ? 'Total Price for Rental Period ($)' : 'Weekly Price ($)'}</label>
+          <input className="input" type="number" min="0" step="0.01" value={form.price} onChange={e => sf('price', e.target.value)} placeholder={form.billingPeriod === 'fixed' ? 'e.g. 105' : 'e.g. 150'} />
         </div>
       </div>
       <div className="form-divider"><span>Bond / Deposit</span></div>
@@ -385,9 +396,9 @@ export default function Rentals() {
         </td>
         <td className="text-muted col-hide-mobile">{r.contractNumber || '—'}</td>
         <td className="text-muted">{formatDate(r.startDate)}</td>
-        {showPayDay && <td className="text-muted">{paymentDay(r.startDate)}</td>}
+        {showPayDay && <td className="text-muted">{r.billingPeriod === 'fixed' ? '—' : paymentDay(r.startDate)}</td>}
         <td className="text-muted">{r.status === 'active' ? `${dur}d` : formatDate(r.endDate)}</td>
-        <td className="text-muted">{r.price ? `$${Number(r.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '—'}</td>
+        <td className="text-muted">{r.price ? `$${Number(r.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}${r.billingPeriod === 'fixed' ? ' total' : '/wk'}` : '—'}</td>
         <td>
           {r.bond?.amount
             ? <div><div style={{ fontSize: 13, fontWeight: 600 }}>${r.bond.amount}</div><Badge variant={r.bond.status === 'held' ? 'amber' : 'green'}>{r.bond.status}</Badge></div>
@@ -435,7 +446,7 @@ export default function Rentals() {
               <SortTh col="startDate">Started</SortTh>
               <SortTh col="payDay">Pay Day</SortTh>
               <SortTh col="duration">Duration</SortTh>
-              <SortTh col="price">Price/wk</SortTh>
+              <SortTh col="price">Price</SortTh>
               <SortTh col="bond">Bond</SortTh>
               <th>Signature</th>
               <th></th>
@@ -452,7 +463,7 @@ export default function Rentals() {
               <SortTh col="contractNumber" className="col-hide-mobile">Contract No.</SortTh>
               <SortTh col="startDate">Started</SortTh>
               <SortTh col="endDate">Ended</SortTh>
-              <SortTh col="price">Price/wk</SortTh>
+              <SortTh col="price">Price</SortTh>
               <SortTh col="bond">Bond</SortTh>
               <th>Signature</th>
               <th></th>
@@ -571,7 +582,7 @@ export default function Rentals() {
                 {selected.contractNumber && <div><div className="label">Contract No.</div><div style={{ marginTop: 3, fontWeight: 600 }}>{selected.contractNumber}</div></div>}
                 {selected.odometer && <div><div className="label">Odometer at Start</div><div style={{ marginTop: 3 }}>{Number(selected.odometer).toLocaleString()} km</div></div>}
                 {selected.odometerReturn && <div><div className="label">Odometer at Return</div><div style={{ marginTop: 3, fontWeight: 600 }}>{Number(selected.odometerReturn).toLocaleString()} km{selected.odometer ? ` (+${(Number(selected.odometerReturn) - Number(selected.odometer)).toLocaleString()} km)` : ''}</div></div>}
-                {selected.price && <div><div className="label">Weekly Price</div><div style={{ marginTop: 3, fontWeight: 600 }}>${Number(selected.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</div></div>}
+                {selected.price && <div><div className="label">{selected.billingPeriod === 'fixed' ? 'Total Price (Rental Period)' : 'Weekly Price'}</div><div style={{ marginTop: 3, fontWeight: 600 }}>${Number(selected.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}{selected.billingPeriod === 'fixed' ? ' total' : ' / week'}</div></div>}
               </div>
               <div style={{ background: selected.bond?.amount ? (selected.bond.status === 'held' ? 'var(--amber-bg)' : 'var(--accent-light)') : 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
                 <div className="fw-600" style={{ marginBottom: 10, fontSize: 13 }}>Bond / Deposit</div>

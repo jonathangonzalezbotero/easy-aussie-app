@@ -55,6 +55,7 @@ export default function ContractPage() {
     endDate:          rental.endDate || '',
     bondAmount:       rental.bond?.amount || settings.defaultBond || '300',
     price:            rental.price || '',
+    billingPeriod:    rental.billingPeriod || 'weekly',
     contractNumber:   rental.contractNumber || '',
     odometer:         rental.odometer ? Number(rental.odometer).toLocaleString() : '',
     renterSignedName: sigReq?.status === 'signed' ? sigReq.signerName : null,

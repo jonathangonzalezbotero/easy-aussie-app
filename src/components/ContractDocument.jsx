@@ -59,18 +59,25 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
   const numBadge          = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#2d8a5a', color: 'white', width: 20, height: 20, borderRadius: '50%', fontSize: 11, fontWeight: 700, flexShrink: 0 };
   const bodyText          = { fontSize: 13.5, lineHeight: 1.7, color: '#333' };
 
-  // Rental fee — highlighted at the top of the Payment section (weekly rate)
+  // Billing basis: 'weekly' (default, matches all pre-existing rentals) or 'fixed'
+  // (a single agreed amount for the whole rental period, e.g. $105 for 2 days).
+  const weekly     = d.billingPeriod !== 'fixed';
+  const perUnit    = weekly ? 'per week' : 'per rental period';
+  const basisTitle = weekly ? 'Rental Period (Weekly Basis)' : 'Rental Period (Fixed Term)';
+  const ongoing    = weekly ? 'Ongoing weekly rental' : 'As agreed';
+
+  // Rental fee — highlighted at the top of the Payment section
   const RateBlock = () => (
     <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '12px 16px', marginBottom: 14 }}>
       <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#166534', marginBottom: 4 }}>Rental Fee</div>
       {d.price ? (
         <div style={{ fontSize: 20, fontWeight: 700, color: '#14532d' }}>
-          ${fmtMoney(d.price)} AUD <span style={{ fontSize: 13.5, fontWeight: 600, color: '#166534' }}>per week</span>
+          ${fmtMoney(d.price)} AUD <span style={{ fontSize: 13.5, fontWeight: 600, color: '#166534' }}>{perUnit}</span>
         </div>
       ) : (
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#166534' }}>$_______________ AUD per week</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#166534' }}>$_______________ AUD {perUnit}</div>
       )}
-      <div style={{ fontSize: 12, color: '#166534', marginTop: 4 }}>Charged weekly for the duration of the rental period. Separate from the refundable security bond below.</div>
+      <div style={{ fontSize: 12, color: '#166534', marginTop: 4 }}>{weekly ? 'Charged weekly for the duration of the rental period.' : 'A single fixed amount covering the full rental period stated above.'} Separate from the refundable security bond below.</div>
     </div>
   );
 
@@ -127,9 +134,9 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
         {[['Make and Model', [d.vehicleMake, d.vehicleModel].filter(Boolean).join(' ') || '_______________'], ['Year', d.vehicleYear || '_______________'], ['Colour', d.vehicleColour ? d.vehicleColour.toUpperCase() : '_______________'], ['Registration', d.vehicleRego || '_______________'], ['Engine Capacity', d.vehicleEngine || '_______________']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
-    { num: '2', title: 'Rental Period (Weekly Basis)', content: (
+    { num: '2', title: basisTitle, content: (
       <div className="contract-grid-3">
-        {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : 'Ongoing weekly rental']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
+        {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : ongoing]].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
     { num: '3', title: 'Payment & Security Bond', content: (
@@ -201,9 +208,9 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
         {[['Make', d.vehicleMake || '_______________'], ['Year', d.vehicleYear || '_______________'], ['Colour', d.vehicleColour ? d.vehicleColour.toUpperCase() : '_______________'], ['Registration / ID', d.vehicleRego || '_______________']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
-    { num: '2', title: 'Rental Period (Weekly Basis)', content: (
+    { num: '2', title: basisTitle, content: (
       <div className="contract-grid-3">
-        {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : 'Ongoing weekly rental']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
+        {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : ongoing]].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
     { num: '3', title: 'Payment & Security Bond', content: (
@@ -275,7 +282,7 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
     )},
     { num: '2', title: 'Rental Period', content: (
       <div className="contract-grid-3">
-        {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : 'Ongoing weekly rental']].map(([l, v]) => <Field key={l} label={l} value={v} />)}
+        {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : ongoing]].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
     { num: '3', title: 'Payment & Security Bond', content: (
