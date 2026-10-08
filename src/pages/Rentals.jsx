@@ -63,13 +63,15 @@ function CustomerPicker({ customers, value, onChange }) {
 }
 
 export default function Rentals() {
-  const { data, add, update } = useStore();
+  const { data, add, update, remove } = useStore();
   const navigate = useNavigate();
   const [tab, setTab] = useState('active');
   const [showCreate, setShowCreate] = useState(false);
   const [editR, setEditR] = useState(null);
   const [detailR, setDetailR] = useState(null);
   const [endR, setEndR] = useState(null);
+  const [deleteR, setDeleteR] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [retainedAmount, setRetainedAmount] = useState('');
   const [retainedNote, setRetainedNote]     = useState('');
   const [odometerReturn, setOdometerReturn] = useState('');
@@ -229,6 +231,22 @@ export default function Rentals() {
     setRetainedNote('');
     setOdometerReturn('');
     if (detailR?.id === r.id) setDetailR(null);
+  };
+
+  // Hard-delete a rental (e.g. customer never showed up). No review email, no completed record.
+  const deleteRental = async () => {
+    const r = deleteR;
+    if (!r) return;
+    setDeleting(true);
+    try {
+      const v = data.vehicles.find(x => x.id === r.vehicleId);
+      if (r.status === 'active' && v?.status === 'rented') {
+        await update('vehicles', r.vehicleId, { status: 'available' });
+      }
+      await remove('rentals', r.id);
+      setDeleteR(null);
+      if (detailR?.id === r.id) setDetailR(null);
+    } finally { setDeleting(false); }
   };
 
   const markBondReturned = async (rental) => {
@@ -416,6 +434,7 @@ export default function Rentals() {
             <button className="btn btn-secondary btn-sm" onClick={() => navigate('/contract', { state: { rentalId: r.id } })}>Contract</button>
             <button className="btn btn-secondary btn-sm" onClick={e => openEdit(r, e)}>Edit</button>
             {showEnd && <button className="btn btn-secondary btn-sm" onClick={e => { e.stopPropagation(); setEndR(r); setRetainedAmount(r.bond?.amount || ''); }}>End</button>}
+            <button className="btn btn-danger btn-sm" onClick={e => { e.stopPropagation(); setDeleteR(r); }}>Delete</button>
           </div>
         </td>
       </tr>
@@ -483,6 +502,30 @@ export default function Rentals() {
       <Modal open={!!editR} onClose={() => { setEditR(null); setForm(EF); }} title="Edit Rental" width={560}
         footer={<><button className="btn btn-secondary" onClick={() => { setEditR(null); setForm(EF); }}>Cancel</button><button className="btn btn-primary" onClick={saveRental} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button></>}>
         {editR && renderForm(vehicleOptions(editR.vehicleId), availableCustomers(editR.customerId))}
+      </Modal>
+
+      {/* Delete rental */}
+      <Modal open={!!deleteR} onClose={() => setDeleteR(null)} title="Delete Rental"
+        footer={<><button className="btn btn-secondary" onClick={() => setDeleteR(null)}>Keep Rental</button><button className="btn btn-danger" onClick={deleteRental} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete Rental'}</button></>}>
+        {deleteR && (() => {
+          const c = data.customers.find(x => x.id === deleteR.customerId);
+          const v = data.vehicles.find(x => x.id === deleteR.vehicleId);
+          const heldBond = deleteR.bond?.amount && deleteR.bond.status === 'held';
+          return (
+            <div>
+              <p style={{ fontSize: 14, marginBottom: 16 }}>Use this when a booking never went ahead (e.g. the customer did not show up). The rental is removed completely instead of being marked as completed, and no review email is sent.</p>
+              <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+                <div className="fw-500" style={{ marginBottom: 4 }}>{c?.name || '—'} · {v?.plate || '—'}{v?.name ? ' · ' + v.name : ''}</div>
+                <div className="text-sm text-muted">Started {formatDate(deleteR.startDate)}{deleteR.contractNumber ? ` · Contract ${deleteR.contractNumber}` : ''}</div>
+              </div>
+              <ul className="text-sm text-muted" style={{ paddingLeft: 18, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {deleteR.status === 'active' && v?.status === 'rented' && <li>{v.plate} will be set back to available.</li>}
+                {heldBond && <li>The held bond of ${deleteR.bond.amount} will be removed from the Bonds page too.</li>}
+                <li>Any signing request for this rental is deleted. This cannot be undone.</li>
+              </ul>
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* End rental */}
@@ -662,6 +705,7 @@ export default function Rentals() {
                 {selected.status === 'active' && (
                   <button className="btn btn-primary" style={{ justifyContent: 'center' }} onClick={() => { setDetailR(null); setEndR(selected); setRetainedAmount(selected.bond?.amount || ''); }}>End This Rental</button>
                 )}
+                <button className="btn btn-danger" style={{ justifyContent: 'center' }} onClick={() => { setDetailR(null); setDeleteR(selected); }}>Delete Rental</button>
               </div>
             </div>
           );
