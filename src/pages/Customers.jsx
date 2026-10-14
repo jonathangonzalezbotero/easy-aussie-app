@@ -7,7 +7,8 @@ import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
 import { formatDate, formatTimestamp } from '../utils/dates';
 
-const EF = { name: '', dateOfBirth: '', phone: '', email: '', address: '', occupation: '', emergencyContact: '', emergencyPhone: '', hotelAddress: '', licenseRef: '', licencePhoto: '', notes: '' };
+const VEHICLE_TYPE_LABELS = { scooter: 'Scooter', ebike: 'E-bike', car: 'Car' };
+const EF = { name: '', dateOfBirth: '', phone: '', email: '', address: '', occupation: '', emergencyContact: '', emergencyPhone: '', hotelAddress: '', licenseRef: '', licencePhoto: '', vehicleType: '', notes: '' };
 
 export default function Customers() {
   const { data, add, update, remove, getCustomerPhoto } = useStore();
@@ -114,6 +115,12 @@ export default function Customers() {
       <div className="grid-2">
         <div className="field"><label className="label">Emergency Contact Name</label><input className="input" value={form.emergencyContact} onChange={e => sf('emergencyContact', e.target.value)} /></div>
         <div className="field"><label className="label">Emergency Contact Phone</label><input className="input" type="tel" value={form.emergencyPhone} onChange={e => sf('emergencyPhone', e.target.value)} /></div>
+      </div>
+      <div className="field"><label className="label">Wants to Rent</label>
+        <select className="select" value={form.vehicleType || ''} onChange={e => sf('vehicleType', e.target.value)}>
+          <option value="">Not specified</option>
+          {Object.entries(VEHICLE_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
       </div>
       <div className="form-divider"><span>Driver's Licence</span></div>
       <div className="field"><label className="label">Licence Number / Reference</label><input className="input" value={form.licenseRef} onChange={e => sf('licenseRef', e.target.value)} /></div>
@@ -228,7 +235,7 @@ export default function Customers() {
         {selected && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px', marginBottom: 20 }}>
-              {[['Date of Birth', selected.dateOfBirth], ['Phone', selected.phone], ['Email', selected.email], ['Occupation', selected.occupation]].map(([l, v]) =>
+              {[['Date of Birth', selected.dateOfBirth], ['Phone', selected.phone], ['Email', selected.email], ['Occupation', selected.occupation], ['Wants to Rent', VEHICLE_TYPE_LABELS[selected.vehicleType]]].map(([l, v]) =>
                 v ? <div key={l}><div className="label">{l}</div><div style={{ marginTop: 3, fontSize: 14 }}>{l === 'Date of Birth' ? formatDate(v) : v}</div></div> : null
               )}
               {selected.address && <div style={{ gridColumn: '1/-1' }}><div className="label">Address</div><div style={{ marginTop: 3, fontSize: 14 }}>{selected.address}</div></div>}

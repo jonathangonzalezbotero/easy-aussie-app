@@ -30,13 +30,13 @@ const vehicleToDb = (v) => ({
 
 // licence_photo is a base64 data URL and can be several MB per row — never fetched in bulk,
 // only lazily per-customer via getCustomerPhoto().
-const CUSTOMER_LIST_COLUMNS = 'id, name, date_of_birth, phone, email, address, occupation, emergency_contact, emergency_phone, hotel_address, license_ref, notes, created_at';
+const CUSTOMER_LIST_COLUMNS = 'id, name, date_of_birth, phone, email, address, occupation, emergency_contact, emergency_phone, hotel_address, license_ref, vehicle_type, notes, created_at';
 
 const customerFromDb = (c) => ({
   id: c.id, name: c.name, dateOfBirth: c.date_of_birth, phone: c.phone, email: c.email,
   address: c.address, occupation: c.occupation, emergencyContact: c.emergency_contact,
   emergencyPhone: c.emergency_phone, hotelAddress: c.hotel_address,
-  licenseRef: c.license_ref, licencePhoto: c.licence_photo, notes: c.notes,
+  licenseRef: c.license_ref, licencePhoto: c.licence_photo, vehicleType: c.vehicle_type, notes: c.notes,
   createdAt: c.created_at,
 });
 
@@ -45,7 +45,7 @@ const customerToDb = (c) => ({
   email: c.email || null, address: c.address || null, occupation: c.occupation || null,
   emergency_contact: c.emergencyContact || null, emergency_phone: c.emergencyPhone || null,
   hotel_address: c.hotelAddress || null, license_ref: c.licenseRef || null,
-  licence_photo: c.licencePhoto || null, notes: c.notes || null,
+  licence_photo: c.licencePhoto || null, vehicle_type: c.vehicleType || null, notes: c.notes || null,
 });
 
 const rentalFromDb = (r) => ({

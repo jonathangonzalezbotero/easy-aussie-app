@@ -40,9 +40,13 @@ create table if not exists customers (
   hotel_address     text,
   license_ref       text,
   licence_photo     text,
+  vehicle_type      text check (vehicle_type in ('scooter','ebike','car')),
   notes             text,
   created_at        timestamptz default now()
 );
+
+-- Run this if the customers table already exists:
+-- alter table customers add column if not exists vehicle_type text check (vehicle_type in ('scooter','ebike','car'));
 
 create table if not exists rentals (
   id            uuid primary key default gen_random_uuid(),

@@ -1,7 +1,14 @@
 import { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
+const VEHICLE_TYPES = [
+  { value: 'scooter', label: 'Scooter', needsLicence: true },
+  { value: 'ebike',   label: 'E-bike',  needsLicence: false },
+  { value: 'car',     label: 'Car',     needsLicence: true },
+];
+
 const EF = {
+  vehicleType: '',
   name: '', dateOfBirth: '', phone: '', email: '',
   addressStreet: '', addressSuburb: '', addressState: '', addressPostCode: '',
   occupation: '', emergencyContact: '', emergencyPhone: '', hotelAddress: '',
@@ -15,6 +22,7 @@ export default function CustomerIntake() {
   const [error, setError]           = useState('');
   const fileInputRef = useRef(null);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const needsLicence = VEHICLE_TYPES.find(t => t.value === form.vehicleType)?.needsLicence ?? true;
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -29,6 +37,7 @@ export default function CustomerIntake() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.vehicleType)       { setError('Please select what you would like to rent'); return; }
     if (!form.name.trim())       { setError('Full name is required'); return; }
     if (!form.dateOfBirth)       { setError('Date of birth is required'); return; }
     if (!form.phone.trim())      { setError('Phone number is required'); return; }
@@ -38,7 +47,7 @@ export default function CustomerIntake() {
     if (!form.addressState.trim())  { setError('State is required'); return; }
     if (!form.addressPostCode.trim()) { setError('Postcode is required'); return; }
     if (!form.occupation.trim()) { setError('Occupation is required'); return; }
-    if (!form.licencePhoto)      { setError('A photo or scan of your licence is required'); return; }
+    if (needsLicence && !form.licencePhoto) { setError('A photo or scan of your licence is required'); return; }
     setError('');
     setSubmitting(true);
     try {
@@ -52,8 +61,9 @@ export default function CustomerIntake() {
         emergency_contact: form.emergencyContact || null,
         emergency_phone:   form.emergencyPhone || null,
         hotel_address:     form.hotelAddress || null,
-        license_ref:       form.licenseRef || null,
-        licence_photo:     form.licencePhoto || null,
+        license_ref:       needsLicence ? (form.licenseRef || null) : null,
+        licence_photo:     needsLicence ? (form.licencePhoto || null) : null,
+        vehicle_type:      form.vehicleType,
         notes:             'Submitted via intake form',
       });
       if (err) throw err;
@@ -111,11 +121,32 @@ export default function CustomerIntake() {
         <form onSubmit={handleSubmit}>
           <div style={{ background: 'white', borderRadius: 16, padding: '28px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+            {/* What are you renting? */}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>What would you like to rent? *</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {VEHICLE_TYPES.map(t => {
+                  const active = form.vehicleType === t.value;
+                  return (
+                    <button key={t.value} type="button" onClick={() => sf('vehicleType', t.value)}
+                      style={{ fontFamily: 'inherit', fontSize: 14, fontWeight: 600, padding: '12px 8px', borderRadius: 9, cursor: 'pointer',
+                        background: active ? 'oklch(0.50 0.14 150)' : '#f7f6f2', color: active ? 'white' : '#333',
+                        border: active ? '1.5px solid oklch(0.50 0.14 150)' : '1.5px solid #e0dfd8' }}>
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {form.vehicleType && !needsLicence && (
+                <p style={{ fontSize: 13, color: '#888', marginTop: 4, lineHeight: 1.5 }}>No driver&apos;s licence is needed for an e-bike.</p>
+              )}
+            </div>
+
             {/* Personal Details */}
             <div className="intake-grid">
               <div style={{ ...fieldStyle }} className="intake-full">
                 <label style={labelStyle}>Full Name *</label>
-                <input style={inputStyle} value={form.name} onChange={e => sf('name', e.target.value)} required placeholder="As shown on your licence" />
+                <input style={inputStyle} value={form.name} onChange={e => sf('name', e.target.value)} required placeholder={needsLicence ? "As shown on your licence" : "Your full name"} />
               </div>
               <div style={fieldStyle}>
                 <label style={labelStyle}>Date of Birth *</label>
@@ -177,7 +208,8 @@ export default function CustomerIntake() {
               </div>
             </div>
 
-            {/* Driver's Licence */}
+            {/* Driver's Licence — only for vehicles that need one */}
+            {needsLicence && (<>
             <div style={dividerStyle}>
               <div style={{ flex: 1, height: 1, background: '#e0dfd8' }} />
               <span>Driver&apos;s Licence</span>
@@ -238,6 +270,7 @@ export default function CustomerIntake() {
                 </div>
               )}
             </div>
+            </>)}
 
             {error && (
               <div style={{ background: '#fee8e8', border: '1px solid #fcc', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#c00' }}>
