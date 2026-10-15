@@ -556,6 +556,12 @@ export default function Rentals() {
                 <div className="text-sm text-muted">Started {formatDate(endR.startDate)} · {daysBetween(endR.startDate, todayStr())}d</div>
                 {endR.odometer && <div className="text-sm text-muted" style={{ marginTop: 4 }}>Start odometer: {Number(endR.odometer).toLocaleString()} km</div>}
               </div>
+              <div className="field" style={{ marginBottom: 16 }}>
+                <label className="label">Rental Notes</label>
+                {endR.notes
+                  ? <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '12px 14px', fontSize: 14, whiteSpace: 'pre-wrap' }}>{endR.notes}</div>
+                  : <div className="text-sm text-muted">No notes recorded for this rental.</div>}
+              </div>
               {v?.type !== 'ebike' && (
                 <div className="field" style={{ marginBottom: 16 }}>
                   <label className="label">Return Odometer (km)</label>
