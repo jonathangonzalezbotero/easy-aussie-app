@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../context/StoreContext';
 import { daysUntil } from '../utils/dates';
+import { useFinance } from '../finance/FinanceContext';
 
 const NAV = [
   { to: '/', id: 'dashboard', label: 'Dashboard' },
@@ -10,6 +11,7 @@ const NAV = [
   { to: '/rentals', id: 'rentals', label: 'Rentals' },
   { to: '/maintenance', id: 'maintenance', label: 'Maintenance' },
   { to: '/bonds', id: 'bonds', label: 'Bonds' },
+  { to: '/finance', id: 'finance', label: 'Finance' },
   { to: '/settings', id: 'settings', label: 'Settings' },
 ];
 
@@ -21,12 +23,14 @@ function Icon({ id }) {
   if (id === 'rentals') return <svg viewBox="0 0 18 18" style={s}><rect x="2" y="5.5" width="14" height="10" rx="2" /><path d="M6.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" /><circle cx="9" cy="11" r="1.5" /><path d="M9 12.5v1.5" /></svg>;
   if (id === 'maintenance') return <svg viewBox="0 0 18 18" style={s}><path d="M14.5 3.5 11 7l2 2 3.5-3.5a3 3 0 0 0-4.5-4L9 4.5 4 9.5l-2 4 4-2 5-5 1.5-3z" /><path d="M2 16l3-3" /></svg>;
   if (id === 'bonds') return <svg viewBox="0 0 18 18" style={s}><path d="M9 1.5L2.5 4.5v5c0 4 2.8 6.8 6.5 7.5 3.7-.7 6.5-3.5 6.5-7.5v-5z" /><path d="M6 9l2 2 4-4" /></svg>;
+  if (id === 'finance') return <svg viewBox="0 0 18 18" style={s}><path d="M2 15.5h14" /><path d="M4 12.5V8M8 12.5V4.5M12 12.5V6.5M16 12.5V3" /></svg>;
   if (id === 'settings') return <svg viewBox="0 0 18 18" style={s}><circle cx="9" cy="9" r="2.5" /><path d="M9 1v2M9 15v2M1 9h2M15 9h2M3.2 3.2l1.4 1.4M13.4 13.4l1.4 1.4M3.2 14.8l1.4-1.4M13.4 4.6l1.4-1.4" /></svg>;
   return null;
 }
 
 export default function Layout({ children }) {
   const { data, loading, errors, refresh } = useStore();
+  const finance = useFinance();
   const navigate = useNavigate();
   const failedTables = Object.keys(errors || {});
 
@@ -41,6 +45,7 @@ export default function Layout({ children }) {
     dashboard: alertCount || null,
     rentals: data.rentals.filter(r => r.status === 'active').length || null,
     bonds: data.rentals.filter(r => r.bond?.status === 'held').length || null,
+    finance: finance?.queueCount || null,
   };
 
   const handleLogout = async () => {

@@ -7,11 +7,13 @@ import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
 import { formatDate, daysBetween, todayStr } from '../utils/dates';
+import { BOND_STATUSES, BOND_RETAIN_REASONS, bondLabel, bondVariant, closedBondStatus } from '../utils/bond';
 
 const EF = {
   customerId: '', vehicleId: '', startDate: todayStr(), endDate: '', contractNumber: '', notes: '', odometer: '', price: '', billingPeriod: 'weekly',
-  bond: { amount: '', method: 'cash', status: 'held' },
+  bond: { amount: '', method: 'cash', status: 'held', refundedAmount: '', retainedAmount: '', retainReason: '', refundMethod: '', refundDate: '' },
 };
+const EMPTY_BOND = EF.bond;
 
 // Searchable customer combobox: with no query, shows the 5 most-recently-created
 // customers (the ones a shared intake link would just have added) instead of
@@ -72,8 +74,12 @@ export default function Rentals() {
   const [endR, setEndR] = useState(null);
   const [deleteR, setDeleteR] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  // End-rental bond decision: 'full' | 'partial' | 'keep'
+  const [endMode, setEndMode] = useState('full');
   const [retainedAmount, setRetainedAmount] = useState('');
+  const [retainReason, setRetainReason] = useState(BOND_RETAIN_REASONS[0]);
   const [retainedNote, setRetainedNote]     = useState('');
+  const [refundMethod, setRefundMethod] = useState('bank');
   const [odometerReturn, setOdometerReturn] = useState('');
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EF);
@@ -82,7 +88,12 @@ export default function Rentals() {
   const [signEmailAddr, setSignEmailAddr] = useState('');
   const [signResult, setSignResult] = useState(null); // 'sent' | 'error'
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const sb = (k, v) => setForm(f => ({ ...f, bond: { ...f.bond, [k]: v } }));
+  const sb = (k, v) => setForm(f => {
+    const bond = { ...f.bond, [k]: v };
+    // A cash bond is in hand straight away; a transfer is awaiting until Finance confirms the bank line.
+    if (k === 'method' && showCreate) bond.status = v === 'cash' ? 'held' : 'awaiting';
+    return { ...f, bond };
+  });
 
   const getSignReq = (rentalId) =>
     (data.signingRequests || []).filter(s => s.rentalId === rentalId)
@@ -155,7 +166,7 @@ export default function Rentals() {
       odometer: r.odometer || '',
       price: r.price || '',
       billingPeriod: r.billingPeriod || 'weekly',
-      bond: { amount: r.bond?.amount || '', method: r.bond?.method || 'cash', status: r.bond?.status || 'held' },
+      bond: { ...EMPTY_BOND, ...(r.bond || {}) },
     });
   };
 
@@ -202,21 +213,32 @@ export default function Rentals() {
     } finally { setSaving(false); }
   };
 
-  const endRental = async (mode) => {
-    // mode: 'return' | 'partial' | 'keep'
+  const resetEnd = () => {
+    setEndR(null); setEndMode('full'); setRetainedAmount(''); setRetainReason(BOND_RETAIN_REASONS[0]);
+    setRetainedNote(''); setRefundMethod('bank'); setOdometerReturn('');
+  };
+
+  const endRental = async () => {
     const r = endR;
     let bondUpdate = r.bond ? { ...r.bond } : r.bond;
-    if (r.bond) {
-      if (mode === 'return') {
-        bondUpdate = { ...r.bond, status: 'returned' };
-      } else if (mode === 'partial') {
-        const kept = parseFloat(retainedAmount);
-        bondUpdate = { ...r.bond, amount: isNaN(kept) ? r.bond.amount : String(kept), status: 'held' };
-      }
+    let noteAppend = r.notes;
+    if (r.bond?.amount && r.bond.status === 'held') {
+      const amount = Number(r.bond.amount) || 0;
+      const kept = endMode === 'full' ? 0 : endMode === 'keep' ? amount : Math.min(amount, Math.max(0, Number(retainedAmount) || 0));
+      const refunded = amount - kept;
+      const reason = kept > 0 ? [retainReason, retainedNote.trim()].filter(Boolean).join(' · ') : '';
+      // Cash refunds are final now. A bank transfer stays Held with the planned amounts until
+      // the outgoing bank line is confirmed in Finance › Reconcile (or marked manually in Bonds).
+      const finalNow = refunded === 0 || refundMethod === 'cash';
+      bondUpdate = {
+        ...r.bond,
+        refundedAmount: String(refunded), retainedAmount: String(kept), retainReason: reason,
+        refundMethod: refunded > 0 ? refundMethod : '',
+        refundDate: finalNow ? todayStr() : '',
+        status: finalNow ? closedBondStatus(amount, refunded) : 'held',
+      };
+      if (kept > 0) noteAppend = r.notes ? `${r.notes}\nBond retained $${kept}: ${reason}` : `Bond retained $${kept}: ${reason}`;
     }
-    const noteAppend = retainedNote.trim()
-      ? (r.notes ? `${r.notes}\nBond retained: ${retainedNote.trim()}` : `Bond retained: ${retainedNote.trim()}`)
-      : r.notes;
     const returnKm = odometerReturn.trim();
     await update('rentals', r.id, { status: 'completed', endDate: todayStr(), bond: bondUpdate, notes: noteAppend, odometerReturn: returnKm || null });
     const vehicleUpdate = { status: 'available' };
@@ -226,10 +248,7 @@ export default function Rentals() {
     if (endedCustomer?.email) {
       callEdgeFunction('send-review-email', { rental_id: r.id, customer_email: endedCustomer.email, customer_name: endedCustomer.name });
     }
-    setEndR(null);
-    setRetainedAmount('');
-    setRetainedNote('');
-    setOdometerReturn('');
+    resetEnd();
     if (detailR?.id === r.id) setDetailR(null);
   };
 
@@ -249,9 +268,13 @@ export default function Rentals() {
     } finally { setDeleting(false); }
   };
 
+  // Manual flip when a refund is final without going through Finance.
   const markBondReturned = async (rental) => {
-    await update('rentals', rental.id, { bond: { ...rental.bond, status: 'returned' } });
-    setDetailR(r => r ? { ...r, bond: { ...r.bond, status: 'returned' } } : r);
+    const amount = Number(rental.bond.amount) || 0;
+    const refunded = rental.bond.refundedAmount === '' ? amount : Number(rental.bond.refundedAmount);
+    const bond = { ...rental.bond, refundedAmount: String(refunded), retainedAmount: String(amount - refunded), refundDate: todayStr(), status: closedBondStatus(amount, refunded) };
+    await update('rentals', rental.id, { bond });
+    setDetailR(r => r ? { ...r, bond } : r);
   };
 
   // Vehicles available for selection in a form; for editing include the currently assigned one
@@ -320,9 +343,9 @@ export default function Rentals() {
         <div className="field">
           <label className="label">Bond Status</label>
           <select className="select" value={form.bond.status} onChange={e => sb('status', e.target.value)}>
-            <option value="held">Held</option>
-            <option value="returned">Returned</option>
+            {BOND_STATUSES.map(st => <option key={st} value={st}>{bondLabel(st)}</option>)}
           </select>
+          <span className="field-hint">Awaiting becomes Held when the deposit is confirmed in Finance › Reconcile. Cash bonds can be set to Held here.</span>
         </div>
       </div>
       <div className="grid-2">
@@ -419,7 +442,7 @@ export default function Rentals() {
         <td className="text-muted">{r.price ? `$${Number(r.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}${r.billingPeriod === 'fixed' ? ' total' : '/wk'}` : '—'}</td>
         <td>
           {r.bond?.amount
-            ? <div><div style={{ fontSize: 13, fontWeight: 600 }}>${r.bond.amount}</div><Badge variant={r.bond.status === 'held' ? 'amber' : 'green'}>{r.bond.status}</Badge></div>
+            ? <div><div style={{ fontSize: 13, fontWeight: 600 }}>${r.bond.amount}</div><Badge variant={bondVariant(r.bond.status)}>{bondLabel(r.bond.status)}</Badge></div>
             : <span className="text-sm text-muted">None</span>}
         </td>
         <td>
@@ -529,19 +552,11 @@ export default function Rentals() {
       </Modal>
 
       {/* End rental */}
-      <Modal open={!!endR} onClose={() => { setEndR(null); setRetainedAmount(''); setRetainedNote(''); setOdometerReturn(''); }} title="End Rental"
+      <Modal open={!!endR} onClose={resetEnd} title="End Rental"
         footer={endR && (
           <>
-            <button className="btn btn-secondary" onClick={() => { setEndR(null); setRetainedAmount(''); setRetainedNote(''); setOdometerReturn(''); }}>Cancel</button>
-            {endR.bond?.amount && endR.bond.status === 'held' && (
-              <button className="btn btn-secondary" onClick={() => endRental('partial')}>End — Keep Partial</button>
-            )}
-            {endR.bond?.amount && endR.bond.status === 'held' && (
-              <button className="btn btn-primary" onClick={() => endRental('return')}>End + Return Bond</button>
-            )}
-            {(!endR.bond?.amount || endR.bond.status !== 'held') && (
-              <button className="btn btn-primary" onClick={() => endRental('keep')}>End Rental</button>
-            )}
+            <button className="btn btn-secondary" onClick={resetEnd}>Cancel</button>
+            <button className="btn btn-primary" onClick={endRental}>End rental</button>
           </>
         )}>
         {endR && (() => {
@@ -578,38 +593,59 @@ export default function Rentals() {
                   )}
                 </div>
               )}
-              {hasBond && (
-                <div style={{ padding: '14px 16px', background: 'var(--amber-bg)', borderRadius: 10 }}>
-                  <div className="fw-600" style={{ fontSize: 13, marginBottom: 10 }}>Bond — ${endR.bond.amount} via {endR.bond.method}</div>
-                  <div className="field">
-                    <label className="label">Amount retained ($)</label>
-                    <input
-                      className="input"
-                      type="number"
-                      min="0"
-                      max={endR.bond.amount}
-                      value={retainedAmount}
-                      onChange={e => setRetainedAmount(e.target.value)}
-                      placeholder={endR.bond.amount}
-                    />
-                  </div>
-                  {retainedAmount !== '' && Number(retainedAmount) < Number(endR.bond.amount) && (
-                    <div className="text-sm text-muted" style={{ marginTop: 8 }}>
-                      Returning ${(Number(endR.bond.amount) - Number(retainedAmount)).toFixed(2)} to customer
+              {hasBond && (() => {
+                const amount = Number(endR.bond.amount) || 0;
+                const kept = endMode === 'full' ? 0 : endMode === 'keep' ? amount : Math.min(amount, Math.max(0, Number(retainedAmount) || 0));
+                const refunded = amount - kept;
+                const Opt = ({ mode, title, sub, children }) => (
+                  <label style={{ display: 'block', border: `1.5px solid ${endMode === mode ? 'var(--accent)' : 'var(--border)'}`, background: endMode === mode ? 'var(--accent-light)' : 'white', borderRadius: 10, padding: '10px 12px', marginBottom: 8, cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <input type="radio" name="endMode" checked={endMode === mode} onChange={() => setEndMode(mode)} style={{ marginTop: 3 }} />
+                      <div style={{ flex: 1 }}>
+                        <div className="fw-600" style={{ fontSize: 14 }}>{title}</div>
+                        {sub && <div className="text-sm text-muted">{sub}</div>}
+                        {endMode === mode && children}
+                      </div>
                     </div>
-                  )}
-                  <div className="field" style={{ marginTop: 12 }}>
-                    <label className="label">Reason for retaining (optional)</label>
-                    <textarea
-                      className="textarea"
-                      rows={2}
-                      value={retainedNote}
-                      onChange={e => setRetainedNote(e.target.value)}
-                      placeholder="e.g. Scratch on left panel, mirror replacement…"
-                    />
+                  </label>
+                );
+                return (
+                  <div>
+                    <div className="form-divider"><span>Bond · ${endR.bond.amount} held via {endR.bond.method}</span></div>
+                    <Opt mode="full" title={`Refund in full · $${amount}`} />
+                    <Opt mode="partial" title="Refund part, keep some">
+                      <div className="grid-2" style={{ marginTop: 10 }}>
+                        <div className="field"><label className="label">Keep ($)</label>
+                          <input className="input" type="number" min="0" max={amount} value={retainedAmount} onChange={e => setRetainedAmount(e.target.value)} placeholder="e.g. 10" /></div>
+                        <div className="field"><label className="label">Reason</label>
+                          <select className="select" value={retainReason} onChange={e => setRetainReason(e.target.value)}>{BOND_RETAIN_REASONS.map(x => <option key={x}>{x}</option>)}</select></div>
+                      </div>
+                    </Opt>
+                    <Opt mode="keep" title="Keep all of it" sub="For damage or unpaid rent above the bond">
+                      <div className="field" style={{ marginTop: 10 }}><label className="label">Reason</label>
+                        <select className="select" value={retainReason} onChange={e => setRetainReason(e.target.value)}>{BOND_RETAIN_REASONS.map(x => <option key={x}>{x}</option>)}</select></div>
+                    </Opt>
+                    {endMode !== 'full' && (
+                      <div className="field" style={{ marginBottom: 12 }}><label className="label">Notes on what was kept</label>
+                        <textarea className="textarea" rows={2} value={retainedNote} onChange={e => setRetainedNote(e.target.value)} placeholder="e.g. Scratch on left panel, mirror replacement…" /></div>
+                    )}
+                    {refunded > 0 && (
+                      <div className="field" style={{ marginBottom: 12 }}><label className="label">Refund by</label>
+                        <select className="select" value={refundMethod} onChange={e => setRefundMethod(e.target.value)}>
+                          <option value="bank">Bank transfer</option>
+                          <option value="cash">Cash</option>
+                        </select></div>
+                    )}
+                    <div style={{ padding: '10px 12px', background: 'var(--amber-bg)', borderRadius: 10, fontSize: 13 }}>
+                      {refunded > 0 && refundMethod === 'bank'
+                        ? <>Expect a bank line of <strong>−${refunded.toFixed(2)}</strong>. The bond stays Held until Finance confirms it{kept > 0 && <>, and the <strong>${kept}</strong> kept becomes Bond retained income</>}.</>
+                        : refunded > 0
+                          ? <>Bond will be marked <strong>{bondLabel(closedBondStatus(amount, refunded))}</strong> now{kept > 0 && <>, ${kept} kept as income</>}.</>
+                          : <>Bond will be marked <strong>Retained</strong>: ${amount} kept as income.</>}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           );
         })()}
@@ -633,17 +669,25 @@ export default function Rentals() {
                 {selected.odometerReturn && <div><div className="label">Odometer at Return</div><div style={{ marginTop: 3, fontWeight: 600 }}>{Number(selected.odometerReturn).toLocaleString()} km{selected.odometer ? ` (+${(Number(selected.odometerReturn) - Number(selected.odometer)).toLocaleString()} km)` : ''}</div></div>}
                 {selected.price && <div><div className="label">{selected.billingPeriod === 'fixed' ? 'Total Price (Rental Period)' : 'Weekly Price'}</div><div style={{ marginTop: 3, fontWeight: 600 }}>${Number(selected.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}{selected.billingPeriod === 'fixed' ? ' total' : ' / week'}</div></div>}
               </div>
-              <div style={{ background: selected.bond?.amount ? (selected.bond.status === 'held' ? 'var(--amber-bg)' : 'var(--accent-light)') : 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+              <div style={{ background: selected.bond?.amount ? (selected.bond.status === 'held' ? 'var(--amber-bg)' : selected.bond.status === 'awaiting' ? 'var(--blue-bg)' : 'var(--accent-light)') : 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
                 <div className="fw-600" style={{ marginBottom: 10, fontSize: 13 }}>Bond / Deposit</div>
                 {selected.bond?.amount ? (
                   <>
                     <div className="grid-2">
                       <div><div className="label">Amount</div><div className="fw-600" style={{ marginTop: 3 }}>${selected.bond.amount}</div></div>
                       <div><div className="label">Method</div><div style={{ marginTop: 3, textTransform: 'capitalize' }}>{selected.bond.method}</div></div>
-                      <div><div className="label">Status</div><div style={{ marginTop: 3 }}><Badge variant={selected.bond.status === 'held' ? 'amber' : 'green'}>{selected.bond.status}</Badge></div></div>
+                      <div><div className="label">Status</div><div style={{ marginTop: 3 }}><Badge variant={bondVariant(selected.bond.status)}>{bondLabel(selected.bond.status)}</Badge></div></div>
+                      {selected.bond.retainedAmount !== '' && Number(selected.bond.retainedAmount) > 0 && (
+                        <div><div className="label">Kept</div><div style={{ marginTop: 3 }}>${selected.bond.retainedAmount}{selected.bond.retainReason ? ` · ${selected.bond.retainReason}` : ''}</div></div>
+                      )}
                     </div>
+                    {selected.bond.status === 'held' && selected.bond.refundedAmount !== '' && Number(selected.bond.refundedAmount) > 0 && (
+                      <div className="text-sm" style={{ marginTop: 10 }}>Refund of ${selected.bond.refundedAmount} by {selected.bond.refundMethod || 'bank'} recorded, waiting for the bank line in Finance.</div>
+                    )}
                     {selected.bond.status === 'held' && (
-                      <button className="btn btn-secondary btn-sm" style={{ marginTop: 12 }} onClick={() => markBondReturned(selected)}>Mark Bond Returned</button>
+                      <button className="btn btn-secondary btn-sm" style={{ marginTop: 12 }} onClick={() => markBondReturned(selected)}>
+                        {selected.bond.refundedAmount !== '' && Number(selected.bond.refundedAmount) < Number(selected.bond.amount) ? 'Mark refund done' : 'Mark bond refunded'}
+                      </button>
                     )}
                   </>
                 ) : <div className="text-sm text-muted">No bond recorded</div>}

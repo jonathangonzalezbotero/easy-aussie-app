@@ -1,0 +1,248 @@
+import { useEffect, useMemo, useState } from 'react';
+import Drawer from '../../components/shared/Drawer';
+import Badge from '../../components/shared/Badge';
+import { useFinance } from '../../finance/FinanceContext';
+import { useStore } from '../../context/StoreContext';
+import { useSuggestions } from '../../finance/useSuggestions';
+import { categoryLabel, categoryTypeNote, money, SOURCE_LABEL, toCents } from '../../finance/categories';
+import { buildConfirm, splitRemainder } from '../../finance/confirm';
+import { unreimbursedExpenses, directorPosition } from '../../finance/reports';
+import { formatDate, todayStr } from '../../utils/dates';
+import { BOND_RETAIN_REASONS } from '../../utils/bond';
+import { AmountCell, AccountBadge, CategorySelect, SideEffectNote, StatusBadge } from './bits';
+
+const blankSplit = () => ({ category: '', amount: '', rentalId: '', customerId: '', vehicleId: '', notes: '' });
+
+// Edit any transaction, or create a manual one (tx = null). Imported lines keep date, amount and
+// description locked; only category, links, splits and notes change.
+export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultAccountId }) {
+  const fin = useFinance();
+  const { data } = useStore();
+  const suggestions = useSuggestions();
+  const isNew = !tx;
+  const locked = !!tx && tx.source !== 'manual';
+  const [form, setForm] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setErr('');
+    if (tx) {
+      setForm({
+        accountId: tx.accountId, date: tx.date, amount: String(tx.amount), description: tx.description,
+        category: tx.category === 'split' ? '' : tx.category, splitOn: tx.splits.length > 0,
+        splits: tx.splits.length ? tx.splits.map(s => ({ ...s, amount: String(s.amount) })) : [blankSplit(), blankSplit()],
+        customerId: tx.customerId || '', rentalId: tx.rentalId || '', vehicleId: tx.vehicleId || '',
+        linkedTransactionId: tx.linkedTransactionId || '', notes: tx.notes || '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0],
+      });
+    } else {
+      const manualAccounts = fin.accounts.filter(a => a.feed === 'manual');
+      setForm({ accountId: defaultAccountId || manualAccounts[0]?.id || fin.accounts[0]?.id || '', date: todayStr(), amount: '', description: '', category: '', splitOn: false, splits: [blankSplit(), blankSplit()], customerId: '', rentalId: '', vehicleId: '', linkedTransactionId: '', notes: '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0] });
+    }
+  }, [open, tx, defaultAccountId, fin.accounts]);
+
+  const sug = tx ? suggestions[tx.id] : null;
+  const account = fin.accounts.find(a => a.id === form?.accountId);
+  const unpaid = useMemo(() => unreimbursedExpenses(fin).filter(t => t.id !== tx?.id), [fin, tx]);
+  const director = useMemo(() => directorPosition(fin), [fin]);
+
+  if (!form) return <Drawer open={open} onClose={onClose} title="Transaction" />;
+
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const setSplit = (i, k, v) => setForm(f => ({ ...f, splits: f.splits.map((s, j) => j === i ? { ...s, [k]: v } : s) }));
+
+  const amountNum = Number(form.amount) || 0;
+  const pseudoTx = { ...(tx || {}), id: tx?.id, amount: amountNum, date: form.date };
+  const activeSplits = form.splitOn ? form.splits.filter(s => s.category || s.amount !== '') : [];
+  const remainder = form.splitOn ? splitRemainder(pseudoTx, activeSplits) : 0;
+  const splitsValid = !form.splitOn || (activeSplits.length >= 2 && remainder === 0 && activeSplits.every(s => s.category));
+  const confirmPayload = buildConfirm(pseudoTx, { ...form, splits: form.splitOn ? activeSplits.map(s => ({ ...s, amount: Number(s.amount) })) : [] }, { rentals: data.rentals });
+  const linkedExpense = form.linkedTransactionId ? fin.transactions.find(t => t.id === form.linkedTransactionId) : null;
+  const canSave = form.accountId && form.date && form.amount !== '' && (form.splitOn ? splitsValid : !!form.category) && !saving;
+
+  const applySuggestion = () => {
+    if (!sug) return;
+    setForm(f => ({
+      ...f, category: sug.category || f.category, customerId: sug.customerId || f.customerId, rentalId: sug.rentalId || f.rentalId,
+      vehicleId: sug.vehicleId || f.vehicleId, linkedTransactionId: sug.linkedTransactionId || f.linkedTransactionId,
+      splitOn: !!sug.splits, splits: sug.splits ? sug.splits.map(s => ({ ...blankSplit(), ...s, amount: String(s.amount) })) : f.splits,
+    }));
+  };
+
+  const save = async () => {
+    setSaving(true); setErr('');
+    try {
+      const splits = form.splitOn ? activeSplits.map(s => ({ category: s.category, amount: Number(s.amount), rentalId: s.rentalId || null, customerId: s.customerId || null, vehicleId: s.vehicleId || null, notes: s.notes || '' })) : [];
+      let saved;
+      if (isNew) {
+        saved = await fin.addTransaction({ accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() || categoryLabel(form.category), source: 'manual', category: splits.length ? 'split' : form.category, matchStatus: 'confirmed', customerId: form.customerId || null, rentalId: form.rentalId || null, vehicleId: form.vehicleId || null, linkedTransactionId: form.linkedTransactionId || null, notes: form.notes, splits });
+        if (confirmPayload.rentalId) await fin.confirmTransaction({ ...confirmPayload, id: saved.id, splits });
+      } else {
+        if (!locked) await fin.updateTransaction(tx.id, { accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() });
+        saved = await fin.confirmTransaction({ ...confirmPayload, splits });
+      }
+      onSaved?.(saved, confirmPayload.effects);
+      onClose();
+    } catch (e) { setErr(e.message || String(e)); } finally { setSaving(false); }
+  };
+
+  const ignore = async () => {
+    setSaving(true);
+    try { await fin.updateTransaction(tx.id, { matchStatus: 'ignored' }); onSaved?.({ ...tx, matchStatus: 'ignored' }, []); onClose(); }
+    catch (e) { setErr(e.message); } finally { setSaving(false); }
+  };
+  const del = async () => {
+    if (!window.confirm('Delete this manual transaction?')) return;
+    setSaving(true);
+    try { await fin.removeTransaction(tx.id); onSaved?.(null, []); onClose(); }
+    catch (e) { setErr(e.message); } finally { setSaving(false); }
+  };
+
+  // Plain render function (not a component) so the selects keep their identity between renders.
+  const linkFields = (value, onChange) => (
+    <div className="grid-2" style={{ gap: 10 }}>
+      <div className="field"><label className="label">Customer</label>
+        <select className="select" value={value.customerId || ''} onChange={e => onChange({ customerId: e.target.value, rentalId: '' })}>
+          <option value="">—</option>{data.customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+      <div className="field"><label className="label">Rental</label>
+        <select className="select" value={value.rentalId || ''} onChange={e => { const r = data.rentals.find(x => x.id === e.target.value); onChange({ rentalId: e.target.value, customerId: r?.customerId || value.customerId, vehicleId: r?.vehicleId || value.vehicleId }); }}>
+          <option value="">—</option>
+          {data.rentals.filter(r => !value.customerId || r.customerId === value.customerId).map(r => { const v = data.vehicles.find(x => x.id === r.vehicleId); return <option key={r.id} value={r.id}>{r.contractNumber || r.startDate} · {v?.plate || ''}{r.bond?.amount ? ` · bond $${r.bond.amount}` : ''}</option>; })}</select></div>
+      <div className="field"><label className="label">Vehicle</label>
+        <select className="select" value={value.vehicleId || ''} onChange={e => onChange({ vehicleId: e.target.value })}>
+          <option value="">—</option>{data.vehicles.map(v => <option key={v.id} value={v.id}>{v.plate}{v.name ? ` · ${v.name}` : ''}</option>)}</select></div>
+    </div>
+  );
+
+  return (
+    <Drawer open={open} onClose={onClose} title={isNew ? 'Add manual transaction' : 'Transaction'}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {tx && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div className="text-sm text-muted">{formatDate(tx.date)} · <AccountBadge account={account} /> · {SOURCE_LABEL[tx.source]}</div>
+            <StatusBadge status={tx.matchStatus} />
+          </div>
+        )}
+        {tx && <div style={{ fontSize: 26, fontWeight: 700 }}><AmountCell value={tx.amount} /></div>}
+        {tx && <div className="fin-mono" style={{ background: 'var(--bg)', borderRadius: 8, padding: '10px 12px' }}>{tx.description || '—'}</div>}
+
+        {(isNew || !locked) && (
+          <>
+            <div className="grid-2" style={{ gap: 10 }}>
+              <div className="field"><label className="label">Account</label>
+                <select className="select" value={form.accountId} onChange={e => sf('accountId', e.target.value)}>{fin.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></div>
+              <div className="field"><label className="label">Date</label><input className="input" type="date" value={form.date} onChange={e => sf('date', e.target.value)} /></div>
+            </div>
+            <div className="grid-2" style={{ gap: 10 }}>
+              <div className="field"><label className="label">Amount ($)</label>
+                <input className="input" type="number" step="0.01" value={form.amount} onChange={e => sf('amount', e.target.value)} placeholder="−50 for money out" />
+                <span className="field-hint">Money in positive, money out negative.</span></div>
+              <div className="field"><label className="label">Description</label><input className="input" value={form.description} onChange={e => sf('description', e.target.value)} placeholder="e.g. Cash · Yann one day" /></div>
+            </div>
+          </>
+        )}
+
+        {sug && tx.matchStatus !== 'confirmed' && (
+          <div style={{ background: 'var(--blue-bg)', borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <div><div className="label" style={{ color: 'var(--blue)' }}>Suggested</div>
+                <div className="fw-600" style={{ fontSize: 14 }}>{categoryLabel(sug.category)}{sug.splits ? ' + split' : ''}</div>
+                <div className="text-sm text-muted">Why: {sug.reason}</div></div>
+              <button className="btn btn-secondary btn-sm" style={{ background: 'white' }} onClick={applySuggestion}>Use</button>
+            </div>
+          </div>
+        )}
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+          <input type="checkbox" checked={form.splitOn} onChange={e => sf('splitOn', e.target.checked)} />
+          <span className="fw-600" style={{ fontSize: 14 }}>Split this transaction</span>
+          {form.splitOn && <span className="text-sm text-muted">{activeSplits.length} lines</span>}
+        </label>
+
+        {!form.splitOn ? (
+          <div className="field"><label className="label">Category</label>
+            <CategorySelect value={form.category} onChange={v => sf('category', v)} />
+            <span className="field-hint">{categoryTypeNote(form.category)}</span></div>
+        ) : (
+          <div>
+            {form.splits.map((s, i) => (
+              <div key={i} className="fin-split-line">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px auto', gap: 8, alignItems: 'end' }}>
+                  <div className="field"><label className="label">Line {i + 1} · category</label><CategorySelect value={s.category} onChange={v => setSplit(i, 'category', v)} /></div>
+                  <div className="field"><label className="label">Amount</label><input className="input" type="number" step="0.01" value={s.amount} onChange={e => setSplit(i, 'amount', e.target.value)} /></div>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setForm(f => ({ ...f, splits: f.splits.filter((_, j) => j !== i) }))} disabled={form.splits.length <= 2}>×</button>
+                </div>
+                {s.category && <div className="text-sm text-muted" style={{ marginTop: 6 }}>{categoryTypeNote(s.category)}{s.rentalId ? ` · ${data.rentals.find(r => r.id === s.rentalId)?.contractNumber || 'rental'}` : ''}</div>}
+                {['bond_deposit', 'bond_refund', 'bond_retained', 'rental_income'].includes(s.category) && (
+                  <div style={{ marginTop: 8 }}>{linkFields(s, p => setForm(f => ({ ...f, splits: f.splits.map((x, j) => j === i ? { ...x, ...p } : x) })))}</div>
+                )}
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 4 }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setForm(f => ({ ...f, splits: [...f.splits, blankSplit()] }))}>+ Add split line</button>
+              <div style={{ background: remainder === 0 ? 'var(--accent-light)' : 'var(--amber-bg)', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 600 }}>Left to allocate {money(remainder / 100)}</div>
+            </div>
+          </div>
+        )}
+
+        {!form.splitOn && (
+          <>
+            <div className="label">Linked records</div>
+            {linkFields(form, p => setForm(f => ({ ...f, ...p })))}
+            {form.category === 'bond_refund' && form.rentalId && (() => {
+              const r = data.rentals.find(x => x.id === form.rentalId); const bond = toCents(r?.bond?.amount); const out = Math.abs(toCents(amountNum));
+              if (!bond || out >= bond) return null;
+              return (
+                <div style={{ background: 'var(--amber-bg)', borderRadius: 10, padding: '10px 12px', fontSize: 13 }}>
+                  <div className="fw-600" style={{ marginBottom: 6 }}>Refund is {money((bond - out) / 100)} less than the bond. How should that be recorded?</div>
+                  <label style={{ display: 'block', marginBottom: 4 }}><input type="radio" checked={form.refundMode === 'retain'} onChange={() => sf('refundMode', 'retain')} /> Keep it as Bond retained income
+                    {form.refundMode === 'retain' && <select className="select" style={{ marginTop: 6 }} value={form.retainReason} onChange={e => sf('retainReason', e.target.value)}>{BOND_RETAIN_REASONS.map(x => <option key={x}>{x}</option>)}</select>}</label>
+                  <label style={{ display: 'block' }}><input type="radio" checked={form.refundMode === 'pending'} onChange={() => sf('refundMode', 'pending')} /> Partial refund, the rest is still to be paid back</label>
+                </div>
+              );
+            })()}
+          </>
+        )}
+
+        {(form.category === 'reimbursement' || form.linkedTransactionId) && (
+          <div>
+            <div className="label" style={{ marginBottom: 6 }}>Linked transaction</div>
+            {linkedExpense ? (
+              <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span className="fw-600">{linkedExpense.description}</span><AmountCell value={linkedExpense.amount} /></div>
+                <div className="text-sm text-muted">{formatDate(linkedExpense.date)} · <AccountBadge account={fin.accounts.find(a => a.id === linkedExpense.accountId)} /> · {categoryLabel(linkedExpense.category)}</div>
+                <div className="text-sm" style={{ color: toCents(linkedExpense.amount) === -toCents(amountNum) ? 'var(--accent)' : 'var(--amber)', marginTop: 4 }}>
+                  {toCents(linkedExpense.amount) === -toCents(amountNum) ? 'Amounts match · expense stays on its date, this payment only settles it' : 'Amounts differ'}</div>
+                <button className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => sf('linkedTransactionId', '')}>Unlink</button>
+              </div>
+            ) : (
+              <select className="select" value="" onChange={e => sf('linkedTransactionId', e.target.value)}>
+                <option value="">Choose an unpaid personal-card expense…</option>
+                {unpaid.map(t => <option key={t.id} value={t.id}>{formatDate(t.date)} · {t.description} · {money(t.amount)}</option>)}
+              </select>
+            )}
+            {linkedExpense && <div style={{ background: 'var(--blue-bg)', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginTop: 8 }}>Owed to you by the business: {money(director.total)} → {money(director.total - Math.abs(Number(linkedExpense.amount)))} after this reimbursement.</div>}
+          </div>
+        )}
+
+        <SideEffectNote title="On save" items={confirmPayload.effects} />
+
+        <div className="field"><label className="label">Notes</label><textarea className="textarea" rows={2} value={form.notes} onChange={e => sf('notes', e.target.value)} placeholder="Add a note" /></div>
+        {err && <div style={{ color: 'var(--red)', fontSize: 13 }}>{err}</div>}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', paddingTop: 6, borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {tx && tx.matchStatus !== 'ignored' && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={ignore} disabled={saving}>Mark as ignored</button>}
+            {tx && tx.source === 'manual' && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={del} disabled={saving}>Delete</button>}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={save} disabled={!canSave}>{saving ? 'Saving…' : 'Save and confirm'}</button>
+          </div>
+        </div>
+        {locked && <div className="text-sm text-muted">Date, amount and description come from {SOURCE_LABEL[tx.source]} and stay as they are. <Badge variant="gray">locked</Badge></div>}
+      </div>
+    </Drawer>
+  );
+}

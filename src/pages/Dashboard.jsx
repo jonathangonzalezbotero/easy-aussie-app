@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import Badge from '../components/shared/Badge';
+import { bondLabel, bondVariant } from '../utils/bond';
 import EmptyState from '../components/shared/EmptyState';
 import { formatDate, daysUntil } from '../utils/dates';
 
@@ -146,7 +147,7 @@ export default function Dashboard() {
                     <td className="text-muted">{r.price ? `$${Number(r.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}${r.billingPeriod === 'fixed' ? ' total' : '/wk'}` : '—'}</td>
                     <td>
                       {r.bond?.amount
-                        ? <Badge variant={r.bond.status === 'held' ? 'amber' : 'green'}>{r.bond.status === 'held' ? `Held $${r.bond.amount}` : 'Returned'}</Badge>
+                        ? <Badge variant={bondVariant(r.bond.status)}>{r.bond.status === 'held' ? `Held $${r.bond.amount}` : bondLabel(r.bond.status)}</Badge>
                         : <span className="text-muted text-sm">None</span>}
                     </td>
                   </tr>

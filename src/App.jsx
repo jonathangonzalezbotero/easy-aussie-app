@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { StoreProvider } from './context/StoreContext';
+import { FinanceProvider } from './finance/FinanceContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -10,6 +11,7 @@ import Rentals from './pages/Rentals';
 import Maintenance from './pages/Maintenance';
 import Bonds from './pages/Bonds';
 import Settings from './pages/Settings';
+import Finance from './pages/Finance';
 import ContractPage from './pages/ContractPage';
 import CustomerIntake from './pages/CustomerIntake';
 import SigningPage from './pages/SigningPage';
@@ -17,6 +19,7 @@ import SigningPage from './pages/SigningPage';
 function AdminApp() {
   return (
     <StoreProvider>
+      <FinanceProvider>
       <Routes>
         <Route path="/contract" element={<ProtectedRoute><ContractPage /></ProtectedRoute>} />
         <Route path="/*" element={
@@ -29,6 +32,7 @@ function AdminApp() {
                 <Route path="/rentals"     element={<Rentals />} />
                 <Route path="/maintenance" element={<Maintenance />} />
                 <Route path="/bonds"       element={<Bonds />} />
+                <Route path="/finance"     element={<Finance />} />
                 <Route path="/settings"    element={<Settings />} />
                 <Route path="*"            element={<Navigate to="/" replace />} />
               </Routes>
@@ -36,6 +40,7 @@ function AdminApp() {
           </ProtectedRoute>
         } />
       </Routes>
+      </FinanceProvider>
     </StoreProvider>
   );
 }

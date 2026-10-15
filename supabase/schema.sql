@@ -57,7 +57,14 @@ create table if not exists rentals (
   status        text default 'active' check (status in ('active','completed')),
   bond_amount   numeric,
   bond_method   text default 'cash',
-  bond_status   text default 'held' check (bond_status in ('held','returned')),
+  bond_status   text default 'held' check (bond_status in ('awaiting','held','refunded','partially_refunded','retained')),
+  bond_refunded_amount numeric,
+  bond_retained_amount numeric,
+  bond_retain_reason   text,
+  bond_refund_method   text,
+  bond_refund_date     date,
+  rent_paid_by         text default 'stripe',
+  stripe_subscription_id text,
   shopify_ref      text,
   contract_ref     text,
   notes            text,
@@ -71,6 +78,7 @@ create table if not exists rentals (
 -- alter table rentals add column if not exists price numeric;
 -- alter table rentals add column if not exists odometer_return numeric;
 -- alter table rentals add column if not exists billing_period text default 'weekly' check (billing_period in ('weekly','fixed'));
+-- Finance module (bond statuses, finance_* tables): run supabase/migration_finance.sql
 
 create table if not exists maintenance (
   id                uuid primary key default gen_random_uuid(),
