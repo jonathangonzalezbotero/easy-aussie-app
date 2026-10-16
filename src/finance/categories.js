@@ -11,6 +11,7 @@ export const CATEGORY_TYPES = {
 
 export const CATEGORIES = [
   { id: 'rental_income',   label: 'Rental income',          type: 'income' },
+  { id: 'rental_refund',   label: 'Rental refund (money back to a customer, reduces income)', type: 'income' },
   { id: 'bond_retained',   label: 'Bond retained',          type: 'income' },
   { id: 'insurance_claim', label: 'Insurance claim',        type: 'income' },
   { id: 'other_income',    label: 'Other income',           type: 'income' },

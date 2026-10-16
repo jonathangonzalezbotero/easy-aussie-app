@@ -26,7 +26,7 @@ export default function Overview({ go }) {
   const sum = useMemo(() => summarise(periodTx), [periodTx]);
   const bySource = useMemo(() => {
     const out = {};
-    for (const t of periodTx) { const a = fin.accounts.find(x => x.id === t.accountId); const key = a?.kind === 'processor' ? 'Stripe' : a?.kind === 'cash' ? 'Cash' : 'Bank'; for (const l of (t.splits.length ? t.splits : [t])) { if (['rental_income', 'bond_retained', 'insurance_claim', 'other_income'].includes(l.category)) out[key] = (out[key] || 0) + Number(l.amount); } }
+    for (const t of periodTx) { const a = fin.accounts.find(x => x.id === t.accountId); const key = a?.kind === 'processor' ? 'Stripe' : a?.kind === 'cash' ? 'Cash' : 'Bank'; for (const l of (t.splits.length ? t.splits : [t])) { if (['rental_income', 'rental_refund', 'bond_retained', 'insurance_claim', 'other_income'].includes(l.category)) out[key] = (out[key] || 0) + Number(l.amount); } }
     return out;
   }, [periodTx, fin.accounts]);
   const opCount = periodTx.filter(t => (t.splits.length ? t.splits : [t]).some(l => categoriesOfType('operating').some(c => c.id === l.category))).length;
