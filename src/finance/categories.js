@@ -26,6 +26,7 @@ export const CATEGORIES = [
   { id: 'contractor',      label: 'Contractor and labour',  type: 'operating' },
   { id: 'accountant',      label: 'Accountant',             type: 'operating' },
   { id: 'fines',           label: 'Fines',                  type: 'operating' },
+  { id: 'entertainment',   label: 'Entertainment (meals, thank-yous · accountant checks deductibility)', type: 'operating' },
   { id: 'other_expense',   label: 'Other',                  type: 'operating' },
 
   { id: 'director_loan_repayment', label: 'Director loan repayment', type: 'capital' },
