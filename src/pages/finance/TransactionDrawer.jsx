@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Drawer from '../../components/shared/Drawer';
 import Badge from '../../components/shared/Badge';
+import SearchSelect from '../../components/shared/SearchSelect';
 import { useFinance } from '../../finance/FinanceContext';
 import { useStore } from '../../context/StoreContext';
 import { useSuggestions } from '../../finance/useSuggestions';
@@ -11,7 +12,7 @@ import { formatDate, todayStr } from '../../utils/dates';
 import { BOND_RETAIN_REASONS } from '../../utils/bond';
 import { AmountCell, AccountBadge, CategorySelect, SideEffectNote, StatusBadge } from './bits';
 
-const blankSplit = () => ({ category: '', amount: '', rentalId: '', customerId: '', vehicleId: '', notes: '' });
+const blankSplit = () => ({ category: '', amount: '', rentalId: '', customerId: '', vehicleId: '', payeeId: '', notes: '' });
 
 // Edit any transaction, or create a manual one (tx = null). Imported lines keep date, amount and
 // description locked; only category, links, splits and notes change.
@@ -33,12 +34,12 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
         accountId: tx.accountId, date: tx.date, amount: String(tx.amount), description: tx.description,
         category: tx.category === 'split' ? '' : tx.category, splitOn: tx.splits.length > 0,
         splits: tx.splits.length ? tx.splits.map(s => ({ ...s, amount: String(s.amount) })) : [blankSplit(), blankSplit()],
-        customerId: tx.customerId || '', rentalId: tx.rentalId || '', vehicleId: tx.vehicleId || '',
+        customerId: tx.customerId || '', rentalId: tx.rentalId || '', vehicleId: tx.vehicleId || '', payeeId: tx.payeeId || '',
         linkedTransactionId: tx.linkedTransactionId || '', notes: tx.notes || '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0],
       });
     } else {
       const manualAccounts = fin.accounts.filter(a => a.feed === 'manual');
-      setForm({ accountId: defaultAccountId || manualAccounts[0]?.id || fin.accounts[0]?.id || '', date: todayStr(), amount: '', description: '', category: '', splitOn: false, splits: [blankSplit(), blankSplit()], customerId: '', rentalId: '', vehicleId: '', linkedTransactionId: '', notes: '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0] });
+      setForm({ accountId: defaultAccountId || manualAccounts[0]?.id || fin.accounts[0]?.id || '', date: todayStr(), amount: '', description: '', category: '', splitOn: false, splits: [blankSplit(), blankSplit()], customerId: '', rentalId: '', vehicleId: '', payeeId: '', linkedTransactionId: '', notes: '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0] });
     }
   }, [open, tx, defaultAccountId, fin.accounts]);
 
@@ -65,7 +66,7 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
     if (!sug) return;
     setForm(f => ({
       ...f, category: sug.category || f.category, customerId: sug.customerId || f.customerId, rentalId: sug.rentalId || f.rentalId,
-      vehicleId: sug.vehicleId || f.vehicleId, linkedTransactionId: sug.linkedTransactionId || f.linkedTransactionId,
+      vehicleId: sug.vehicleId || f.vehicleId, payeeId: sug.payeeId || f.payeeId, linkedTransactionId: sug.linkedTransactionId || f.linkedTransactionId,
       splitOn: !!sug.splits, splits: sug.splits ? sug.splits.map(s => ({ ...blankSplit(), ...s, amount: String(s.amount) })) : f.splits,
     }));
   };
@@ -73,10 +74,10 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
   const save = async () => {
     setSaving(true); setErr('');
     try {
-      const splits = form.splitOn ? activeSplits.map(s => ({ category: s.category, amount: Number(s.amount), rentalId: s.rentalId || null, customerId: s.customerId || null, vehicleId: s.vehicleId || null, notes: s.notes || '' })) : [];
+      const splits = form.splitOn ? activeSplits.map(s => ({ category: s.category, amount: Number(s.amount), rentalId: s.rentalId || null, customerId: s.customerId || null, vehicleId: s.vehicleId || null, payeeId: s.payeeId || null, notes: s.notes || '' })) : [];
       let saved;
       if (isNew) {
-        saved = await fin.addTransaction({ accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() || categoryLabel(form.category), source: 'manual', category: splits.length ? 'split' : form.category, matchStatus: 'confirmed', customerId: form.customerId || null, rentalId: form.rentalId || null, vehicleId: form.vehicleId || null, linkedTransactionId: form.linkedTransactionId || null, notes: form.notes, splits });
+        saved = await fin.addTransaction({ accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() || categoryLabel(form.category), source: 'manual', category: splits.length ? 'split' : form.category, matchStatus: 'confirmed', customerId: form.customerId || null, rentalId: form.rentalId || null, vehicleId: form.vehicleId || null, payeeId: form.payeeId || null, linkedTransactionId: form.linkedTransactionId || null, notes: form.notes, splits });
         if (confirmPayload.rentalId) await fin.confirmTransaction({ ...confirmPayload, id: saved.id, splits });
       } else {
         if (!locked) await fin.updateTransaction(tx.id, { accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() });
@@ -100,18 +101,23 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
   };
 
   // Plain render function (not a component) so the selects keep their identity between renders.
+  const customerOptions = data.customers.map(c => ({ value: c.id, label: c.name, sub: c.phone || c.email || '' }));
+  const rentalOptions = (customerId) => data.rentals.filter(r => !customerId || r.customerId === customerId)
+    .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''))
+    .map(r => { const v = data.vehicles.find(x => x.id === r.vehicleId); const c = data.customers.find(x => x.id === r.customerId); return { value: r.id, label: `${r.contractNumber || formatDate(r.startDate)} · ${v?.plate || ''}`, sub: `${c?.name || ''}${r.bond?.amount ? ` · bond $${r.bond.amount}` : ''} · ${r.status}` }; });
+  const vehicleOptions = data.vehicles.map(v => ({ value: v.id, label: v.plate, sub: v.name || v.type }));
+  const payeeOptions = fin.payees.filter(p => p.active !== false).map(p => ({ value: p.id, label: p.name, sub: p.kind }));
+  const createPayee = async (name, apply) => { try { const p = await fin.addPayee({ name, kind: 'contractor' }); apply(p.id); } catch (e) { setErr(e.message); } };
   const linkFields = (value, onChange) => (
     <div className="grid-2" style={{ gap: 10 }}>
       <div className="field"><label className="label">Customer</label>
-        <select className="select" value={value.customerId || ''} onChange={e => onChange({ customerId: e.target.value, rentalId: '' })}>
-          <option value="">—</option>{data.customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+        <SearchSelect options={customerOptions} value={value.customerId || ''} placeholder="Search customers…" onChange={id => onChange({ customerId: id, rentalId: '' })} /></div>
       <div className="field"><label className="label">Rental</label>
-        <select className="select" value={value.rentalId || ''} onChange={e => { const r = data.rentals.find(x => x.id === e.target.value); onChange({ rentalId: e.target.value, customerId: r?.customerId || value.customerId, vehicleId: r?.vehicleId || value.vehicleId }); }}>
-          <option value="">—</option>
-          {data.rentals.filter(r => !value.customerId || r.customerId === value.customerId).map(r => { const v = data.vehicles.find(x => x.id === r.vehicleId); return <option key={r.id} value={r.id}>{r.contractNumber || r.startDate} · {v?.plate || ''}{r.bond?.amount ? ` · bond $${r.bond.amount}` : ''}</option>; })}</select></div>
+        <SearchSelect options={rentalOptions(value.customerId)} value={value.rentalId || ''} placeholder="Search rentals…" onChange={id => { const r = data.rentals.find(x => x.id === id); onChange({ rentalId: id, customerId: r?.customerId || value.customerId, vehicleId: r?.vehicleId || value.vehicleId }); }} /></div>
       <div className="field"><label className="label">Vehicle</label>
-        <select className="select" value={value.vehicleId || ''} onChange={e => onChange({ vehicleId: e.target.value })}>
-          <option value="">—</option>{data.vehicles.map(v => <option key={v.id} value={v.id}>{v.plate}{v.name ? ` · ${v.name}` : ''}</option>)}</select></div>
+        <SearchSelect options={vehicleOptions} value={value.vehicleId || ''} placeholder="Search plates…" onChange={id => onChange({ vehicleId: id })} /></div>
+      <div className="field"><label className="label">Paid to</label>
+        <SearchSelect options={payeeOptions} value={value.payeeId || ''} placeholder="Contractor or supplier…" onChange={id => onChange({ payeeId: id })} onCreate={name => createPayee(name, id => onChange({ payeeId: id }))} createLabel="Add payee" /></div>
     </div>
   );
 
@@ -174,7 +180,7 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
                   <button className="btn btn-ghost btn-sm" onClick={() => setForm(f => ({ ...f, splits: f.splits.filter((_, j) => j !== i) }))} disabled={form.splits.length <= 2}>×</button>
                 </div>
                 {s.category && <div className="text-sm text-muted" style={{ marginTop: 6 }}>{categoryTypeNote(s.category)}{s.rentalId ? ` · ${data.rentals.find(r => r.id === s.rentalId)?.contractNumber || 'rental'}` : ''}</div>}
-                {['bond_deposit', 'bond_refund', 'bond_retained', 'rental_income'].includes(s.category) && (
+                {s.category && (
                   <div style={{ marginTop: 8 }}>{linkFields(s, p => setForm(f => ({ ...f, splits: f.splits.map((x, j) => j === i ? { ...x, ...p } : x) })))}</div>
                 )}
               </div>

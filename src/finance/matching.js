@@ -38,7 +38,7 @@ function daysApart(a, b) { return Math.abs((new Date(a + 'T00:00:00') - new Date
 
 // Build a suggestion for one transaction. Returns { category, customerId, rentalId, vehicleId,
 // linkedTransactionId, reason, kind, bondCheck } or null.
-export function suggestFor(tx, { rules, customers, rentals, vehicles, transactions, accounts }) {
+export function suggestFor(tx, { rules, customers, rentals, vehicles, transactions, accounts, payees = [] }) {
   const account = accounts.find(a => a.id === tx.accountId);
   const desc = tx.description || '';
   const d = norm(desc);
@@ -90,15 +90,31 @@ export function suggestFor(tx, { rules, customers, rentals, vehicles, transactio
     if (candidate) return { kind: 'reimbursement', category: 'reimbursement', linkedTransactionId: candidate.id, reason: `amount matches ${candidate.description} paid on a personal card on ${candidate.date}` };
   }
 
+  const payee = rule?.payeeId ? payees.find(p => p.id === rule.payeeId) : matchPayee(payees, desc);
   if (rule) {
     const vehicle = vehicles.find(v => v.plate && d.includes(norm(v.plate)));
-    return { kind: 'rule', category: rule.category, vehicleId: vehicle?.id || null, reason: `rule "${rule.pattern}"`, ruleId: rule.id };
+    return { kind: 'rule', category: rule.category, vehicleId: vehicle?.id || null, payeeId: payee?.id || null, reason: `rule "${rule.pattern}"${payee ? ` · ${payee.name}` : ''}`, ruleId: rule.id };
   }
 
   // 6. Plate in the description → maintenance on that vehicle
   const vehicle = vehicles.find(v => v.plate && v.plate.length >= 4 && d.includes(norm(v.plate)));
-  if (vehicle && amt < 0) return { kind: 'vehicle', category: 'maintenance', vehicleId: vehicle.id, reason: `plate ${vehicle.plate} in description` };
+  if (vehicle && amt < 0) return { kind: 'vehicle', category: 'maintenance', vehicleId: vehicle.id, payeeId: payee?.id || null, reason: `plate ${vehicle.plate} in description` };
 
+  // 7. Known payee in the description
+  if (payee && amt < 0) return { kind: 'payee', category: payee.defaultCategory || 'contractor', payeeId: payee.id, reason: `paid to ${payee.name}` };
+
+  return null;
+}
+
+// First payee whose match text (or name) appears in the description.
+export function matchPayee(payees, description) {
+  const d = norm(description);
+  if (!d) return null;
+  for (const p of payees || []) {
+    if (p.active === false) continue;
+    const parts = (p.matchText || p.name).split('|').map(x => norm(x).trim()).filter(x => x.length >= 3);
+    if (parts.some(x => d.includes(x))) return p;
+  }
   return null;
 }
 

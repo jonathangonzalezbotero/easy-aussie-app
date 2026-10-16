@@ -8,11 +8,11 @@ export function useSuggestions() {
   const fin = useFinance();
   const { data } = useStore();
   return useMemo(() => {
-    const ctx = { rules: fin.rules, customers: data.customers, rentals: data.rentals, vehicles: data.vehicles, transactions: fin.transactions, accounts: fin.accounts };
+    const ctx = { rules: fin.rules, customers: data.customers, rentals: data.rentals, vehicles: data.vehicles, transactions: fin.transactions, accounts: fin.accounts, payees: fin.payees };
     const out = {};
     for (const tx of fin.transactions) {
       if (tx.matchStatus === 'unreviewed' || tx.matchStatus === 'suggested') out[tx.id] = suggestFor(tx, ctx);
     }
     return out;
-  }, [fin.transactions, fin.rules, fin.accounts, data.customers, data.rentals, data.vehicles]);
+  }, [fin.transactions, fin.rules, fin.accounts, fin.payees, data.customers, data.rentals, data.vehicles]);
 }

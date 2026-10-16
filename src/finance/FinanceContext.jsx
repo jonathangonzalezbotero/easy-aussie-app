@@ -7,25 +7,28 @@ const FinanceContext = createContext(null);
 const accountFromDb = (a) => ({ id: a.id, name: a.name, kind: a.kind, feed: a.feed, accountHint: a.account_hint || '', sortOrder: a.sort_order || 0, lastImportAt: a.last_import_at });
 const accountToDb = (a) => ({ name: a.name, kind: a.kind, feed: a.feed, account_hint: a.accountHint || null, sort_order: a.sortOrder || 0, last_import_at: a.lastImportAt || null });
 
-const splitFromDb = (s) => ({ id: s.id, transactionId: s.transaction_id, category: s.category, amount: Number(s.amount), rentalId: s.rental_id, customerId: s.customer_id, vehicleId: s.vehicle_id, notes: s.notes || '', sortOrder: s.sort_order || 0 });
+const splitFromDb = (s) => ({ id: s.id, transactionId: s.transaction_id, category: s.category, amount: Number(s.amount), rentalId: s.rental_id, customerId: s.customer_id, vehicleId: s.vehicle_id, payeeId: s.payee_id || null, notes: s.notes || '', sortOrder: s.sort_order || 0 });
+
+const payeeFromDb = (p) => ({ id: p.id, name: p.name, kind: p.kind || 'supplier', abn: p.abn || '', defaultCategory: p.default_category || '', matchText: p.match_text || '', notes: p.notes || '', active: p.active !== false });
+const payeeToDb = (p) => ({ name: p.name, kind: p.kind || 'supplier', abn: p.abn || null, default_category: p.defaultCategory || null, match_text: p.matchText || null, notes: p.notes || null, active: p.active !== false });
 
 const txFromDb = (t) => ({
   id: t.id, accountId: t.account_id, date: t.date, amount: Number(t.amount), description: t.description || '',
   balance: t.balance == null ? null : Number(t.balance), source: t.source, importId: t.import_id, externalId: t.external_id,
   raw: t.raw, category: t.category || '', matchStatus: t.match_status, suggestion: t.suggestion,
-  customerId: t.customer_id, rentalId: t.rental_id, vehicleId: t.vehicle_id, linkedTransactionId: t.linked_transaction_id,
+  customerId: t.customer_id, rentalId: t.rental_id, vehicleId: t.vehicle_id, payeeId: t.payee_id || null, linkedTransactionId: t.linked_transaction_id,
   notes: t.notes || '', hasUndo: !!t.previous_state, confirmedAt: t.confirmed_at, createdAt: t.created_at, splits: [],
 });
 // Only the editable columns. Locked columns (date, amount, description) are passed only for manual lines.
 const txToDb = (t, { full = false } = {}) => ({
   ...(full ? { account_id: t.accountId, date: t.date, amount: Number(t.amount), description: t.description || '', source: t.source || 'manual', balance: t.balance == null || t.balance === '' ? null : Number(t.balance), raw: t.raw || null, external_id: t.externalId || null, import_id: t.importId || null } : {}),
   category: t.category || null, match_status: t.matchStatus || 'unreviewed', suggestion: t.suggestion || null,
-  customer_id: t.customerId || null, rental_id: t.rentalId || null, vehicle_id: t.vehicleId || null,
+  customer_id: t.customerId || null, rental_id: t.rentalId || null, vehicle_id: t.vehicleId || null, payee_id: t.payeeId || null,
   linked_transaction_id: t.linkedTransactionId || null, notes: t.notes || null, updated_at: new Date().toISOString(),
 });
 
-const ruleFromDb = (r) => ({ id: r.id, pattern: r.pattern, category: r.category, accountId: r.account_id, priority: r.priority ?? 100, active: r.active !== false });
-const ruleToDb = (r) => ({ pattern: r.pattern, category: r.category, account_id: r.accountId || null, priority: r.priority ?? 100, active: r.active !== false });
+const ruleFromDb = (r) => ({ id: r.id, pattern: r.pattern, category: r.category, accountId: r.account_id, payeeId: r.payee_id || null, priority: r.priority ?? 100, active: r.active !== false });
+const ruleToDb = (r) => ({ pattern: r.pattern, category: r.category, account_id: r.accountId || null, payee_id: r.payeeId || null, priority: r.priority ?? 100, active: r.active !== false });
 
 const recurringFromDb = (r) => ({ id: r.id, name: r.name, category: r.category, amount: Number(r.amount), frequency: r.frequency, nextDue: r.next_due, vehicleId: r.vehicle_id, active: r.active !== false });
 const recurringToDb = (r) => ({ name: r.name, category: r.category, amount: Number(r.amount), frequency: r.frequency, next_due: r.nextDue || null, vehicle_id: r.vehicleId || null, active: r.active !== false });
@@ -68,14 +71,14 @@ async function fetchAll(buildQuery) {
 }
 
 export function FinanceProvider({ children }) {
-  const [state, setState] = useState({ accounts: [], transactions: [], rules: [], recurring: [], overrides: [], imports: [], subscriptions: [], regoRenewals: [], settings: DEFAULT_SETTINGS });
+  const [state, setState] = useState({ accounts: [], transactions: [], rules: [], recurring: [], overrides: [], imports: [], subscriptions: [], regoRenewals: [], payees: [], settings: DEFAULT_SETTINGS });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);     // set when the finance tables are missing (migration not run)
 
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      const [accounts, txs, splits, rules, recurring, overrides, imports, subs, settingsRow, regos] = await Promise.all([
+      const [accounts, txs, splits, rules, recurring, overrides, imports, subs, settingsRow, regos, payees] = await Promise.all([
         fetchAll(() => supabase.from('finance_accounts').select('*').order('sort_order')),
         fetchAll(() => supabase.from('finance_transactions').select('*').order('date', { ascending: false }).order('created_at', { ascending: false })),
         fetchAll(() => supabase.from('finance_splits').select('*').order('sort_order')),
@@ -86,6 +89,7 @@ export function FinanceProvider({ children }) {
         fetchAll(() => supabase.from('finance_stripe_subscriptions').select('*')),
         supabase.from('finance_settings').select('*').eq('id', 1).maybeSingle().then(({ data, error }) => { if (error) throw error; return data; }),
         fetchAll(() => supabase.from('rego_renewals').select('*').order('renewal_date')).catch(() => []),
+        fetchAll(() => supabase.from('finance_payees').select('*').order('name')).catch(() => []),
       ]);
       const splitsByTx = {};
       for (const s of splits.map(splitFromDb)) (splitsByTx[s.transactionId] ||= []).push(s);
@@ -93,7 +97,7 @@ export function FinanceProvider({ children }) {
         accounts: accounts.map(accountFromDb),
         transactions: txs.map(t => ({ ...txFromDb(t), splits: splitsByTx[t.id] || [] })),
         rules: rules.map(ruleFromDb), recurring: recurring.map(recurringFromDb), overrides: overrides.map(overrideFromDb),
-        imports: imports.map(importFromDb), subscriptions: subs.map(subFromDb), regoRenewals: regos.map(regoFromDb),
+        imports: imports.map(importFromDb), subscriptions: subs.map(subFromDb), regoRenewals: regos.map(regoFromDb), payees: payees.map(payeeFromDb),
         settings: settingsRow ? settingsFromDb(settingsRow) : DEFAULT_SETTINGS,
       });
     } catch (e) {
@@ -132,7 +136,7 @@ export function FinanceProvider({ children }) {
     const { error: delErr } = await supabase.from('finance_splits').delete().eq('transaction_id', txId);
     if (delErr) throw delErr;
     if (!splits.length) return [];
-    const rows = splits.map((s, i) => ({ transaction_id: txId, category: s.category, amount: Number(s.amount), rental_id: s.rentalId || null, customer_id: s.customerId || null, vehicle_id: s.vehicleId || null, notes: s.notes || null, sort_order: i }));
+    const rows = splits.map((s, i) => ({ transaction_id: txId, category: s.category, amount: Number(s.amount), rental_id: s.rentalId || null, customer_id: s.customerId || null, vehicle_id: s.vehicleId || null, payee_id: s.payeeId || null, notes: s.notes || null, sort_order: i }));
     const { data, error } = await supabase.from('finance_splits').insert(rows).select();
     if (error) throw error;
     return data.map(splitFromDb);
@@ -148,6 +152,7 @@ export function FinanceProvider({ children }) {
     const dbPatch = {};
     if ('category' in updates) dbPatch.category = updates.category || null;
     if ('matchStatus' in updates) dbPatch.match_status = updates.matchStatus;
+    if ('payeeId' in updates) dbPatch.payee_id = updates.payeeId || null;
     dbPatch.updated_at = new Date().toISOString();
     const { error } = await supabase.from('finance_transactions').update(dbPatch).in('id', ids);
     if (error) throw error;
@@ -178,10 +183,10 @@ export function FinanceProvider({ children }) {
     const p_updates = {};
     if ('category' in updates) p_updates.category = updates.category || null;
     p_updates.match_status = updates.matchStatus || 'confirmed';
-    for (const [k, col] of [['customerId', 'customer_id'], ['rentalId', 'rental_id'], ['vehicleId', 'vehicle_id'], ['linkedTransactionId', 'linked_transaction_id'], ['notes', 'notes']]) {
+    for (const [k, col] of [['customerId', 'customer_id'], ['rentalId', 'rental_id'], ['vehicleId', 'vehicle_id'], ['payeeId', 'payee_id'], ['linkedTransactionId', 'linked_transaction_id'], ['notes', 'notes']]) {
       if (k in updates) p_updates[col] = updates[k] ?? '';
     }
-    const p_splits = splits ? splits.map(s => ({ category: s.category, amount: Number(s.amount), rental_id: s.rentalId || null, customer_id: s.customerId || null, vehicle_id: s.vehicleId || null, notes: s.notes || null })) : null;
+    const p_splits = splits ? splits.map(s => ({ category: s.category, amount: Number(s.amount), rental_id: s.rentalId || null, customer_id: s.customerId || null, vehicle_id: s.vehicleId || null, payee_id: s.payeeId || null, notes: s.notes || null })) : null;
     const p_rental_updates = rentalUpdates ? Object.fromEntries(Object.entries({
       bond_status: rentalUpdates.status, bond_refunded_amount: rentalUpdates.refundedAmount, bond_retained_amount: rentalUpdates.retainedAmount,
       bond_retain_reason: rentalUpdates.retainReason, bond_refund_method: rentalUpdates.refundMethod, bond_refund_date: rentalUpdates.refundDate, bond_amount: rentalUpdates.amount,
@@ -226,6 +231,7 @@ export function FinanceProvider({ children }) {
   const rulesApi = simple('finance_rules', 'rules', ruleFromDb, ruleToDb);
   const recurringApi = simple('finance_recurring', 'recurring', recurringFromDb, recurringToDb);
   const accountsApi = simple('finance_accounts', 'accounts', accountFromDb, accountToDb);
+  const payeesApi = simple('finance_payees', 'payees', payeeFromDb, payeeToDb);
   const updateAccount = accountsApi.update;
 
   const setOverride = async (month, category, amount, note) => {
@@ -257,6 +263,7 @@ export function FinanceProvider({ children }) {
     addRule: rulesApi.add, updateRule: rulesApi.update, removeRule: rulesApi.remove,
     addRecurring: recurringApi.add, updateRecurring: recurringApi.update, removeRecurring: recurringApi.remove,
     updateAccount, setOverride, updateSettings,
+    addPayee: payeesApi.add, updatePayee: payeesApi.update, removePayee: payeesApi.remove,
   };
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>;
 }

@@ -145,7 +145,7 @@ export default function FinanceSettings({ go }) {
                 <tr key={r.id} style={{ cursor: 'default', opacity: r.active ? 1 : 0.5 }}>
                   <td className="text-muted">{i + 1}</td>
                   <td className="fin-mono">{r.pattern}</td>
-                  <td>{categoryLabel(r.category)}</td>
+                  <td>{categoryLabel(r.category)}{r.payeeId && <div className="text-sm text-muted">→ {fin.payees.find(p => p.id === r.payeeId)?.name}</div>}</td>
                   <td className="col-hide-mobile text-muted">{r.accountId ? fin.accounts.find(a => a.id === r.accountId)?.name : 'Any'}</td>
                   <td className="col-hide-mobile"><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ height: 6, width: Math.max(6, 60 * st.hits / maxHits), background: 'var(--accent)', borderRadius: 3 }} /><span className="text-sm">{st.hits} lines</span>{st.overlaps.length > 0 && <Badge variant="amber">{st.hits ? 'also match' : 'overlaps'} rule {[...fin.rules].sort((a, b) => a.priority - b.priority).findIndex(x => x.id === st.overlaps[0].id) + 1}</Badge>}</div></td>
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -226,7 +226,7 @@ export default function FinanceSettings({ go }) {
 function RuleModal({ rule, onClose, fin, recent }) {
   const isNew = rule === 'new';
   const [f, setF] = useState(null);
-  const cur = f || (rule && rule !== 'new' ? rule : { pattern: '', category: '', accountId: '', priority: (Math.max(0, ...fin.rules.map(r => r.priority)) + 10), active: true });
+  const cur = f || (rule && rule !== 'new' ? rule : { pattern: '', category: '', accountId: '', payeeId: '', priority: (Math.max(0, ...fin.rules.map(r => r.priority)) + 10), active: true });
   const set = (k, v) => setF({ ...cur, [k]: v });
   const matches = cur.pattern ? recent.filter(t => rulesMatching([{ ...cur, id: 'x' }], t.description, t.accountId).length).slice(0, 5) : [];
   if (!rule) return null;
@@ -240,6 +240,7 @@ function RuleModal({ rule, onClose, fin, recent }) {
         <div className="field"><label className="label">Category</label><CategorySelect value={cur.category} onChange={v => set('category', v)} /></div>
         <div className="field"><label className="label">Account</label><select className="select" value={cur.accountId || ''} onChange={e => set('accountId', e.target.value)}><option value="">Any</option>{fin.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></div>
       </div>
+      <div className="field"><label className="label">Paid to (optional)</label><select className="select" value={cur.payeeId || ''} onChange={e => set('payeeId', e.target.value)}><option value="">—</option>{fin.payees.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><span className="field-hint">Matching lines are attributed to this payee as well as categorised.</span></div>
       <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}><input type="checkbox" checked={cur.active !== false} onChange={e => set('active', e.target.checked)} /> Active</label>
       {cur.pattern && <div><div className="label" style={{ marginBottom: 6 }}>Would match in the last 90 days · {matches.length}{matches.length === 5 ? '+' : ''}</div>{matches.map(t => <div key={t.id} className="text-sm fin-mono" style={{ padding: '3px 0' }}>{t.description} <span className="text-muted">{money(t.amount)}</span></div>)}{!matches.length && <div className="text-sm text-muted">No recent lines match.</div>}</div>}
     </Modal>

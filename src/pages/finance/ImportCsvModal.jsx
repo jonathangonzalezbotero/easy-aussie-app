@@ -80,12 +80,12 @@ export default function ImportCsvModal({ open, onClose, onDone, accountId: initi
 
   // Suggestions for the review step
   const prepared = useMemo(() => {
-    const ctx = { rules: fin.rules, customers: data.customers, rentals: data.rentals, vehicles: data.vehicles, transactions: fin.transactions, accounts: fin.accounts };
+    const ctx = { rules: fin.rules, customers: data.customers, rentals: data.rentals, vehicles: data.vehicles, transactions: fin.transactions, accounts: fin.accounts, payees: fin.payees };
     return newLines.map(l => {
       const tx = { accountId, date: l.date, amount: l.amount, description: l.description, raw: l.raw };
       const sug = suggestFor(tx, ctx);
       const byRule = sug?.kind === 'rule' || sug?.kind === 'vehicle';
-      return { ...l, suggestion: sug, matchStatus: sug ? (byRule ? 'unreviewed' : 'suggested') : 'unreviewed', category: sug?.category || '', customerId: sug?.customerId || null, rentalId: sug?.rentalId || null, vehicleId: sug?.vehicleId || null, linkedTransactionId: sug?.linkedTransactionId || null };
+      return { ...l, suggestion: sug, matchStatus: sug ? (byRule ? 'unreviewed' : 'suggested') : 'unreviewed', category: sug?.category || '', customerId: sug?.customerId || null, rentalId: sug?.rentalId || null, vehicleId: sug?.vehicleId || null, payeeId: sug?.payeeId || null, linkedTransactionId: sug?.linkedTransactionId || null };
     });
   }, [newLines, fin, data, accountId]);
   const reviewCounts = useMemo(() => ({ rule: prepared.filter(p => p.suggestion && p.matchStatus === 'unreviewed').length, matched: prepared.filter(p => p.matchStatus === 'suggested').length, none: prepared.filter(p => !p.suggestion).length, in: prepared.filter(p => p.amount > 0).reduce((s, p) => s + p.amount, 0), out: prepared.filter(p => p.amount < 0).reduce((s, p) => s + p.amount, 0) }), [prepared]);
@@ -96,7 +96,7 @@ export default function ImportCsvModal({ open, onClose, onDone, accountId: initi
     setBusy(true); setErr('');
     try {
       localStorage.setItem(`finance.csvMapping.${accountId}`, JSON.stringify(mapping));
-      const items = prepared.map(p => ({ accountId, date: p.date, amount: p.amount, description: p.description, balance: p.balance, source: 'bank_csv', raw: p.raw, category: p.category, matchStatus: p.matchStatus, suggestion: p.suggestion ? { category: p.suggestion.category, reason: p.suggestion.reason, kind: p.suggestion.kind } : null, customerId: p.customerId, rentalId: p.rentalId, vehicleId: p.vehicleId, linkedTransactionId: p.linkedTransactionId }));
+      const items = prepared.map(p => ({ accountId, date: p.date, amount: p.amount, description: p.description, balance: p.balance, source: 'bank_csv', raw: p.raw, category: p.category, matchStatus: p.matchStatus, suggestion: p.suggestion ? { category: p.suggestion.category, reason: p.suggestion.reason, kind: p.suggestion.kind } : null, customerId: p.customerId, rentalId: p.rentalId, vehicleId: p.vehicleId, payeeId: p.payeeId, linkedTransactionId: p.linkedTransactionId }));
       const inserted = items.length ? await fin.insertTransactions(items) : [];
       await fin.addImport({ accountId, kind: 'bank_csv', fileName: file.name, lineCount: mapped.lines.length, newCount: inserted.length, skippedCount: mapped.lines.length - inserted.length, fromDate: dateRange?.[0], toDate: dateRange?.[1], closingBalance: closing });
       if (accountCheck.state === 'new' && accountCheck.fileLast4) await fin.updateAccount(accountId, { accountHint: accountCheck.fileLast4 });

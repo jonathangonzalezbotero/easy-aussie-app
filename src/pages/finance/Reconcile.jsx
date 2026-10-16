@@ -47,7 +47,7 @@ export default function Reconcile({ go }) {
   const payload = useMemo(() => {
     if (!current) return null;
     const useSplits = sug?.splits && !(sug.kind === 'bond_refund' && refundMode === 'pending');
-    const form = { category: sug?.category || current.category, splits: useSplits ? sug.splits : [], customerId: sug?.customerId || current.customerId, rentalId: sug?.rentalId || current.rentalId, vehicleId: sug?.vehicleId || current.vehicleId, linkedTransactionId: sug?.linkedTransactionId || current.linkedTransactionId, notes: current.notes, refundMode, retainReason };
+    const form = { category: sug?.category || current.category, splits: useSplits ? sug.splits : [], customerId: sug?.customerId || current.customerId, rentalId: sug?.rentalId || current.rentalId, vehicleId: sug?.vehicleId || current.vehicleId, payeeId: sug?.payeeId || current.payeeId, linkedTransactionId: sug?.linkedTransactionId || current.linkedTransactionId, notes: current.notes, refundMode, retainReason };
     return buildConfirm(current, form, { rentals: data.rentals });
   }, [current, sug, refundMode, retainReason, data.rentals]);
 

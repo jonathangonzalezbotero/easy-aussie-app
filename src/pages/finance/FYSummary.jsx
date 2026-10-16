@@ -4,6 +4,7 @@ import { useStore } from '../../context/StoreContext';
 import { useSuggestions } from '../../finance/useSuggestions';
 import { CATEGORIES, categoriesOfType, categoryLabel, fyLabel, fyMonths, fyOf, fyRange, money, money0, monthLabel, summarise } from '../../finance/categories';
 import { inRange, categoryByMonth, directorPosition } from '../../finance/reports';
+import { payeeSummary, PAYEE_KINDS } from '../../finance/payees';
 import { formatDate, todayStr } from '../../utils/dates';
 import { AlertStrip, AmountCell, StatCard, Toast } from './bits';
 
@@ -37,6 +38,7 @@ export default function FYSummary({ go }) {
   const bondsAtClose = data.rentals.filter(r => r.bond?.amount && (r.startDate || '') <= closingDate && (r.bond.status === 'held' || (['refunded', 'partially_refunded', 'retained'].includes(r.bond.status) && r.bond.refundDate && r.bond.refundDate > closingDate)));
   const bondsTotal = bondsAtClose.reduce((s, r) => s + Number(r.bond.amount), 0);
   const director = useMemo(() => directorPosition(fin), [fin]);
+  const payeeRows = useMemo(() => payeeSummary(live, fin.payees, to).filter(r => r.total > 0).sort((a, b) => b.total - a.total), [live, fin.payees, to]);
   const rowTotal = (cat) => months.reduce((s, m) => s + (byMonth[cat]?.[m] || 0), 0);
   const cell = (v) => v ? money0(Math.abs(v)) : '—';
   const monthIncome = (m) => incomeRows.reduce((s, c) => s + (byMonth[c.id]?.[m] || 0), 0);
@@ -139,6 +141,17 @@ export default function FYSummary({ go }) {
               </table></div>)}
           </div>
         </div>
+
+        {payeeRows.length > 0 && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div className="card-head"><span className="card-title">Paid to contractors and suppliers · {fyLabel(fy)}</span><span className="text-sm text-muted">Money out, net of refunds</span></div>
+            <div className="table-wrap"><table className="table">
+              <thead><tr><th>Payee</th><th className="col-hide-mobile">Type</th><th className="col-hide-mobile">ABN</th><th>Categories</th><th style={{ textAlign: 'right' }}>Payments</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead>
+              <tbody>{payeeRows.map(r => <tr key={r.id} style={{ cursor: 'default' }}><td className="fw-500">{r.name}</td><td className="col-hide-mobile text-muted">{PAYEE_KINDS[r.kind] || r.kind}</td><td className="col-hide-mobile text-muted">{r.abn || '—'}</td><td className="text-sm">{Object.entries(r.byCategory).sort((a, b) => b[1] - a[1]).map(([c, v]) => `${categoryLabel(c)} ${money0(v)}`).join(' · ')}</td><td style={{ textAlign: 'right' }}>{r.count}</td><td style={{ textAlign: 'right' }} className="fw-600">{money(r.total)}</td></tr>)}
+                <tr style={{ cursor: 'default' }}><td colSpan={5} className="fw-600">Total</td><td className="fw-600" style={{ textAlign: 'right' }}>{money(payeeRows.reduce((s, r) => s + r.total, 0))}</td></tr></tbody>
+            </table></div>
+          </div>
+        )}
 
         {open.length > 0 && (
           <div className="card" style={{ marginTop: 20 }}>

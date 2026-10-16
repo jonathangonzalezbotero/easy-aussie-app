@@ -48,7 +48,7 @@ export function buildConfirm(tx, form, { rentals }) {
 
   return {
     id: tx.id,
-    updates: { category: form.category || (form.splits?.length ? 'split' : ''), customerId: form.customerId || null, rentalId: form.rentalId || null, vehicleId: form.vehicleId || null, linkedTransactionId: form.linkedTransactionId || null, notes: form.notes || '', matchStatus: 'confirmed' },
+    updates: { category: form.category || (form.splits?.length ? 'split' : ''), customerId: form.customerId || null, rentalId: form.rentalId || null, vehicleId: form.vehicleId || null, payeeId: form.payeeId || null, linkedTransactionId: form.linkedTransactionId || null, notes: form.notes || '', matchStatus: 'confirmed' },
     splits: form.splits?.length ? form.splits : [],
     rentalId, rentalUpdates, effects,
   };

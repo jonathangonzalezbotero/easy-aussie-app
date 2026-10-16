@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useFinance } from '../../finance/FinanceContext';
 import { useStore } from '../../context/StoreContext';
 import { useSuggestions } from '../../finance/useSuggestions';
@@ -15,7 +16,9 @@ export default function Transactions({ go }) {
   const fin = useFinance();
   const { data } = useStore();
   const suggestions = useSuggestions();
-  const [filters, setFilters] = useState({ period: monthKey(new Date().toISOString()), account: '', source: '', category: '', type: '', status: '', q: '' });
+  const [params] = useSearchParams();
+  const [filters, setFilters] = useState({ period: params.get('payee') ? 'all' : monthKey(new Date().toISOString()), account: '', source: '', category: '', type: '', status: '', payee: params.get('payee') || '', q: '' });
+  const [bulkPayee, setBulkPayee] = useState('');
   const [sort, setSort] = useState({ col: 'date', dir: 'desc' });
   const [selected, setSelected] = useState([]);
   const [bulkCat, setBulkCat] = useState('');
@@ -41,11 +44,13 @@ export default function Transactions({ go }) {
       if (filters.account && t.accountId !== filters.account) return false;
       if (filters.source && t.source !== filters.source) return false;
       if (filters.status && t.matchStatus !== filters.status) return false;
+      if (filters.payee === 'none' && (t.payeeId || t.amount >= 0)) return false;
+      if (filters.payee && filters.payee !== 'none' && t.payeeId !== filters.payee && !t.splits.some(s => s.payeeId === filters.payee)) return false;
       const cats = t.splits.length ? t.splits.map(s => s.category) : [t.category];
       if (filters.category && !cats.includes(filters.category)) return false;
       if (filters.type && !cats.some(c => categoryType(c) === filters.type)) return false;
       if (q) {
-        const hay = [t.description, custName(t.customerId), plate(t.vehicleId), String(t.amount), categoryLabel(t.category), t.notes].join(' ').toLowerCase();
+        const hay = [t.description, custName(t.customerId), plate(t.vehicleId), String(t.amount), categoryLabel(t.category), t.notes, fin.payees.find(p => p.id === t.payeeId)?.name || ''].join(' ').toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -61,7 +66,7 @@ export default function Transactions({ go }) {
       return 0;
     });
     return list;
-  }, [fin.transactions, fin.accounts, filters, sort, data.customers, data.vehicles]);
+  }, [fin.transactions, fin.accounts, fin.payees, filters, sort, data.customers, data.vehicles]);
 
   const totals = useMemo(() => rows.reduce((acc, t) => { if (t.matchStatus === 'ignored') return acc; if (t.amount > 0) acc.in += t.amount; else acc.out += t.amount; return acc; }, { in: 0, out: 0 }), [rows]);
 
@@ -99,7 +104,9 @@ export default function Transactions({ go }) {
     const v = data.vehicles.find(x => x.id === t.vehicleId || x.id === r?.vehicleId);
     const linked = t.linkedTransactionId ? fin.transactions.find(x => x.id === t.linkedTransactionId) : null;
     const reimbursedBy = fin.transactions.find(x => x.linkedTransactionId === t.id);
+    const payee = fin.payees.find(p => p.id === t.payeeId);
     if (linked) return [`Pairs with ${linked.description.slice(0, 24)}`, `${formatDate(linked.date)}`];
+    if (payee) return [payee.name, [v?.plate, t.splits.length ? `${t.splits.length} splits` : ''].filter(Boolean).join(' · ') || 'Payee'];
     if (reimbursedBy) return [`Reimbursed ${formatDate(reimbursedBy.date)}`, fin.accounts.find(a => a.id === reimbursedBy.accountId)?.name || ''];
     if (c || r) return [c?.name || '—', [r?.contractNumber, v?.plate].filter(Boolean).join(' · ')];
     if (v) return [v.plate, 'Vehicle'];
@@ -133,6 +140,8 @@ export default function Transactions({ go }) {
           <div className="field"><label className="label">Category</label><CategorySelect value={filters.category} onChange={v => sfl('category', v)} placeholder="All categories" /></div>
           <div className="field"><label className="label">Category type</label>
             <select className="select" value={filters.type} onChange={e => sfl('type', e.target.value)}><option value="">All types</option>{Object.entries(CATEGORY_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
+          <div className="field"><label className="label">Paid to</label>
+            <select className="select" value={filters.payee} onChange={e => sfl('payee', e.target.value)}><option value="">All payees</option><option value="none">No payee set</option>{fin.payees.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           <div className="field"><label className="label">Match status</label>
             <select className="select" value={filters.status} onChange={e => sfl('status', e.target.value)}><option value="">All statuses</option>{Object.entries(MATCH_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
         </div>
@@ -147,6 +156,9 @@ export default function Transactions({ go }) {
             <span>Categorise as</span>
             <CategorySelect value={bulkCat} onChange={setBulkCat} />
             <button className="btn btn-primary btn-sm" disabled={!bulkCat} onClick={() => applyBulk({ category: bulkCat, matchStatus: 'confirmed' })}>Apply to {selected.length}</button>
+            <span>Paid to</span>
+            <select className="select" value={bulkPayee} onChange={e => setBulkPayee(e.target.value)}><option value="">Choose payee…</option>{fin.payees.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+            <button className="btn btn-primary btn-sm" disabled={!bulkPayee} onClick={() => { applyBulk({ payeeId: bulkPayee }); setBulkPayee(''); }}>Set payee</button>
             <button className="btn btn-sm" style={{ background: 'transparent', color: 'white' }} onClick={() => applyBulk({ matchStatus: 'confirmed' })}>Confirm as is</button>
             <button className="btn btn-sm" style={{ background: 'transparent', color: 'white' }} onClick={() => applyBulk({ matchStatus: 'ignored' })}>Mark ignored</button>
             <span style={{ flex: 1 }} />
