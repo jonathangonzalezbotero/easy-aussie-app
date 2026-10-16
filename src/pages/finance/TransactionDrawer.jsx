@@ -7,7 +7,7 @@ import { useStore } from '../../context/StoreContext';
 import { useSuggestions } from '../../finance/useSuggestions';
 import { categoryLabel, categoryTypeNote, money, SOURCE_LABEL, toCents } from '../../finance/categories';
 import { buildConfirm, splitRemainder } from '../../finance/confirm';
-import { unreimbursedExpenses, directorPosition } from '../../finance/reports';
+import { unreimbursedExpenses, directorPosition, reimbursedByExpense, outstandingDrawings } from '../../finance/reports';
 import { entriesForTransaction, MAINTENANCE_CATEGORIES } from '../../finance/maintenanceLink';
 import { formatDate, todayStr } from '../../utils/dates';
 import { BOND_RETAIN_REASONS } from '../../utils/bond';
@@ -49,6 +49,10 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
   const sug = tx ? suggestions[tx.id] : null;
   const account = fin.accounts.find(a => a.id === form?.accountId);
   const unpaid = useMemo(() => unreimbursedExpenses(fin).filter(t => t.id !== tx?.id), [fin, tx]);
+  const openDrawings = useMemo(() => outstandingDrawings(fin).filter(t => t.id !== tx?.id), [fin, tx]);
+  const isPayback = form?.category === 'drawings_repaid';
+  // Already paid back on the linked expense by other reimbursements (not counting this one).
+  const paidByOthers = useMemo(() => { const m = reimbursedByExpense(fin.transactions.filter(t => t.id !== tx?.id)); return (id) => m[id] || 0; }, [fin.transactions, tx]);
   const director = useMemo(() => directorPosition(fin), [fin]);
 
   if (!form) return <Drawer open={open} onClose={onClose} title="Transaction" />;
@@ -226,24 +230,37 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
           </>
         )}
 
-        {(form.category === 'reimbursement' || form.linkedTransactionId) && (
+        {(form.category === 'reimbursement' || form.category === 'drawings_repaid' || form.linkedTransactionId) && (
           <div>
-            <div className="label" style={{ marginBottom: 6 }}>Linked transaction</div>
+            <div className="label" style={{ marginBottom: 6 }}>{isPayback ? 'Which personal expense does this pay back?' : 'Linked transaction'}</div>
             {linkedExpense ? (
               <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span className="fw-600">{linkedExpense.description}</span><AmountCell value={linkedExpense.amount} /></div>
                 <div className="text-sm text-muted">{formatDate(linkedExpense.date)} · <AccountBadge account={fin.accounts.find(a => a.id === linkedExpense.accountId)} /> · {categoryLabel(linkedExpense.category)}</div>
-                <div className="text-sm" style={{ color: toCents(linkedExpense.amount) === -toCents(amountNum) ? 'var(--accent)' : 'var(--amber)', marginTop: 4 }}>
-                  {toCents(linkedExpense.amount) === -toCents(amountNum) ? 'Amounts match · expense stays on its date, this payment only settles it' : 'Amounts differ'}</div>
+                {(() => {
+                  const total = Math.abs(toCents(linkedExpense.amount)); const before = paidByOthers(linkedExpense.id); const thisOne = Math.abs(toCents(amountNum)); const after = total - before - thisOne;
+                  const tone = after === 0 ? 'var(--accent)' : after > 0 ? 'var(--amber)' : 'var(--red)';
+                  const text = after === 0 ? (before ? `Settles the remaining ${money(thisOne / 100)} · fully paid back` : 'Amounts match · expense stays on its date, this payment only settles it')
+                    : after > 0 ? `Partial: ${money(thisOne / 100)} of ${money(total / 100)}${before ? ` (${money(before / 100)} paid earlier)` : ''} · ${money(after / 100)} still owed to you`
+                    : `This is ${money(-after / 100)} more than what is left on the expense`;
+                  return <div className="text-sm" style={{ color: tone, marginTop: 4 }}>{text}</div>;
+                })()}
                 <button className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => sf('linkedTransactionId', '')}>Unlink</button>
               </div>
+            ) : isPayback ? (
+              <select className="select" value="" onChange={e => sf('linkedTransactionId', e.target.value)}>
+                <option value="">Choose the drawing being paid back…</option>
+                {openDrawings.map(t => <option key={t.id} value={t.id}>{formatDate(t.date)} · {t.description} · {money(t.amount)}{t.remaining !== Math.abs(toCents(t.amount)) ? ` · ${money(t.remaining / 100)} left` : ''}</option>)}
+              </select>
             ) : (
               <select className="select" value="" onChange={e => sf('linkedTransactionId', e.target.value)}>
                 <option value="">Choose an unpaid personal-card expense…</option>
-                {unpaid.map(t => <option key={t.id} value={t.id}>{formatDate(t.date)} · {t.description} · {money(t.amount)}</option>)}
+                {unpaid.map(t => <option key={t.id} value={t.id}>{formatDate(t.date)} · {t.description} · {money(t.amount)}{t.remaining !== Math.abs(toCents(t.amount)) ? ` · ${money(t.remaining / 100)} left` : ''}</option>)}
               </select>
             )}
-            {linkedExpense && <div style={{ background: 'var(--blue-bg)', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginTop: 8 }}>Owed to you by the business: {money(director.total)} → {money(director.total - Math.abs(Number(linkedExpense.amount)))} after this reimbursement.</div>}
+            {isPayback && !linkedExpense && openDrawings.length === 0 && <div className="text-sm text-muted" style={{ marginTop: 6 }}>No open drawings. Categorise the business payment for the personal item as "Personal / drawings" first.</div>}
+            {linkedExpense && !isPayback && (() => { const already = tx?.linkedTransactionId === linkedExpense.id ? Math.abs(toCents(tx.amount)) : 0; const base = director.total + already / 100; return <div style={{ background: 'var(--blue-bg)', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginTop: 8 }}>Owed to you by the business: {money(base)} → {money(base - Math.abs(amountNum))} after this reimbursement.</div>; })()}
+            {linkedExpense && isPayback && <div style={{ background: 'var(--blue-bg)', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginTop: 8 }}>Transfer only. The drawing stays as capital on its date; this cancels it. Nothing is added to income.</div>}
           </div>
         )}
 

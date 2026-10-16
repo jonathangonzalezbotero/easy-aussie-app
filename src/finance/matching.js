@@ -56,6 +56,16 @@ export function suggestFor(tx, { rules, customers, rentals, vehicles, transactio
     if (rental && amt < 0) return bondRefundSuggestion(rental, tx, `reference ${code} found in description`);
   }
 
+  // 1b. Money in that matches a drawing not yet paid back → personal expense paid back
+  if (amt > 0 && account?.kind === 'bank') {
+    const repaid = {};
+    for (const t of transactions) if (t.linkedTransactionId && t.amount > 0 && t.id !== tx.id && t.category === 'drawings_repaid') repaid[t.linkedTransactionId] = (repaid[t.linkedTransactionId] || 0) + toCents(t.amount);
+    const openDraw = transactions.filter(t => t.id !== tx.id && t.amount < 0 && t.matchStatus !== 'ignored' && (t.category === 'drawings' || t.splits.some(s => s.category === 'drawings')) && daysApart(t.date, tx.date) <= 90)
+      .map(t => ({ t, left: Math.abs(toCents(t.amount)) - (repaid[t.id] || 0) })).filter(x => x.left > 0);
+    const hit = openDraw.find(x => x.left === cents) || openDraw.find(x => x.left > cents && /transfer|from|repay|pay ?back/.test(d));
+    if (hit) return { kind: 'drawings_repaid', category: 'drawings_repaid', linkedTransactionId: hit.t.id, reason: `matches the ${hit.left === cents ? '' : 'remaining '}personal expense ${hit.t.description} paid by the business on ${hit.t.date}` };
+  }
+
   // 2. Stripe payout landing in the bank
   if (amt > 0 && /stripe/.test(d) && account?.kind === 'bank') {
     return { kind: 'payout', category: 'stripe_payout', reason: 'Stripe payout: the charges are already counted as income from Stripe', payoutMatch: findPayoutCharges(tx, transactions, accounts) };
@@ -86,8 +96,13 @@ export function suggestFor(tx, { rules, customers, rentals, vehicles, transactio
   // 5. Reimbursement: outgoing bank transfer equal to an unpaid personal-card expense
   if (amt < 0 && account?.kind === 'bank' && /reimb|transfer to/.test(d)) {
     const personal = accounts.filter(a => a.kind === 'personal').map(a => a.id);
-    const candidate = transactions.find(t => personal.includes(t.accountId) && t.id !== tx.id && toCents(t.amount) === cents && !t.linkedTransactionId && daysApart(t.date, tx.date) <= 60);
-    if (candidate) return { kind: 'reimbursement', category: 'reimbursement', linkedTransactionId: candidate.id, reason: `amount matches ${candidate.description} paid on a personal card on ${candidate.date}` };
+    const paid = {};
+    for (const t of transactions) if (t.linkedTransactionId && t.amount < 0 && t.id !== tx.id) paid[t.linkedTransactionId] = (paid[t.linkedTransactionId] || 0) + Math.abs(toCents(t.amount));
+    const open = transactions.filter(t => personal.includes(t.accountId) && t.id !== tx.id && t.amount < 0 && daysApart(t.date, tx.date) <= 90)
+      .map(t => ({ t, left: Math.abs(toCents(t.amount)) - (paid[t.id] || 0) })).filter(x => x.left > 0);
+    const out = Math.abs(cents);
+    const candidate = open.find(x => x.left === out) || open.find(x => x.left > out);
+    if (candidate) return { kind: 'reimbursement', category: 'reimbursement', linkedTransactionId: candidate.t.id, reason: candidate.left === out ? `amount matches what is left on ${candidate.t.description} paid on a personal card on ${candidate.t.date}` : `partial payback of ${candidate.t.description} (${(candidate.left - out) / 100} would still be owed)` };
   }
 
   const payee = rule?.payeeId ? payees.find(p => p.id === rule.payeeId) : matchPayee(payees, desc);
@@ -176,6 +191,7 @@ export function describeSideEffects(tx, sug, { rentals, customers }) {
     if (kept > 0) out.push(`Income: +$${kept} under Bond retained`);
   }
   if (sug.kind === 'reimbursement') out.push('Pairs with the personal-card expense; the expense keeps its original date');
+  if (sug.kind === 'drawings_repaid') out.push('Transfer only: cancels the drawing, nothing is added to income');
   if (sug.kind === 'payout') out.push('Transfer only: nothing is added to income');
   return out;
 }

@@ -30,13 +30,14 @@ export const CATEGORIES = [
   { id: 'director_loan_repayment', label: 'Director loan repayment', type: 'capital' },
   { id: 'director_loan_in',        label: 'Director loan (money in)', type: 'capital' },
   { id: 'vehicle_purchase',        label: 'Vehicle purchase',         type: 'capital' },
-  { id: 'drawings',                label: 'Personal / drawings',      type: 'capital' },
+  { id: 'drawings',                label: 'Personal / drawings (business paid something personal)', type: 'capital' },
 
   { id: 'bond_deposit',    label: 'Bond deposit',           type: 'bond' },
   { id: 'bond_refund',     label: 'Bond refund',            type: 'bond' },
 
   { id: 'stripe_payout',     label: 'Stripe payout',              type: 'transfer' },
-  { id: 'reimbursement',     label: 'Reimbursement',              type: 'transfer' },
+  { id: 'reimbursement',     label: 'Reimbursement (business pays you back)', type: 'transfer' },
+  { id: 'drawings_repaid',   label: 'Personal expense paid back (you pay the business)', type: 'transfer' },
   { id: 'internal_transfer', label: 'Transfer between accounts',  type: 'transfer' },
 ];
 

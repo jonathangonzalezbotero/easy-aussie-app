@@ -45,6 +45,7 @@ export function buildConfirm(tx, form, { rentals }) {
   }
   if (form.linkedTransactionId && form.category === 'reimbursement') effects.push('Pairs with the personal-card expense; the expense keeps its original date');
   if (form.category === 'stripe_payout') effects.push('Transfer only: nothing is added to income');
+  if (form.linkedTransactionId && form.category === 'drawings_repaid') effects.push('Transfer only: cancels the personal drawing, nothing is added to income');
 
   return {
     id: tx.id,

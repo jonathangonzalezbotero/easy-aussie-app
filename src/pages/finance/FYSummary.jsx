@@ -100,7 +100,7 @@ export default function FYSummary({ go }) {
             <div className="label" style={{ marginBottom: 8 }}>Balances at {formatDate(closingDate)}</div>
             <div className="grid-2">
               <StatCard color="var(--amber)" soft value={money0(bondsTotal)} label="Bonds held" sub={`${bondsAtClose.length} bond${bondsAtClose.length !== 1 ? 's' : ''} · liability`} />
-              <StatCard color="var(--amber)" soft value={fin.settings.directorLoanOpeningDate ? money0(director.total) : '—'} label="Owed to director" sub={fin.settings.directorLoanOpeningDate ? `Loan ${money0(director.loanBalance)} + unreimbursed ${money0(director.unreimbursedTotal)}` : 'Set the opening balance in Settings'} />
+              <StatCard color="var(--amber)" soft value={fin.settings.directorLoanOpeningDate ? money0(director.total) : '—'} label="Owed to director" sub={fin.settings.directorLoanOpeningDate ? `Loan ${money0(director.loanBalance)} + unreimbursed ${money0(director.unreimbursedTotal)}${director.drawingsTotal ? ` − drawings ${money0(director.drawingsTotal)}` : ''}` : 'Set the opening balance in Settings'} />
             </div>
           </div>
         </div>

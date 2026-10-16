@@ -86,7 +86,7 @@ export default function MaintenanceLinkModal({ entry, onClose, onDone }) {
 
   return (
     <>
-      <Modal open onClose={onClose} title="Payment for this job" width={620}
+      <Modal open={!splitting} onClose={onClose} title="Payment for this job" width={620}
         footer={<><button className="btn btn-secondary" onClick={onClose}>Close</button></>}>
         <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }}>
           <div className="fw-600">{vehicle?.plate || '—'}{vehicle?.name ? ` · ${vehicle.name}` : ''} · {formatDate(entry.date)} · <span style={{ textTransform: 'capitalize' }}>{entry.type}</span></div>

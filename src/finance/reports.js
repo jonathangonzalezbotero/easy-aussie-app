@@ -21,14 +21,39 @@ export const categoryByMonth = (txs, months) => {
   return out;
 };
 
-// Personal-card expenses that no reimbursement has been linked to yet.
-export const unreimbursedExpenses = (fin) => {
-  const personal = new Set(fin.accounts.filter(a => a.kind === 'personal').map(a => a.id));
-  const linkedIds = new Set(fin.transactions.map(t => t.linkedTransactionId).filter(Boolean));
-  return fin.transactions.filter(t => personal.has(t.accountId) && t.amount < 0 && t.matchStatus !== 'ignored' && !linkedIds.has(t.id));
+// How much of each personal-card expense has been paid back: several reimbursements can point at one
+// expense, and a reimbursement can be for part of it. Returns a map id -> cents reimbursed.
+export const reimbursedByExpense = (transactions) => {
+  const out = {};
+  for (const t of transactions) {
+    if (!t.linkedTransactionId || t.matchStatus === 'ignored' || t.amount >= 0) continue;
+    out[t.linkedTransactionId] = (out[t.linkedTransactionId] || 0) + Math.abs(toCents(t.amount));
+  }
+  return out;
 };
 
-// Money the business owes the director: loan balance plus unreimbursed personal-card expenses.
+// Personal-card expenses not fully paid back yet. Each carries `remaining` (cents) still owed.
+export const unreimbursedExpenses = (fin) => {
+  const personal = new Set(fin.accounts.filter(a => a.kind === 'personal').map(a => a.id));
+  const paid = reimbursedByExpense(fin.transactions);
+  return fin.transactions
+    .filter(t => personal.has(t.accountId) && t.amount < 0 && t.matchStatus !== 'ignored')
+    .map(t => ({ ...t, remaining: Math.abs(toCents(t.amount)) - (paid[t.id] || 0) }))
+    .filter(t => t.remaining > 0);
+};
+
+// Drawings (business paid something personal) not yet paid back. Each carries `remaining` (cents).
+export const outstandingDrawings = (fin) => {
+  const paid = {};
+  for (const t of fin.transactions) if (t.linkedTransactionId && t.matchStatus !== 'ignored' && t.amount > 0 && effectiveLines(t).some(l => l.category === 'drawings_repaid')) paid[t.linkedTransactionId] = (paid[t.linkedTransactionId] || 0) + toCents(t.amount);
+  return fin.transactions
+    .filter(t => t.matchStatus !== 'ignored' && t.amount < 0 && effectiveLines(t).some(l => l.category === 'drawings'))
+    .map(t => ({ ...t, remaining: effectiveLines(t).filter(l => l.category === 'drawings').reduce((s, l) => s + Math.abs(toCents(l.amount)), 0) - (paid[t.id] || 0) }))
+    .filter(t => t.remaining > 0);
+};
+
+// Money the business owes the director: loan balance plus unreimbursed personal-card expenses,
+// minus drawings the director has not paid back yet.
 export const directorPosition = (fin) => {
   const s = fin.settings;
   const opening = toCents(s.directorLoanOpening);
@@ -42,8 +67,10 @@ export const directorPosition = (fin) => {
     }
   }
   const unpaid = unreimbursedExpenses(fin);
-  const unpaidTotal = unpaid.reduce((c, t) => c + Math.abs(toCents(t.amount)), 0);
-  return { loanBalance: loan / 100, unreimbursed: unpaid, unreimbursedTotal: unpaidTotal / 100, total: (loan + unpaidTotal) / 100 };
+  const unpaidTotal = unpaid.reduce((c, t) => c + t.remaining, 0);
+  const drawings = outstandingDrawings(fin);
+  const drawingsTotal = drawings.reduce((c, t) => c + t.remaining, 0);
+  return { loanBalance: loan / 100, unreimbursed: unpaid, unreimbursedTotal: unpaidTotal / 100, drawings, drawingsTotal: drawingsTotal / 100, total: (loan + unpaidTotal - drawingsTotal) / 100 };
 };
 
 export const bondsHeld = (rentals) => {
