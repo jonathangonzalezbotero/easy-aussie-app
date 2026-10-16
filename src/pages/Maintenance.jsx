@@ -6,7 +6,7 @@ import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
 import { formatDate, daysUntil, todayStr } from '../utils/dates';
 import { useFinance } from '../finance/FinanceContext';
-import { autoMatches } from '../finance/maintenanceLink';
+import { autoMatches, linkedLine } from '../finance/maintenanceLink';
 import { money } from '../finance/categories';
 import MaintenanceLinkModal from '../components/MaintenanceLinkModal';
 import { CHECKLIST_TEMPLATES, templateFor, buildChecklist, checklistProgress, templateGroups } from '../utils/serviceChecklist';
@@ -26,9 +26,12 @@ export default function Maintenance() {
     setMatching(true);
     try {
       const pairs = autoMatches(data.maintenance, fin.transactions, data.rentals);
-      for (const { entry, tx } of pairs) {
-        await update('maintenance', entry.id, { transactionId: tx.id });
-        if (!tx.vehicleId && entry.vehicleId && !tx.splits.length) await fin.updateTransaction(tx.id, { vehicleId: entry.vehicleId });
+      for (const { entry, line } of pairs) {
+        await update('maintenance', entry.id, { transactionId: line.tx.id, splitId: line.split?.id || null });
+        if (entry.vehicleId && !line.vehicleId) {
+          if (line.split) await fin.updateTransaction(line.tx.id, { splits: line.tx.splits.map(s => s.id === line.split.id ? { ...s, vehicleId: entry.vehicleId } : s) });
+          else await fin.updateTransaction(line.tx.id, { vehicleId: entry.vehicleId });
+        }
       }
       setNotice(pairs.length ? `${pairs.length} job${pairs.length > 1 ? 's' : ''} linked to their payments. The rest need a manual pick.` : 'No safe matches: nothing with the same amount within 14 days that is not already linked.');
     } finally { setMatching(false); }
@@ -259,10 +262,11 @@ export default function Maintenance() {
                       <td onClick={() => openEdit(m)} style={{ cursor: 'pointer' }}>{(() => { if (!m.checklist?.length) return <span className="text-sm text-muted">—</span>; const p = checklistProgress(m.checklist); return <div style={{ minWidth: 90 }}><div className="text-sm" style={{ color: p.pct === 1 ? 'var(--accent)' : 'var(--amber)', fontWeight: 600 }}>{p.done}/{p.total}{p.pct === 1 ? ' ✓' : ''}</div><div style={{ height: 4, background: 'var(--border)', borderRadius: 2 }}><div style={{ height: 4, width: `${p.pct * 100}%`, background: p.pct === 1 ? 'var(--accent)' : 'var(--amber)', borderRadius: 2 }} /></div></div>; })()}</td>
                       <td>{m.cost ? '$' + m.cost : '—'}</td>
                       {financeReady && (() => {
-                        const tx = m.transactionId ? fin.transactions.find(t => t.id === m.transactionId) : null;
+                        const ll = linkedLine(m, fin.transactions);
+                        const mismatch = ll && m.cost && ll.amount !== Math.round(Number(m.cost) * 100);
                         return (
                           <td onClick={() => setLinkFor(m)} style={{ cursor: 'pointer' }}>
-                            {tx ? <div><Badge variant="green">Paid</Badge><div className="text-sm text-muted">{formatDate(tx.date).replace(/ \d{4}$/, '')} · {fin.accounts.find(a => a.id === tx.accountId)?.name}{Math.abs(Number(tx.amount)) !== Number(m.cost) ? ` · ${money(tx.amount)}` : ''}</div></div>
+                            {ll ? <div><Badge variant={mismatch ? 'amber' : 'green'}>{mismatch ? 'Paid · check' : 'Paid'}</Badge><div className="text-sm text-muted">{formatDate(ll.tx.date).replace(/ \d{4}$/, '')} · {fin.accounts.find(a => a.id === ll.tx.accountId)?.name}{ll.split ? ` · line ${ll.tx.splits.indexOf(ll.split) + 1}` : ''}{mismatch ? ` · ${money(-ll.amount / 100)}` : ''}</div></div>
                               : m.cost ? <Badge variant="amber">Not in Finance</Badge> : <span className="text-sm text-muted">No cost</span>}
                           </td>);
                       })()}

@@ -91,6 +91,7 @@ const maintenanceFromDb = (m) => ({
   cost: m.cost ? String(m.cost) : '',
   odometer: m.odometer ? String(m.odometer) : '',
   transactionId: m.transaction_id || null,
+  splitId: m.split_id || null,
   checklist: Array.isArray(m.checklist) ? m.checklist : null,
 });
 
@@ -101,6 +102,7 @@ const maintenanceToDb = (m) => ({
   cost: m.cost ? Number(m.cost) : null,
   odometer: m.odometer ? Number(m.odometer) : null,
   transaction_id: m.transactionId || null,
+  split_id: m.splitId || null,
   checklist: m.checklist && m.checklist.length ? m.checklist : null,
 });
 

@@ -132,14 +132,20 @@ export function FinanceProvider({ children }) {
     return merged;
   };
 
+  // Lines that already have an id keep it (service-log links point at split ids); the rest are inserted.
   const replaceSplits = async (txId, splits) => {
-    const { error: delErr } = await supabase.from('finance_splits').delete().eq('transaction_id', txId);
+    const rows = splits.map((s, i) => ({ ...(s.id ? { id: s.id } : {}), transaction_id: txId, category: s.category, amount: Number(s.amount), rental_id: s.rentalId || null, customer_id: s.customerId || null, vehicle_id: s.vehicleId || null, payee_id: s.payeeId || null, notes: s.notes || null, sort_order: i }));
+    let kept = [];
+    if (rows.length) {
+      const { data, error } = await supabase.from('finance_splits').upsert(rows).select();
+      if (error) throw error;
+      kept = data.map(splitFromDb);
+    }
+    let del = supabase.from('finance_splits').delete().eq('transaction_id', txId);
+    if (kept.length) del = del.not('id', 'in', `(${kept.map(k => k.id).join(',')})`);
+    const { error: delErr } = await del;
     if (delErr) throw delErr;
-    if (!splits.length) return [];
-    const rows = splits.map((s, i) => ({ transaction_id: txId, category: s.category, amount: Number(s.amount), rental_id: s.rentalId || null, customer_id: s.customerId || null, vehicle_id: s.vehicleId || null, payee_id: s.payeeId || null, notes: s.notes || null, sort_order: i }));
-    const { data, error } = await supabase.from('finance_splits').insert(rows).select();
-    if (error) throw error;
-    return data.map(splitFromDb);
+    return kept.sort((a, b) => a.sortOrder - b.sortOrder);
   };
 
   const removeTransaction = async (id) => {
@@ -186,7 +192,7 @@ export function FinanceProvider({ children }) {
     for (const [k, col] of [['customerId', 'customer_id'], ['rentalId', 'rental_id'], ['vehicleId', 'vehicle_id'], ['payeeId', 'payee_id'], ['linkedTransactionId', 'linked_transaction_id'], ['notes', 'notes']]) {
       if (k in updates) p_updates[col] = updates[k] ?? '';
     }
-    const p_splits = splits ? splits.map(s => ({ category: s.category, amount: Number(s.amount), rental_id: s.rentalId || null, customer_id: s.customerId || null, vehicle_id: s.vehicleId || null, payee_id: s.payeeId || null, notes: s.notes || null })) : null;
+    const p_splits = splits ? splits.map(s => ({ id: s.id || null, category: s.category, amount: Number(s.amount), rental_id: s.rentalId || null, customer_id: s.customerId || null, vehicle_id: s.vehicleId || null, payee_id: s.payeeId || null, notes: s.notes || null })) : null;
     const p_rental_updates = rentalUpdates ? Object.fromEntries(Object.entries({
       bond_status: rentalUpdates.status, bond_refunded_amount: rentalUpdates.refundedAmount, bond_retained_amount: rentalUpdates.retainedAmount,
       bond_retain_reason: rentalUpdates.retainReason, bond_refund_method: rentalUpdates.refundMethod, bond_refund_date: rentalUpdates.refundDate, bond_amount: rentalUpdates.amount,
@@ -195,7 +201,10 @@ export function FinanceProvider({ children }) {
     if (error) throw error;
     // Patch only what changed: another update may have landed in local state since this closure was created.
     const patch = { ...updates, matchStatus: p_updates.match_status, hasUndo: true, confirmedAt: new Date().toISOString() };
-    if (splits) patch.splits = splits.map((s, i) => ({ ...s, amount: Number(s.amount), transactionId: id, sortOrder: i }));
+    if (splits) {
+      const { data: sp } = await supabase.from('finance_splits').select('*').eq('transaction_id', id).order('sort_order');
+      patch.splits = (sp || []).map(splitFromDb);
+    }
     let merged;
     setState(s => ({ ...s, transactions: s.transactions.map(t => t.id === id ? (merged = { ...t, ...patch }) : t) }));
     return merged || { ...(state.transactions.find(t => t.id === id) || {}), ...patch };

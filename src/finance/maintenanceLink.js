@@ -1,54 +1,85 @@
-// Matching between service-log entries (maintenance table) and the finance transactions that paid
-// for them. A link never moves money: Finance totals come from transactions only, and the service
-// log's cost is used to find the payment and to flag jobs that never reached Finance.
+// Matching between service-log entries (maintenance table) and the finance payment lines that paid
+// for them. A "payment line" is a whole transaction, or one split line of a split transaction, so a
+// single workshop bill can pay for a repair on one bike plus parts for another. A link never moves
+// money: Finance totals come from transactions only; the service log's cost is used to find the
+// payment and to flag jobs that never reached Finance.
 import { effectiveLines, toCents } from './categories';
 
 export const MAINTENANCE_CATEGORIES = ['maintenance', 'contractor'];
 const DAY = 86400000;
 const daysApart = (a, b) => Math.abs((new Date(a + 'T00:00:00') - new Date(b + 'T00:00:00')) / DAY);
 
-// Does this transaction have a line that could be a vehicle job?
+// Every maintenance/contractor payment line across the ledger: { key, tx, split|null, amount(cents, positive), vehicleId, category }.
+export function paymentLines(transactions, rentals) {
+  const out = [];
+  for (const tx of transactions) {
+    if (tx.matchStatus === 'ignored' || tx.amount >= 0) continue;
+    const txVehicle = tx.vehicleId || rentals.find(r => r.id === tx.rentalId)?.vehicleId || null;
+    if (tx.splits.length) {
+      for (const sp of tx.splits) {
+        if (!MAINTENANCE_CATEGORIES.includes(sp.category) || sp.amount >= 0) continue;
+        out.push({ key: `${tx.id}:${sp.id}`, tx, split: sp, amount: Math.abs(toCents(sp.amount)), vehicleId: sp.vehicleId || rentals.find(r => r.id === sp.rentalId)?.vehicleId || txVehicle, category: sp.category });
+      }
+    } else if (MAINTENANCE_CATEGORIES.includes(tx.category)) {
+      out.push({ key: tx.id, tx, split: null, amount: Math.abs(toCents(tx.amount)), vehicleId: txVehicle, category: tx.category });
+    }
+  }
+  return out;
+}
+
+export const lineKey = (m) => m.transactionId ? (m.splitId ? `${m.transactionId}:${m.splitId}` : m.transactionId) : null;
 export const isMaintenanceTx = (tx) => tx.matchStatus !== 'ignored' && tx.amount < 0 && effectiveLines(tx).some(l => MAINTENANCE_CATEGORIES.includes(l.category));
 
-// Transactions already claimed by a service-log entry.
-export const linkedTransactionIds = (maintenance) => new Set(maintenance.map(m => m.transactionId).filter(Boolean));
+// The payment line a service entry is linked to, if any. Falls back to the whole transaction when the
+// split it pointed at no longer exists.
+export function linkedLine(entry, transactions) {
+  if (!entry?.transactionId) return null;
+  const tx = transactions.find(t => t.id === entry.transactionId);
+  if (!tx) return null;
+  const split = entry.splitId ? tx.splits.find(s => s.id === entry.splitId) : null;
+  return { tx, split, amount: Math.abs(toCents(split ? split.amount : tx.amount)), stale: !!entry.splitId && !split };
+}
 
-// Service-log entries that could be paid by this transaction: unlinked, with a cost, within `days`.
-// Sorted: exact amount first, then same vehicle, then nearest date.
-export function entriesForTransaction(tx, maintenance, rentals, { days = 21 } = {}) {
-  const amount = Math.abs(toCents(tx.amount));
-  const txVehicle = tx.vehicleId || rentals.find(r => r.id === tx.rentalId)?.vehicleId || null;
+// Keys already claimed by other service-log entries. A whole-transaction link claims every line of it.
+export function claimedKeys(maintenance, exceptId) {
+  const set = new Set();
+  for (const m of maintenance) { if (m.id === exceptId || !m.transactionId) continue; set.add(lineKey(m)); if (!m.splitId) set.add(m.transactionId); }
+  return set;
+}
+const isClaimed = (claimed, line) => claimed.has(line.key) || claimed.has(line.tx.id);
+
+// Service-log entries that could be paid by this line: unlinked, with a cost, within `days`.
+export function entriesForTransaction(txOrLine, maintenance, rentals, { days = 21 } = {}) {
+  const line = txOrLine.tx ? txOrLine : { tx: txOrLine, amount: Math.abs(toCents(txOrLine.amount)), vehicleId: txOrLine.vehicleId || rentals.find(r => r.id === txOrLine.rentalId)?.vehicleId || null };
   return maintenance
-    .filter(m => !m.transactionId && m.cost && m.date && daysApart(m.date, tx.date) <= days)
-    .map(m => ({ entry: m, exact: toCents(m.cost) === amount, sameVehicle: !!txVehicle && m.vehicleId === txVehicle, gap: daysApart(m.date, tx.date) }))
+    .filter(m => !m.transactionId && m.cost && m.date && daysApart(m.date, line.tx.date) <= days)
+    .map(m => ({ entry: m, exact: toCents(m.cost) === line.amount, sameVehicle: !!line.vehicleId && m.vehicleId === line.vehicleId, gap: daysApart(m.date, line.tx.date) }))
     .sort((a, b) => (b.exact - a.exact) || (b.sameVehicle - a.sameVehicle) || (a.gap - b.gap));
 }
 
-// Transactions that could have paid this entry: maintenance or contractor lines, not linked to another
-// entry, within `days`. Sorted: exact amount, same vehicle, nearest date.
+// Payment lines that could have paid this entry. Sorted: exact amount, same vehicle, nearest date.
 export function transactionsForEntry(entry, transactions, maintenance, rentals, { days = 30 } = {}) {
   const cost = toCents(entry.cost);
-  const taken = linkedTransactionIds(maintenance.filter(m => m.id !== entry.id));
-  return transactions
-    .filter(t => isMaintenanceTx(t) && !taken.has(t.id) && entry.date && daysApart(t.date, entry.date) <= days)
-    .map(t => { const v = t.vehicleId || rentals.find(r => r.id === t.rentalId)?.vehicleId || null; return { tx: t, exact: !!cost && Math.abs(toCents(t.amount)) === cost, sameVehicle: !!v && v === entry.vehicleId, otherVehicle: !!v && v !== entry.vehicleId, gap: daysApart(t.date, entry.date) }; })
+  const claimed = claimedKeys(maintenance, entry.id);
+  return paymentLines(transactions, rentals)
+    .filter(l => !isClaimed(claimed, l) && entry.date && daysApart(l.tx.date, entry.date) <= days)
+    .map(l => ({ ...l, exact: !!cost && l.amount === cost, sameVehicle: !!l.vehicleId && l.vehicleId === entry.vehicleId, otherVehicle: !!l.vehicleId && l.vehicleId !== entry.vehicleId, gap: daysApart(l.tx.date, entry.date), bigger: !!cost && l.amount > cost }))
     .sort((a, b) => (b.exact - a.exact) || (b.sameVehicle - a.sameVehicle) || (a.gap - b.gap));
 }
 
-// Safe automatic pairs: exact amount, within 14 days, and the pairing is unique in both directions.
+// Safe automatic pairs: exact amount, within 14 days, unique in both directions, vehicle agrees or unset.
 export function autoMatches(maintenance, transactions, rentals) {
   const pairs = [];
-  const usedTx = linkedTransactionIds(maintenance);
+  const claimed = claimedKeys(maintenance, null);
   for (const m of maintenance) {
     if (m.transactionId || !m.cost || !m.vehicleId || !m.date) continue;
-    const cands = transactionsForEntry(m, transactions, maintenance, rentals, { days: 14 }).filter(c => c.exact && !c.otherVehicle && !usedTx.has(c.tx.id));
+    const cands = transactionsForEntry(m, transactions, maintenance, rentals, { days: 14 }).filter(c => c.exact && !c.otherVehicle && !isClaimed(claimed, c));
     if (cands.length !== 1) continue;
-    const tx = cands[0].tx;
-    // the transaction must not fit another unlinked entry equally well
-    const rivals = entriesForTransaction(tx, maintenance, rentals, { days: 14 }).filter(e => e.exact && e.entry.id !== m.id);
+    const line = cands[0];
+    const rivals = entriesForTransaction(line, maintenance, rentals, { days: 14 }).filter(e => e.exact && e.entry.id !== m.id);
     if (rivals.length) continue;
-    usedTx.add(tx.id);
-    pairs.push({ entry: m, tx });
+    claimed.add(line.key); if (!line.split) claimed.add(line.tx.id);
+    pairs.push({ entry: m, line });
   }
   return pairs;
 }

@@ -17,7 +17,7 @@ const blankSplit = () => ({ category: '', amount: '', rentalId: '', customerId: 
 
 // Edit any transaction, or create a manual one (tx = null). Imported lines keep date, amount and
 // description locked; only category, links, splits and notes change.
-export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultAccountId }) {
+export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultAccountId, presetSplits, presetMaintenanceId }) {
   const fin = useFinance();
   const { data, update: updateStore } = useStore();
   const suggestions = useSuggestions();
@@ -33,17 +33,18 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
     if (tx) {
       setForm({
         accountId: tx.accountId, date: tx.date, amount: String(tx.amount), description: tx.description,
-        category: tx.category === 'split' ? '' : tx.category, splitOn: tx.splits.length > 0,
-        splits: tx.splits.length ? tx.splits.map(s => ({ ...s, amount: String(s.amount) })) : [blankSplit(), blankSplit()],
+        category: tx.category === 'split' ? '' : tx.category, splitOn: tx.splits.length > 0 || !!presetSplits,
+        splits: presetSplits ? presetSplits.map(s => ({ ...blankSplit(), ...s })) : tx.splits.length ? tx.splits.map(s => ({ ...s, amount: String(s.amount) })) : [blankSplit(), blankSplit()],
         customerId: tx.customerId || '', rentalId: tx.rentalId || '', vehicleId: tx.vehicleId || '', payeeId: tx.payeeId || '',
         linkedTransactionId: tx.linkedTransactionId || '', notes: tx.notes || '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0],
-        maintenanceId: data.maintenance.find(m => m.transactionId === tx.id)?.id || '',
+        maintenanceId: presetMaintenanceId || data.maintenance.find(m => m.transactionId === tx.id && !m.splitId)?.id || '',
+        jobSplitIndex: presetSplits ? 0 : null,
       });
     } else {
       const manualAccounts = fin.accounts.filter(a => a.feed === 'manual');
       setForm({ accountId: defaultAccountId || manualAccounts[0]?.id || fin.accounts[0]?.id || '', date: todayStr(), amount: '', description: '', category: '', splitOn: false, splits: [blankSplit(), blankSplit()], customerId: '', rentalId: '', vehicleId: '', payeeId: '', linkedTransactionId: '', notes: '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0], maintenanceId: '' });
     }
-  }, [open, tx, defaultAccountId, fin.accounts, data.maintenance]);
+  }, [open, tx, defaultAccountId, fin.accounts, data.maintenance, presetSplits, presetMaintenanceId]);
 
   const sug = tx ? suggestions[tx.id] : null;
   const account = fin.accounts.find(a => a.id === form?.accountId);
@@ -64,9 +65,10 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
   const linkedExpense = form.linkedTransactionId ? fin.transactions.find(t => t.id === form.linkedTransactionId) : null;
   const canSave = form.accountId && form.date && form.amount !== '' && (form.splitOn ? splitsValid : !!form.category) && !saving;
   const isJob = form.splitOn ? activeSplits.some(s => MAINTENANCE_CATEGORIES.includes(s.category)) : MAINTENANCE_CATEGORIES.includes(form.category);
-  const currentlyLinked = tx ? data.maintenance.find(m => m.transactionId === tx.id) : null;
-  const jobMatches = isJob && amountNum < 0 ? entriesForTransaction({ ...pseudoTx, vehicleId: form.vehicleId, rentalId: form.rentalId }, data.maintenance, data.rentals, { days: 30 }).slice(0, 6) : [];
-  const pickJob = (m) => setForm(f => ({ ...f, maintenanceId: m ? m.id : '', vehicleId: m?.vehicleId || f.vehicleId }));
+  const currentlyLinked = tx ? data.maintenance.find(m => m.transactionId === tx.id && !m.splitId) : null;
+  const splitLinks = tx ? data.maintenance.filter(m => m.transactionId === tx.id && m.splitId) : [];
+  const jobMatches = isJob && amountNum < 0 && !form.splitOn ? entriesForTransaction({ ...pseudoTx, vehicleId: form.vehicleId, rentalId: form.rentalId }, data.maintenance, data.rentals, { days: 30 }).slice(0, 6) : [];
+  const pickJob = (m) => setForm(f => ({ ...f, maintenanceId: m ? m.id : '', jobSplitIndex: null, vehicleId: m?.vehicleId || f.vehicleId }));
 
   const applySuggestion = () => {
     if (!sug) return;
@@ -80,7 +82,7 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
   const save = async () => {
     setSaving(true); setErr('');
     try {
-      const splits = form.splitOn ? activeSplits.map(s => ({ category: s.category, amount: Number(s.amount), rentalId: s.rentalId || null, customerId: s.customerId || null, vehicleId: s.vehicleId || null, payeeId: s.payeeId || null, notes: s.notes || '' })) : [];
+      const splits = form.splitOn ? activeSplits.map(s => ({ id: s.id || undefined, category: s.category, amount: Number(s.amount), rentalId: s.rentalId || null, customerId: s.customerId || null, vehicleId: s.vehicleId || null, payeeId: s.payeeId || null, notes: s.notes || '' })) : [];
       let saved;
       if (isNew) {
         saved = await fin.addTransaction({ accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() || categoryLabel(form.category), source: 'manual', category: splits.length ? 'split' : form.category, matchStatus: 'confirmed', customerId: form.customerId || null, rentalId: form.rentalId || null, vehicleId: form.vehicleId || null, payeeId: form.payeeId || null, linkedTransactionId: form.linkedTransactionId || null, notes: form.notes, splits });
@@ -90,8 +92,12 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
         saved = await fin.confirmTransaction({ ...confirmPayload, splits });
       }
       // Service-log link: one entry per payment. Clearing the pick unlinks a previously linked entry.
-      if (form.maintenanceId && form.maintenanceId !== currentlyLinked?.id) await updateStore('maintenance', form.maintenanceId, { transactionId: saved.id });
-      if (currentlyLinked && form.maintenanceId !== currentlyLinked.id) await updateStore('maintenance', currentlyLinked.id, { transactionId: null });
+      if (form.maintenanceId) {
+        const splitId = form.splitOn && form.jobSplitIndex != null ? saved.splits?.[form.jobSplitIndex]?.id || null : null;
+        const prev = data.maintenance.find(m => m.id === form.maintenanceId);
+        if (prev?.transactionId !== saved.id || (prev?.splitId || null) !== splitId) await updateStore('maintenance', form.maintenanceId, { transactionId: saved.id, splitId });
+      }
+      if (currentlyLinked && form.maintenanceId !== currentlyLinked.id) await updateStore('maintenance', currentlyLinked.id, { transactionId: null, splitId: null });
       onSaved?.(saved, confirmPayload.effects);
       onClose();
     } catch (e) { setErr(e.message || String(e)); } finally { setSaving(false); }
@@ -241,18 +247,21 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
           </div>
         )}
 
-        {(isJob || currentlyLinked) && (
+        {(isJob || currentlyLinked || splitLinks.length > 0) && (
           <div>
             <div className="label" style={{ marginBottom: 6 }}>Service log</div>
+            {form.splitOn && splitLinks.length > 0 && <div className="text-sm text-muted" style={{ marginBottom: 6 }}>{splitLinks.map(m => { const v = data.vehicles.find(x => x.id === m.vehicleId); const idx = tx.splits.findIndex(s => s.id === m.splitId); return `Line ${idx + 1}: ${v?.plate || ''} ${m.type} ${formatDate(m.date)}`; }).join(' · ')}</div>}
+            {form.splitOn && form.jobSplitIndex == null && !splitLinks.length && <div className="text-sm text-muted">Split payments are linked line by line from the Maintenance page (click the Paid column on the job).</div>}
             {(() => {
+              if (form.splitOn && form.jobSplitIndex == null) return null;
               const picked = form.maintenanceId ? data.maintenance.find(m => m.id === form.maintenanceId) : null;
               if (picked) {
                 const v = data.vehicles.find(x => x.id === picked.vehicleId);
                 return (
                   <div style={{ border: '1.5px solid var(--accent)', background: 'var(--accent-light)', borderRadius: 10, padding: '10px 12px', fontSize: 13 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span className="fw-600">{v?.plate || '—'} · {picked.type} · {formatDate(picked.date)}</span><span className="fw-600">{picked.cost ? `$${picked.cost}` : 'no cost'}</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span className="fw-600">{v?.plate || '—'} · {picked.type} · {formatDate(picked.date)}{form.jobSplitIndex != null ? ` · paid by line ${form.jobSplitIndex + 1}` : ''}</span><span className="fw-600">{picked.cost ? `$${picked.cost}` : 'no cost'}</span></div>
                     <div className="text-muted">{picked.description || 'No description'}</div>
-                    {picked.cost && toCents(picked.cost) !== Math.abs(toCents(amountNum)) && <div style={{ color: 'var(--amber)', marginTop: 4 }}>Logged cost differs from this payment. Finance counts the payment.</div>}
+                    {picked.cost && form.jobSplitIndex == null && toCents(picked.cost) !== Math.abs(toCents(amountNum)) && <div style={{ color: 'var(--amber)', marginTop: 4 }}>Logged cost differs from this payment. Finance counts the payment.</div>}
                     <button className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} onClick={() => pickJob(null)}>Unlink</button>
                   </div>
                 );

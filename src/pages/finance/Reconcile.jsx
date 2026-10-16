@@ -55,8 +55,7 @@ export default function Reconcile({ go }) {
   // Service-log entry to link on confirm: only when exactly one unlinked entry has the same amount nearby.
   const jobMatch = useMemo(() => {
     if (!current || !payload) return null;
-    const cats = payload.splits.length ? payload.splits.map(s => s.category) : [payload.updates.category];
-    if (!cats.some(c => MAINTENANCE_CATEGORIES.includes(c))) return null;
+    if (payload.splits.length || !MAINTENANCE_CATEGORIES.includes(payload.updates.category)) return null;
     const exact = entriesForTransaction({ ...current, vehicleId: payload.updates.vehicleId || current.vehicleId }, data.maintenance, data.rentals, { days: 21 }).filter(e => e.exact);
     return exact.length === 1 ? exact[0].entry : null;
   }, [current, payload, data.maintenance, data.rentals]);
@@ -82,7 +81,7 @@ export default function Reconcile({ go }) {
     try {
       const finalPayload = jobMatch && !payload.updates.vehicleId && !payload.splits.length ? { ...payload, updates: { ...payload.updates, vehicleId: jobMatch.vehicleId } } : payload;
       await fin.confirmTransaction(finalPayload);
-      if (jobMatch) await updateStore('maintenance', jobMatch.id, { transactionId: current.id });
+      if (jobMatch) await updateStore('maintenance', jobMatch.id, { transactionId: current.id, splitId: null });
       if (payload.rentalId) await refreshStore();
       setDone(d => [...d, current.id]);
       setToast({ message: effects[0] || `${categoryLabel(payload.updates.category)} confirmed`, undo: current.id });
