@@ -8,6 +8,7 @@ import Reconcile from './finance/Reconcile';
 import Forecast from './finance/Forecast';
 import FYSummary from './finance/FYSummary';
 import Payees from './finance/Payees';
+import VehiclesFinance from './finance/VehiclesFinance';
 import FinanceSettings from './finance/FinanceSettings';
 import { Skeleton } from './finance/bits';
 
@@ -16,6 +17,7 @@ const TABS = [
   { value: 'transactions', label: 'Transactions' },
   { value: 'reconcile', label: 'Reconcile' },
   { value: 'payees', label: 'Payees' },
+  { value: 'vehicles', label: 'Vehicles' },
   { value: 'forecast', label: 'Forecast' },
   { value: 'fy', label: 'FY summary' },
   { value: 'settings', label: 'Settings' },
@@ -51,6 +53,7 @@ export default function Finance() {
           {tab === 'transactions' && <Transactions go={go} />}
           {tab === 'reconcile' && <Reconcile go={go} />}
           {tab === 'payees' && <Payees go={go} />}
+          {tab === 'vehicles' && <VehiclesFinance go={go} />}
           {tab === 'forecast' && <Forecast go={go} />}
           {tab === 'fy' && <FYSummary go={go} />}
           {tab === 'settings' && <FinanceSettings go={go} />}

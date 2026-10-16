@@ -3,6 +3,7 @@ import { useStore } from '../context/StoreContext';
 import { supabase } from '../lib/supabase';
 import Modal from '../components/shared/Modal';
 import Drawer from '../components/shared/Drawer';
+import VehicleFinanceCard from '../components/VehicleFinanceCard';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
@@ -447,6 +448,7 @@ export default function Vehicles() {
                 })()
             }
 
+            <VehicleFinanceCard vehicle={selected} />
             <div className="drawer-section-title">Rental History ({vRentals.length})</div>
             {vRentals.length === 0 ? <p className="text-sm text-muted mb-20">No rentals recorded</p> : (
               <div className="mb-20">

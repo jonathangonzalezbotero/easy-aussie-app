@@ -17,7 +17,7 @@ export default function Transactions({ go }) {
   const { data } = useStore();
   const suggestions = useSuggestions();
   const [params] = useSearchParams();
-  const [filters, setFilters] = useState({ period: params.get('payee') ? 'all' : monthKey(new Date().toISOString()), account: '', source: '', category: '', type: '', status: '', payee: params.get('payee') || '', q: '' });
+  const [filters, setFilters] = useState({ period: params.get('payee') || params.get('vehicle') ? 'all' : monthKey(new Date().toISOString()), account: '', source: '', category: '', type: '', status: '', payee: params.get('payee') || '', vehicle: params.get('vehicle') || '', q: '' });
   const [bulkPayee, setBulkPayee] = useState('');
   const [sort, setSort] = useState({ col: 'date', dir: 'desc' });
   const [selected, setSelected] = useState([]);
@@ -45,6 +45,7 @@ export default function Transactions({ go }) {
       if (filters.source && t.source !== filters.source) return false;
       if (filters.status && t.matchStatus !== filters.status) return false;
       if (filters.payee === 'none' && (t.payeeId || t.amount >= 0)) return false;
+      if (filters.vehicle) { const rv = data.rentals.find(r => r.id === t.rentalId)?.vehicleId; if (t.vehicleId !== filters.vehicle && rv !== filters.vehicle && !t.splits.some(s => s.vehicleId === filters.vehicle || data.rentals.find(r => r.id === s.rentalId)?.vehicleId === filters.vehicle)) return false; }
       if (filters.payee && filters.payee !== 'none' && t.payeeId !== filters.payee && !t.splits.some(s => s.payeeId === filters.payee)) return false;
       const cats = t.splits.length ? t.splits.map(s => s.category) : [t.category];
       if (filters.category && !cats.includes(filters.category)) return false;
@@ -66,7 +67,7 @@ export default function Transactions({ go }) {
       return 0;
     });
     return list;
-  }, [fin.transactions, fin.accounts, fin.payees, filters, sort, data.customers, data.vehicles]);
+  }, [fin.transactions, fin.accounts, fin.payees, filters, sort, data.customers, data.vehicles, data.rentals]);
 
   const totals = useMemo(() => rows.reduce((acc, t) => { if (t.matchStatus === 'ignored') return acc; if (t.amount > 0) acc.in += t.amount; else acc.out += t.amount; return acc; }, { in: 0, out: 0 }), [rows]);
 
@@ -140,6 +141,8 @@ export default function Transactions({ go }) {
           <div className="field"><label className="label">Category</label><CategorySelect value={filters.category} onChange={v => sfl('category', v)} placeholder="All categories" /></div>
           <div className="field"><label className="label">Category type</label>
             <select className="select" value={filters.type} onChange={e => sfl('type', e.target.value)}><option value="">All types</option>{Object.entries(CATEGORY_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
+          <div className="field"><label className="label">Vehicle</label>
+            <select className="select" value={filters.vehicle} onChange={e => sfl('vehicle', e.target.value)}><option value="">All vehicles</option>{data.vehicles.map(v => <option key={v.id} value={v.id}>{v.plate}{v.name ? ` · ${v.name}` : ''}</option>)}</select></div>
           <div className="field"><label className="label">Paid to</label>
             <select className="select" value={filters.payee} onChange={e => sfl('payee', e.target.value)}><option value="">All payees</option><option value="none">No payee set</option>{fin.payees.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           <div className="field"><label className="label">Match status</label>

@@ -28,7 +28,7 @@ Vite + React 19 SPA. React Router v6 for client-side routing. Supabase for auth 
 | `/rentals`  | Protected | Rental lifecycle                        |
 | `/maintenance` | Protected | Service log                          |
 | `/bonds`    | Protected | Bond/deposit tracking                   |
-| `/finance`  | Protected | Finance module (`?tab=overview|transactions|reconcile|payees|forecast|fy|settings`) |
+| `/finance`  | Protected | Finance module (`?tab=overview|transactions|reconcile|payees|vehicles|forecast|fy|settings`) |
 | `/settings` | Protected | Business settings                       |
 | `/contract` | Protected | Full-screen contract view + PDF download |
 
@@ -51,6 +51,7 @@ Supabase uses snake_case columns. Conversion happens in `src/context/StoreContex
 - **Bond statuses** on rentals: `awaiting`, `held`, `refunded`, `partially_refunded`, `retained` (helpers in `src/utils/bond.js`). Ending a rental records the planned refund; a bank-transfer refund stays `held` until the bank line is confirmed in Reconcile.
 - **Imports**: NAB CSV wizard (`ImportCsvModal`, header-driven column mapping saved per account in localStorage, duplicate check on account+date+amount+description+balance, cut-over date blocks older lines) and spreadsheet history (`SpreadsheetImportModal`, xlsx/csv, category guessed from text and sign since cell colours cannot be read).
 - **Payees** (`finance_payees`, `src/finance/payees.js`, Payees tab): who was paid, independent of category, so one contractor can have both labour and parts lines. `payee_id` sits on transactions, splits and rules; attribution comes from a rule with a payee, or from the payee's `match_text` (falls back to its name). Separate from customers on purpose.
+- **Per-vehicle earnings** (`src/finance/vehicles.js`, Vehicles tab in Finance, `VehicleFinanceCard` in the vehicle drawer): a line counts for a vehicle when the split or transaction names it, or through its linked rental. Fleet-wide costs are not spread.
 - **Forecast** (`src/finance/forecast.js`) is generated live: income from active rentals (weekly price pro-rated) and from the fleet target; expenses from recurring items, vehicle rego expiry + last `rego_renewals` cost, 3-month averages, Stripe fee estimate. Overrides are stored in `finance_forecast_overrides`.
 - **Edge functions**: `stripe-sync` (charges, fees, refunds, subscriptions; secret `STRIPE_SECRET_KEY`), `stripe-webhook` (failed/recovered payments; deploy with `--no-verify-jwt`, secret `STRIPE_WEBHOOK_SECRET`), `send-csv-reminder` (Sunday email via Resend). Schedules in `supabase/finance-cron.sql`.
 
