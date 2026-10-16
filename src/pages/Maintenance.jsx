@@ -5,12 +5,34 @@ import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
 import { formatDate, daysUntil, todayStr } from '../utils/dates';
+import { useFinance } from '../finance/FinanceContext';
+import { autoMatches } from '../finance/maintenanceLink';
+import { money } from '../finance/categories';
+import MaintenanceLinkModal from '../components/MaintenanceLinkModal';
+import { CHECKLIST_TEMPLATES, templateFor, buildChecklist, checklistProgress, templateGroups } from '../utils/serviceChecklist';
 
-const EF = { vehicleId: '', type: 'service', description: '', date: todayStr(), nextServiceDate: '', cost: '', odometer: '' };
+const EF = { vehicleId: '', type: 'service', description: '', date: todayStr(), nextServiceDate: '', cost: '', odometer: '', checklist: null };
 
 export default function Maintenance() {
   const { data, add, update, remove } = useStore();
+  const fin = useFinance();
   const [tab, setTab] = useState('log');
+  const [linkFor, setLinkFor] = useState(null);
+  const [matching, setMatching] = useState(false);
+  const [notice, setNotice] = useState('');
+  const financeReady = !!fin && !fin.error && !fin.loading;
+  const unpaid = data.maintenance.filter(m => m.cost && !m.transactionId).length;
+  const matchAll = async () => {
+    setMatching(true);
+    try {
+      const pairs = autoMatches(data.maintenance, fin.transactions, data.rentals);
+      for (const { entry, tx } of pairs) {
+        await update('maintenance', entry.id, { transactionId: tx.id });
+        if (!tx.vehicleId && entry.vehicleId && !tx.splits.length) await fin.updateTransaction(tx.id, { vehicleId: entry.vehicleId });
+      }
+      setNotice(pairs.length ? `${pairs.length} job${pairs.length > 1 ? 's' : ''} linked to their payments. The rest need a manual pick.` : 'No safe matches: nothing with the same amount within 14 days that is not already linked.');
+    } finally { setMatching(false); }
+  };
   const [showAdd, setShowAdd] = useState(false);
   const [editM, setEditM] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
@@ -44,8 +66,20 @@ export default function Maintenance() {
       nextServiceDate: m.nextServiceDate || '',
       cost: m.cost || '',
       odometer: m.odometer || '',
+      checklist: m.checklist || null,
     });
   };
+
+  // Checklist helpers for the form
+  const formVehicle = data.vehicles.find(v => v.id === form.vehicleId);
+  const hadFirstService = !!formVehicle && data.maintenance.some(m => m.vehicleId === formVehicle.id && m.type === 'service' && (!editM || m.id !== editM.id));
+  const suggestedTemplate = templateFor(formVehicle, form.type, { odometer: form.odometer, hadFirstService });
+  const [newItem, setNewItem] = useState('');
+  const startChecklist = (key) => sf('checklist', buildChecklist(key));
+  const toggleItem = (i) => sf('checklist', form.checklist.map((it, j) => j === i ? { ...it, done: !it.done } : it));
+  const removeItem = (i) => sf('checklist', form.checklist.filter((_, j) => j !== i));
+  const addItem = () => { const t = newItem.trim(); if (!t) return; sf('checklist', [...(form.checklist || []), { item: t, done: false }]); setNewItem(''); };
+  const setAll = (done) => sf('checklist', form.checklist.map(it => ({ ...it, done })));
 
   const records = [...data.maintenance].sort((a, b) => {
     const mul = sort.dir === 'asc' ? 1 : -1;
@@ -120,6 +154,50 @@ export default function Maintenance() {
         <div className="field"><label className="label">Date *</label><input className="input" type="date" value={form.date} onChange={e => sf('date', e.target.value)} /></div>
         <div className="field"><label className="label">Cost ($)</label><input className="input" type="number" min="0" value={form.cost} onChange={e => sf('cost', e.target.value)} placeholder="Optional" /></div>
       </div>
+      {(form.type === 'service' || form.type === 'inspection' || form.checklist) && (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
+          {!form.checklist ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div><div className="fw-600" style={{ fontSize: 14 }}>Service checklist</div><div className="text-sm text-muted">{suggestedTemplate ? `Suggested: ${CHECKLIST_TEMPLATES[suggestedTemplate].label}${formVehicle ? ` for ${formVehicle.plate}` : ''}${suggestedTemplate.startsWith('zoot') ? ` · from the odometer (${Number(form.odometer || formVehicle?.odometer || 0).toLocaleString()} km)` : ''}` : 'Tick off each step as you go'}</div></div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {suggestedTemplate && <button type="button" className="btn btn-primary btn-sm" onClick={() => startChecklist(suggestedTemplate)}>Start {CHECKLIST_TEMPLATES[suggestedTemplate].label}</button>}
+                <select className="select" style={{ width: 'auto', padding: '6px 10px' }} value="" onChange={e => e.target.value && startChecklist(e.target.value)}>
+                  <option value="">Other template…</option>
+                  {Object.entries(templateGroups()).map(([g, list]) => <optgroup key={g} label={g}>{list.map(([k, t]) => <option key={k} value={k}>{t.label}</option>)}</optgroup>)}
+                  <option value="blank">Blank list</option>
+                </select>
+              </div>
+            </div>
+          ) : (() => {
+            const p = checklistProgress(form.checklist);
+            return (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div className="fw-600" style={{ fontSize: 14 }}>Checklist · {p.done} of {p.total} done</div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAll(true)}>Tick all</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAll(false)}>Clear</button>
+                    <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => sf('checklist', null)}>Remove list</button>
+                  </div>
+                </div>
+                <div style={{ height: 6, background: 'var(--border)', borderRadius: 3, marginBottom: 10 }}><div style={{ height: 6, width: `${p.pct * 100}%`, background: p.pct === 1 ? 'var(--accent)' : 'var(--amber)', borderRadius: 3, transition: 'width 0.2s' }} /></div>
+                <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {form.checklist.map((it, i) => (
+                    <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', borderRadius: 8, background: it.done ? 'var(--accent-light)' : 'transparent', cursor: 'pointer', fontSize: 14 }}>
+                      <input type="checkbox" checked={!!it.done} onChange={() => toggleItem(i)} style={{ width: 18, height: 18 }} />
+                      <span style={{ flex: 1, textDecoration: it.done ? 'line-through' : 'none', color: it.done ? 'var(--muted)' : 'inherit' }}>{it.item}{it.hint && <div className="text-sm text-muted" style={{ textDecoration: 'none' }}>{it.hint}</div>}</span>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={e => { e.preventDefault(); removeItem(i); }} style={{ fontSize: 14, lineHeight: 1 }}>×</button>
+                    </label>))}
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <input className="input" value={newItem} placeholder="Add a step…" onChange={e => setNewItem(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }} />
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={addItem}>Add</button>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
       <div className="grid-2">
         <div className="field">
           <label className="label">Odometer (km)</label>
@@ -138,8 +216,12 @@ export default function Maintenance() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Maintenance</h1>
-        <button className="btn btn-primary" onClick={() => { setForm(EF); setShowAdd(true); }}>+ Log Service</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {financeReady && unpaid > 0 && <button className="btn btn-secondary" onClick={matchAll} disabled={matching}>{matching ? 'Matching…' : `Match ${unpaid} with Finance`}</button>}
+          <button className="btn btn-primary" onClick={() => { setForm(EF); setShowAdd(true); }}>+ Log Service</button>
+        </div>
       </div>
+      {notice && <div style={{ background: 'var(--blue-bg)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, display: 'flex', justifyContent: 'space-between' }}><span>{notice}</span><button className="btn btn-ghost btn-sm" onClick={() => setNotice('')}>×</button></div>}
 
       <div className="mb-16">
         <Tabs tabs={[
@@ -159,7 +241,9 @@ export default function Maintenance() {
                 <SortTh col="date">Date</SortTh>
                 <SortTh col="odometer" className="col-hide-mobile">Odometer</SortTh>
                 <th className="col-hide-mobile">Description</th>
+                <th>Checklist</th>
                 <SortTh col="cost">Cost</SortTh>
+                {financeReady && <th>Paid</th>}
                 <th></th>
               </tr></thead>
               <tbody>
@@ -172,7 +256,16 @@ export default function Maintenance() {
                       <td className="text-muted">{formatDate(m.date)}</td>
                       <td className="text-muted col-hide-mobile">{m.odometer ? Number(m.odometer).toLocaleString() + ' km' : '—'}</td>
                       <td className="text-muted col-hide-mobile" style={{ maxWidth: 220 }}>{m.description || '—'}</td>
+                      <td onClick={() => openEdit(m)} style={{ cursor: 'pointer' }}>{(() => { if (!m.checklist?.length) return <span className="text-sm text-muted">—</span>; const p = checklistProgress(m.checklist); return <div style={{ minWidth: 90 }}><div className="text-sm" style={{ color: p.pct === 1 ? 'var(--accent)' : 'var(--amber)', fontWeight: 600 }}>{p.done}/{p.total}{p.pct === 1 ? ' ✓' : ''}</div><div style={{ height: 4, background: 'var(--border)', borderRadius: 2 }}><div style={{ height: 4, width: `${p.pct * 100}%`, background: p.pct === 1 ? 'var(--accent)' : 'var(--amber)', borderRadius: 2 }} /></div></div>; })()}</td>
                       <td>{m.cost ? '$' + m.cost : '—'}</td>
+                      {financeReady && (() => {
+                        const tx = m.transactionId ? fin.transactions.find(t => t.id === m.transactionId) : null;
+                        return (
+                          <td onClick={() => setLinkFor(m)} style={{ cursor: 'pointer' }}>
+                            {tx ? <div><Badge variant="green">Paid</Badge><div className="text-sm text-muted">{formatDate(tx.date).replace(/ \d{4}$/, '')} · {fin.accounts.find(a => a.id === tx.accountId)?.name}{Math.abs(Number(tx.amount)) !== Number(m.cost) ? ` · ${money(tx.amount)}` : ''}</div></div>
+                              : m.cost ? <Badge variant="amber">Not in Finance</Badge> : <span className="text-sm text-muted">No cost</span>}
+                          </td>);
+                      })()}
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button className="btn btn-secondary btn-sm" onClick={() => openEdit(m)}>Edit</button>
@@ -222,6 +315,8 @@ export default function Maintenance() {
         footer={<><button className="btn btn-secondary" onClick={() => { setEditM(null); setForm(EF); }}>Cancel</button><button className="btn btn-primary" onClick={saveEdit} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button></>}>
         {renderForm()}
       </Modal>
+
+      {linkFor && <MaintenanceLinkModal entry={data.maintenance.find(m => m.id === linkFor.id) || linkFor} onClose={() => setLinkFor(null)} onDone={msg => setNotice(msg)} />}
 
       <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Delete Record"
         footer={<><button className="btn btn-secondary" onClick={() => setDeleteId(null)}>Cancel</button><button className="btn btn-danger" onClick={async () => { await remove('maintenance', deleteId); setDeleteId(null); }}>Delete</button></>}>

@@ -5,6 +5,7 @@ import EmptyState from '../../components/shared/EmptyState';
 import { useFinance } from '../../finance/FinanceContext';
 import { useStore } from '../../context/StoreContext';
 import { vehicleSummary } from '../../finance/vehicles';
+import { serviceLogByVehicle } from '../../finance/maintenanceLink';
 import { categoryLabel, fyLabel, fyOf, money, money0 } from '../../finance/categories';
 import { formatDate, todayStr } from '../../utils/dates';
 import { StatCard } from './bits';
@@ -18,6 +19,9 @@ export default function VehiclesFinance({ go }) {
   const [openId, setOpenId] = useState(null);
   const fy = fyOf(today);
   const { rows, unattributed } = useMemo(() => vehicleSummary(fin.transactions, data.rentals, data.vehicles, today), [fin.transactions, data.rentals, data.vehicles, today]);
+  const log = useMemo(() => serviceLogByVehicle(data.maintenance), [data.maintenance]);
+  const logGap = Object.values(log).reduce((s, l) => s + l.notInFinance, 0);
+  const logUnlinked = Object.values(log).reduce((s, l) => s + l.unlinked, 0);
   const inc = (r) => period === 'fy' ? r.incomeFy : r.income;
   const exp = (r) => period === 'fy' ? r.expensesFy : r.expenses;
   const sorted = [...rows].sort((a, b) => (inc(b) - exp(b)) - (inc(a) - exp(a)));
@@ -35,7 +39,7 @@ export default function VehiclesFinance({ go }) {
       <div className="grid-4 mb-20">
         <StatCard color="var(--accent)" value={money0(totals.income)} label="Income attributed to vehicles" sub={unattributed.income ? `${money0(unattributed.income)} more income has no vehicle yet` : 'All income has a vehicle'} />
         <StatCard color="var(--red)" value={money0(totals.expenses)} label="Expenses charged to vehicles" sub={unattributed.expenses ? `${money0(unattributed.expenses)} is fleet-wide or unassigned` : 'All expenses have a vehicle'} />
-        <StatCard color="var(--blue)" value={best ? best.vehicle.plate : '—'} label="Best earner" sub={best ? `net ${money0(inc(best) - exp(best))}` : ''} />
+        <StatCard color={logGap ? 'var(--amber)' : 'var(--blue)'} value={logGap ? money0(logGap) : (best ? best.vehicle.plate : '—')} label={logGap ? 'Service log not in Finance' : 'Best earner'} sub={logGap ? `${logUnlinked} job${logUnlinked > 1 ? 's' : ''} with a cost but no payment linked` : (best ? `net ${money0(inc(best) - exp(best))}` : '')} onClick={logGap ? () => navigate('/maintenance') : undefined} />
         <StatCard color="var(--amber)" value={worst ? worst.vehicle.plate : '—'} label="Lowest net" sub={worst ? `net ${money0(inc(worst) - exp(worst))}` : ''} />
       </div>
 
@@ -49,7 +53,7 @@ export default function VehiclesFinance({ go }) {
                 const rec = r.purchasePrice ? Math.max(0, r.net) / r.purchasePrice : null;
                 const cats = Object.entries(r.byCategory).sort((a, b) => b[1] - a[1]);
                 return (
-                  <VehicleRow key={r.vehicle.id} r={r} net={net} rec={rec} cats={cats} inc={inc(r)} exp={exp(r)} open={openId === r.vehicle.id}
+                  <VehicleRow key={r.vehicle.id} r={r} net={net} rec={rec} cats={cats} inc={inc(r)} exp={exp(r)} open={openId === r.vehicle.id} log={log[r.vehicle.id]}
                     onToggle={() => setOpenId(openId === r.vehicle.id ? null : r.vehicle.id)}
                     onView={() => go('transactions', { vehicle: r.vehicle.id })} onOpen={() => navigate('/vehicles')} />
                 );
@@ -64,7 +68,7 @@ export default function VehiclesFinance({ go }) {
   );
 }
 
-function VehicleRow({ r, net, rec, cats, inc, exp, open, onToggle, onView, onOpen }) {
+function VehicleRow({ r, net, rec, cats, inc, exp, open, onToggle, onView, onOpen, log }) {
   const v = r.vehicle;
   return (
     <>
@@ -86,6 +90,7 @@ function VehicleRow({ r, net, rec, cats, inc, exp, open, onToggle, onView, onOpe
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 6 }}>
               {cats.map(([c, val]) => <div key={c} style={{ display: 'flex', justifyContent: 'space-between', background: 'white', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', fontSize: 13 }}><span>{categoryLabel(c)}</span><span className="fw-600">{money(val)}</span></div>)}
             </div>)}
+          {log && <div className="text-sm" style={{ marginTop: 8, color: log.notInFinance ? 'var(--amber)' : 'var(--muted)' }}>Service log: {money(log.logged)} of jobs recorded{log.notInFinance ? `, ${money(log.notInFinance)} across ${log.unlinked} job${log.unlinked > 1 ? 's' : ''} has no payment linked and is not counted above` : ', all linked to payments'}.</div>}
           <div className="text-sm text-muted" style={{ marginTop: 8 }}>All time: income {money(r.income)} · expenses {money(r.expenses)} · net {money(r.net)}{r.last ? ` · last line ${formatDate(r.last)}` : ''}{v.purchaseDate ? ` · bought ${formatDate(v.purchaseDate)}` : ''}</div>
         </td></tr>
       )}

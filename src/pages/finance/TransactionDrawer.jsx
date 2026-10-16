@@ -8,6 +8,7 @@ import { useSuggestions } from '../../finance/useSuggestions';
 import { categoryLabel, categoryTypeNote, money, SOURCE_LABEL, toCents } from '../../finance/categories';
 import { buildConfirm, splitRemainder } from '../../finance/confirm';
 import { unreimbursedExpenses, directorPosition } from '../../finance/reports';
+import { entriesForTransaction, MAINTENANCE_CATEGORIES } from '../../finance/maintenanceLink';
 import { formatDate, todayStr } from '../../utils/dates';
 import { BOND_RETAIN_REASONS } from '../../utils/bond';
 import { AmountCell, AccountBadge, CategorySelect, SideEffectNote, StatusBadge } from './bits';
@@ -18,7 +19,7 @@ const blankSplit = () => ({ category: '', amount: '', rentalId: '', customerId: 
 // description locked; only category, links, splits and notes change.
 export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultAccountId }) {
   const fin = useFinance();
-  const { data } = useStore();
+  const { data, update: updateStore } = useStore();
   const suggestions = useSuggestions();
   const isNew = !tx;
   const locked = !!tx && tx.source !== 'manual';
@@ -36,12 +37,13 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
         splits: tx.splits.length ? tx.splits.map(s => ({ ...s, amount: String(s.amount) })) : [blankSplit(), blankSplit()],
         customerId: tx.customerId || '', rentalId: tx.rentalId || '', vehicleId: tx.vehicleId || '', payeeId: tx.payeeId || '',
         linkedTransactionId: tx.linkedTransactionId || '', notes: tx.notes || '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0],
+        maintenanceId: data.maintenance.find(m => m.transactionId === tx.id)?.id || '',
       });
     } else {
       const manualAccounts = fin.accounts.filter(a => a.feed === 'manual');
-      setForm({ accountId: defaultAccountId || manualAccounts[0]?.id || fin.accounts[0]?.id || '', date: todayStr(), amount: '', description: '', category: '', splitOn: false, splits: [blankSplit(), blankSplit()], customerId: '', rentalId: '', vehicleId: '', payeeId: '', linkedTransactionId: '', notes: '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0] });
+      setForm({ accountId: defaultAccountId || manualAccounts[0]?.id || fin.accounts[0]?.id || '', date: todayStr(), amount: '', description: '', category: '', splitOn: false, splits: [blankSplit(), blankSplit()], customerId: '', rentalId: '', vehicleId: '', payeeId: '', linkedTransactionId: '', notes: '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0], maintenanceId: '' });
     }
-  }, [open, tx, defaultAccountId, fin.accounts]);
+  }, [open, tx, defaultAccountId, fin.accounts, data.maintenance]);
 
   const sug = tx ? suggestions[tx.id] : null;
   const account = fin.accounts.find(a => a.id === form?.accountId);
@@ -61,6 +63,10 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
   const confirmPayload = buildConfirm(pseudoTx, { ...form, splits: form.splitOn ? activeSplits.map(s => ({ ...s, amount: Number(s.amount) })) : [] }, { rentals: data.rentals });
   const linkedExpense = form.linkedTransactionId ? fin.transactions.find(t => t.id === form.linkedTransactionId) : null;
   const canSave = form.accountId && form.date && form.amount !== '' && (form.splitOn ? splitsValid : !!form.category) && !saving;
+  const isJob = form.splitOn ? activeSplits.some(s => MAINTENANCE_CATEGORIES.includes(s.category)) : MAINTENANCE_CATEGORIES.includes(form.category);
+  const currentlyLinked = tx ? data.maintenance.find(m => m.transactionId === tx.id) : null;
+  const jobMatches = isJob && amountNum < 0 ? entriesForTransaction({ ...pseudoTx, vehicleId: form.vehicleId, rentalId: form.rentalId }, data.maintenance, data.rentals, { days: 30 }).slice(0, 6) : [];
+  const pickJob = (m) => setForm(f => ({ ...f, maintenanceId: m ? m.id : '', vehicleId: m?.vehicleId || f.vehicleId }));
 
   const applySuggestion = () => {
     if (!sug) return;
@@ -83,6 +89,9 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
         if (!locked) await fin.updateTransaction(tx.id, { accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() });
         saved = await fin.confirmTransaction({ ...confirmPayload, splits });
       }
+      // Service-log link: one entry per payment. Clearing the pick unlinks a previously linked entry.
+      if (form.maintenanceId && form.maintenanceId !== currentlyLinked?.id) await updateStore('maintenance', form.maintenanceId, { transactionId: saved.id });
+      if (currentlyLinked && form.maintenanceId !== currentlyLinked.id) await updateStore('maintenance', currentlyLinked.id, { transactionId: null });
       onSaved?.(saved, confirmPayload.effects);
       onClose();
     } catch (e) { setErr(e.message || String(e)); } finally { setSaving(false); }
@@ -229,6 +238,37 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
               </select>
             )}
             {linkedExpense && <div style={{ background: 'var(--blue-bg)', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginTop: 8 }}>Owed to you by the business: {money(director.total)} → {money(director.total - Math.abs(Number(linkedExpense.amount)))} after this reimbursement.</div>}
+          </div>
+        )}
+
+        {(isJob || currentlyLinked) && (
+          <div>
+            <div className="label" style={{ marginBottom: 6 }}>Service log</div>
+            {(() => {
+              const picked = form.maintenanceId ? data.maintenance.find(m => m.id === form.maintenanceId) : null;
+              if (picked) {
+                const v = data.vehicles.find(x => x.id === picked.vehicleId);
+                return (
+                  <div style={{ border: '1.5px solid var(--accent)', background: 'var(--accent-light)', borderRadius: 10, padding: '10px 12px', fontSize: 13 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span className="fw-600">{v?.plate || '—'} · {picked.type} · {formatDate(picked.date)}</span><span className="fw-600">{picked.cost ? `$${picked.cost}` : 'no cost'}</span></div>
+                    <div className="text-muted">{picked.description || 'No description'}</div>
+                    {picked.cost && toCents(picked.cost) !== Math.abs(toCents(amountNum)) && <div style={{ color: 'var(--amber)', marginTop: 4 }}>Logged cost differs from this payment. Finance counts the payment.</div>}
+                    <button className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} onClick={() => pickJob(null)}>Unlink</button>
+                  </div>
+                );
+              }
+              if (!jobMatches.length) return <div className="text-sm text-muted">No unlinked service-log entry with a cost within 30 days. Log the job in Maintenance and link it from there.</div>;
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {jobMatches.map(({ entry: m, exact, sameVehicle }) => { const v = data.vehicles.find(x => x.id === m.vehicleId); return (
+                    <div key={m.id} style={{ border: `1.5px solid ${exact ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 10, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                      <div style={{ minWidth: 0 }}><div className="fw-600">{v?.plate || '—'} · {m.type} · {formatDate(m.date).replace(/ \d{4}$/, '')}{sameVehicle ? '' : ''}</div><div className="text-muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.description || 'No description'}</div></div>
+                      <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><div className="fw-600">${m.cost}{exact ? ' ✓' : ''}</div><button className="btn btn-secondary btn-sm" onClick={() => pickJob(m)}>Link</button></div>
+                    </div>); })}
+                  <div className="text-sm text-muted">Linking sets the vehicle and marks the job as paid. It does not add anything to Finance.</div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

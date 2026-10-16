@@ -90,6 +90,8 @@ const maintenanceFromDb = (m) => ({
   date: m.date, nextServiceDate: m.next_service_date,
   cost: m.cost ? String(m.cost) : '',
   odometer: m.odometer ? String(m.odometer) : '',
+  transactionId: m.transaction_id || null,
+  checklist: Array.isArray(m.checklist) ? m.checklist : null,
 });
 
 const maintenanceToDb = (m) => ({
@@ -98,6 +100,8 @@ const maintenanceToDb = (m) => ({
   next_service_date: m.nextServiceDate || null,
   cost: m.cost ? Number(m.cost) : null,
   odometer: m.odometer ? Number(m.odometer) : null,
+  transaction_id: m.transactionId || null,
+  checklist: m.checklist && m.checklist.length ? m.checklist : null,
 });
 
 const settingsFromDb = (s) => ({

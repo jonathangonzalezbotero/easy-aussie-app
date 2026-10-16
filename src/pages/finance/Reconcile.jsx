@@ -6,6 +6,7 @@ import { useStore } from '../../context/StoreContext';
 import { useSuggestions } from '../../finance/useSuggestions';
 import { buildConfirm } from '../../finance/confirm';
 import { bondsHeld } from '../../finance/reports';
+import { entriesForTransaction, MAINTENANCE_CATEGORIES } from '../../finance/maintenanceLink';
 import { categoryLabel, categoryTypeNote, money } from '../../finance/categories';
 import { useNavigate } from 'react-router-dom';
 import { formatDate, formatTimestamp } from '../../utils/dates';
@@ -18,7 +19,7 @@ const Kbd = ({ k }) => <span className="fin-kbd">{k}</span>;
 export default function Reconcile({ go }) {
   const fin = useFinance();
   const navigate = useNavigate();
-  const { data, refresh: refreshStore } = useStore();
+  const { data, refresh: refreshStore, update: updateStore } = useStore();
   const suggestions = useSuggestions();
   const [idx, setIdx] = useState(0);
   const [done, setDone] = useState([]);          // ids confirmed in this session (shown greyed in the list)
@@ -51,9 +52,19 @@ export default function Reconcile({ go }) {
     return buildConfirm(current, form, { rentals: data.rentals });
   }, [current, sug, refundMode, retainReason, data.rentals]);
 
+  // Service-log entry to link on confirm: only when exactly one unlinked entry has the same amount nearby.
+  const jobMatch = useMemo(() => {
+    if (!current || !payload) return null;
+    const cats = payload.splits.length ? payload.splits.map(s => s.category) : [payload.updates.category];
+    if (!cats.some(c => MAINTENANCE_CATEGORIES.includes(c))) return null;
+    const exact = entriesForTransaction({ ...current, vehicleId: payload.updates.vehicleId || current.vehicleId }, data.maintenance, data.rentals, { days: 21 }).filter(e => e.exact);
+    return exact.length === 1 ? exact[0].entry : null;
+  }, [current, payload, data.maintenance, data.rentals]);
+
   const effects = useMemo(() => {
     if (!payload) return [];
     const out = [...payload.effects];
+    if (jobMatch) { const v = data.vehicles.find(x => x.id === jobMatch.vehicleId); out.push(`Service log: marks "${(jobMatch.description || jobMatch.type).slice(0, 40)}" on ${v?.plate || 'vehicle'} (${formatDate(jobMatch.date)}) as paid by this line`); }
     if (payload.rentalUpdates?.status && rental) {
       const after = payload.rentalUpdates.status === 'held' ? held.total + (rental.bond.status === 'held' ? 0 : Number(payload.rentalUpdates.amount || rental.bond.amount)) : held.total - Number(rental.bond.amount || 0);
       const n = payload.rentalUpdates.status === 'held' ? held.count + (rental.bond.status === 'held' ? 0 : 1) : held.count - 1;
@@ -61,7 +72,7 @@ export default function Reconcile({ go }) {
     }
     if (payload.splits.length) out.push(`This line becomes ${payload.splits.length} splits: ${payload.splits.map(s => `${categoryLabel(s.category)} ${money(s.amount)}`).join(' and ')}`);
     return out;
-  }, [payload, rental, held]);
+  }, [payload, rental, held, jobMatch, data.vehicles]);
 
   const canConfirm = current && payload && (payload.updates.category || payload.splits.length) && !busy;
 
@@ -69,7 +80,9 @@ export default function Reconcile({ go }) {
     if (!canConfirm) return;
     setBusy(true);
     try {
-      await fin.confirmTransaction(payload);
+      const finalPayload = jobMatch && !payload.updates.vehicleId && !payload.splits.length ? { ...payload, updates: { ...payload.updates, vehicleId: jobMatch.vehicleId } } : payload;
+      await fin.confirmTransaction(finalPayload);
+      if (jobMatch) await updateStore('maintenance', jobMatch.id, { transactionId: current.id });
       if (payload.rentalId) await refreshStore();
       setDone(d => [...d, current.id]);
       setToast({ message: effects[0] || `${categoryLabel(payload.updates.category)} confirmed`, undo: current.id });
