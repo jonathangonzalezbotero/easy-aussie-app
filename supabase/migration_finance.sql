@@ -5,7 +5,7 @@
 alter table rentals drop constraint if exists rentals_bond_status_check;
 update rentals set bond_status = 'refunded' where bond_status = 'returned';
 alter table rentals add constraint rentals_bond_status_check
-  check (bond_status in ('awaiting','held','refunded','partially_refunded','retained'));
+  check (bond_status in ('awaiting','held','refunded','partially_refunded','retained','transferred'));
 
 alter table rentals add column if not exists bond_refunded_amount  numeric;
 alter table rentals add column if not exists bond_retained_amount  numeric;

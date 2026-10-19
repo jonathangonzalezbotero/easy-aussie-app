@@ -35,7 +35,7 @@ export default function FYSummary({ go }) {
   const capitalLines = useMemo(() => live.flatMap(t => (t.splits.length ? t.splits : [t]).filter(l => categoriesOfType('capital').some(c => c.id === l.category)).map(l => ({ date: t.date, description: t.description, category: l.category, amount: Number(l.amount), vehicleId: l.vehicleId || t.vehicleId }))).sort((a, b) => a.date.localeCompare(b.date)), [live]);
   const capitalTotal = capitalLines.reduce((s, l) => s + Math.abs(l.amount), 0);
   // Bonds held at the end of the FY: held now, or refunded after the FY end
-  const bondsAtClose = data.rentals.filter(r => r.bond?.amount && (r.startDate || '') <= closingDate && (r.bond.status === 'held' || (['refunded', 'partially_refunded', 'retained'].includes(r.bond.status) && r.bond.refundDate && r.bond.refundDate > closingDate)));
+  const bondsAtClose = data.rentals.filter(r => r.bond?.amount && (r.startDate || '') <= closingDate && (r.bond.status === 'held' || (['refunded', 'partially_refunded', 'retained', 'transferred'].includes(r.bond.status) && r.bond.refundDate && r.bond.refundDate > closingDate)));
   const bondsTotal = bondsAtClose.reduce((s, r) => s + Number(r.bond.amount), 0);
   const director = useMemo(() => directorPosition(fin), [fin]);
   const payeeRows = useMemo(() => payeeSummary(live, fin.payees, to).filter(r => r.total > 0).sort((a, b) => b.total - a.total), [live, fin.payees, to]);

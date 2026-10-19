@@ -57,7 +57,7 @@ create table if not exists rentals (
   status        text default 'active' check (status in ('active','completed')),
   bond_amount   numeric,
   bond_method   text default 'cash',
-  bond_status   text default 'held' check (bond_status in ('awaiting','held','refunded','partially_refunded','retained')),
+  bond_status   text default 'held' check (bond_status in ('awaiting','held','refunded','partially_refunded','retained','transferred')),
   bond_refunded_amount numeric,
   bond_retained_amount numeric,
   bond_retain_reason   text,

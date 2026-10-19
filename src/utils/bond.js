@@ -10,6 +10,7 @@ export const BOND_STATUS_LABEL = {
   refunded: 'Refunded',
   partially_refunded: 'Part refunded',
   retained: 'Retained',
+  transferred: 'Moved to another rental',
 };
 
 export const BOND_STATUSES = Object.keys(BOND_STATUS_LABEL);
@@ -25,7 +26,7 @@ export const bondVariant = (status) => {
 
 export const isBondHeld = (bond) => !!bond?.amount && bond.status === 'held';
 export const isBondOpen = (bond) => !!bond?.amount && (bond.status === 'held' || bond.status === 'awaiting');
-export const isBondClosed = (bond) => ['refunded', 'partially_refunded', 'retained'].includes(bond?.status);
+export const isBondClosed = (bond) => ['refunded', 'partially_refunded', 'retained', 'transferred'].includes(bond?.status);
 
 // A refund the rental end recorded but the bank line has not confirmed yet.
 export const bondRefundPending = (bond) =>

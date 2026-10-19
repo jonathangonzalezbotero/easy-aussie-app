@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Modal from '../components/shared/Modal';
 import { useStore } from '../context/StoreContext';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
@@ -60,6 +61,23 @@ export default function Bonds() {
   };
   const markHeld = (r) => update('rentals', r.id, { bond: { ...r.bond, status: 'held' } });
 
+  // Move a held bond to another rental of the same customer. The source closes as "transferred"
+  // (nothing refunded, nothing retained); the target's bond grows by the amount and becomes held.
+  const [moveR, setMoveR] = useState(null);
+  const [moveTo, setMoveTo] = useState('');
+  const moveTargets = moveR ? data.rentals.filter(r => r.id !== moveR.id && r.customerId === moveR.customerId && r.status === 'active') : [];
+  const doMove = async () => {
+    const target = data.rentals.find(r => r.id === moveTo);
+    if (!target) return;
+    const amount = Number(moveR.bond.amount) || 0;
+    const tv = data.vehicles.find(v => v.id === target.vehicleId);
+    const sv = data.vehicles.find(v => v.id === moveR.vehicleId);
+    await update('rentals', target.id, { bond: { ...target.bond, amount: String((Number(target.bond?.amount) || 0) + amount), status: 'held', method: target.bond?.method || moveR.bond.method },
+      notes: [target.notes, `Bond $${amount} moved in from ${moveR.contractNumber || sv?.plate || 'previous rental'} on ${todayStr()}`].filter(Boolean).join('\n') });
+    await update('rentals', moveR.id, { bond: { ...moveR.bond, status: 'transferred', refundedAmount: '0', retainedAmount: '0', refundDate: todayStr(), retainReason: `Moved to ${target.contractNumber || tv?.plate || 'another rental'}` } });
+    setMoveR(null); setMoveTo('');
+  };
+
   const bondRow = (r) => {
     const c = data.customers.find(x => x.id === r.customerId);
     const v = data.vehicles.find(x => x.id === r.vehicleId);
@@ -74,11 +92,13 @@ export default function Bonds() {
           <Badge variant={bondVariant(r.bond.status)}>{bondLabel(r.bond.status)}</Badge>
           {refundPending && <div className="text-sm text-muted" style={{ marginTop: 4 }}>Refund ${r.bond.refundedAmount} pending</div>}
           {isBondClosed(r.bond) && Number(r.bond.retainedAmount) > 0 && <div className="text-sm text-muted" style={{ marginTop: 4 }}>Kept ${r.bond.retainedAmount}{r.bond.retainReason ? ` · ${r.bond.retainReason}` : ''}</div>}
+          {r.bond.status === 'transferred' && r.bond.retainReason && <div className="text-sm text-muted" style={{ marginTop: 4 }}>{r.bond.retainReason}</div>}
           {isBondClosed(r.bond) && r.bond.refundDate && <div className="text-sm text-muted">{formatDate(r.bond.refundDate)}</div>}
         </td>
         <td><Badge variant={r.status === 'active' ? 'blue' : 'gray'}>{r.status}</Badge></td>
         <td>
           {r.bond.status === 'held' && <button className="btn btn-secondary btn-sm" onClick={() => markRefunded(r)}>{refundPending ? 'Refund done' : 'Mark refunded'}</button>}
+          {r.bond.status === 'held' && <button className="btn btn-ghost btn-sm" onClick={() => { setMoveR(r); setMoveTo(''); }} title="Move this bond to another rental of the same customer">Move</button>}
           {r.bond.status === 'awaiting' && <button className="btn btn-secondary btn-sm" onClick={() => markHeld(r)}>Received</button>}
         </td>
       </tr>
@@ -137,6 +157,23 @@ export default function Bonds() {
         {tab === 'awaiting' && table(awaiting, 'No bonds waiting to be paid')}
         {tab === 'closed' && table(closed, 'No bonds refunded or retained yet')}
       </div>
+
+      <Modal open={!!moveR} onClose={() => setMoveR(null)} title="Move bond to another rental"
+        footer={<><button className="btn btn-secondary" onClick={() => setMoveR(null)}>Cancel</button><button className="btn btn-primary" disabled={!moveTo} onClick={doMove}>Move bond</button></>}>
+        {moveR && (
+          <>
+            <p style={{ fontSize: 14 }}>${moveR.bond.amount} held for <strong>{data.customers.find(c => c.id === moveR.customerId)?.name}</strong> on {moveR.contractNumber || 'this rental'} will be added to the bond of the rental you pick. This rental's bond closes as "moved", with nothing refunded and nothing kept as income.</p>
+            {moveTargets.length === 0 ? <div className="text-sm text-muted">This customer has no other active rental. Create the new rental first.</div> : (
+              <div className="field"><label className="label">Move to</label>
+                <select className="select" value={moveTo} onChange={e => setMoveTo(e.target.value)}>
+                  <option value="">Choose rental…</option>
+                  {moveTargets.map(r => { const v = data.vehicles.find(x => x.id === r.vehicleId); return <option key={r.id} value={r.id}>{r.contractNumber || formatDate(r.startDate)} · {v?.plate}{r.bond?.amount ? ` · bond now $${r.bond.amount} (${r.bond.status})` : ' · no bond yet'}</option>; })}
+                </select></div>
+            )}
+            <div className="text-sm text-muted">Nothing changes in Finance: the deposits already received stay as bond deposits, and the total held matches the money in the bank.</div>
+          </>
+        )}
+      </Modal>
     </div>
   );
 }
