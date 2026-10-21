@@ -34,7 +34,7 @@ export default function Forecast({ go }) {
   const active = data.rentals.filter(r => r.status === 'active');
   const weekly = active.reduce((s, r) => s + (r.billingPeriod !== 'fixed' ? Number(r.price) || 0 : 0), 0);
   const ending = active.filter(r => r.endDate && r.endDate >= today).sort((a, b) => a.endDate.localeCompare(b.endDate))[0];
-  const missing = data.vehicles.filter(v => !['stolen', 'sold'].includes(v.status) && !v.regoExpiry);
+  const missing = data.vehicles.filter(v => !['stolen', 'sold'].includes(v.status) && v.type !== 'ebike' && !v.regoExpiry); // e-bikes need no rego in QLD
 
   const saveOverride = async () => {
     try { await fin.setOverride(monthStart(edit.month), edit.category, edit.value === '' ? null : Number(edit.value), edit.note); setToast({ message: edit.value === '' ? 'Reset to generated value' : 'Override saved' }); setEdit(null); }
@@ -86,7 +86,7 @@ export default function Forecast({ go }) {
         <div className="table-wrap"><table className="fin-grid">
           <thead><tr><th>Category</th>{months.map(m => <th key={m}>{monthLabel(m, { short: true })}</th>)}<th>12 months</th></tr></thead>
           <tbody>
-            <tr className="group"><td colSpan={months.length + 2}>Income</td></tr>
+            <tr className="group"><td>Income</td><td colSpan={months.length + 1} /></tr>
             <tr><td>Rental income</td>{months.map(m => <td key={m}>{money0(income(m))}</td>)}<td style={{ fontWeight: 700 }}>{money0(totIncome)}</td></tr>
             {[['operating', 'Operating expenses'], ['capital', 'Capital']].map(([type, label]) => (
               <GroupRows key={type} label={label} rows={fc.rows.filter(r => r.type === type)} months={months} onEdit={(category, m, c) => setEdit({ category, month: m, value: c.override ? String(c.value) : '', generated: c.generated, origin: c.origin, note: c.note || '' })} />))}
@@ -121,7 +121,7 @@ function GroupRows({ label, rows, months, onEdit }) {
   if (!rows.length) return null;
   return (
     <>
-      <tr className="group"><td colSpan={months.length + 2}>{label}</td></tr>
+      <tr className="group"><td>{label}</td><td colSpan={months.length + 1} /></tr>
       {rows.map(r => (
         <tr key={r.category}><td>{categoryLabel(r.category)}</td>
           {months.map(m => { const c = r.cells[m]; return <td key={m} className={`editable${c.override ? ' override' : ''}`} title={`${c.override ? `Override (generated ${money0(c.generated)}). ` : 'Generated · '}${c.origin}${c.note ? ` · ${c.note}` : ''}`} onClick={() => onEdit(r.category, m, c)}>{c.value ? money0(c.value) : '—'}</td>; })}

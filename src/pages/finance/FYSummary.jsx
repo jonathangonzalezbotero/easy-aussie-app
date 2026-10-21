@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useFinance } from '../../finance/FinanceContext';
 import { useStore } from '../../context/StoreContext';
 import { useSuggestions } from '../../finance/useSuggestions';
-import { CATEGORIES, categoriesOfType, categoryLabel, fyLabel, fyMonths, fyOf, fyRange, money, money0, monthLabel, summarise, txName } from '../../finance/categories';
+import { CATEGORIES, categoriesOfType, categoryLabel, categoryShort, fyLabel, fyMonths, fyOf, fyRange, money, money0, monthLabel, summarise, txName } from '../../finance/categories';
 import { inRange, categoryByMonth, directorPosition } from '../../finance/reports';
 import { payeeSummary, PAYEE_KINDS } from '../../finance/payees';
 import { formatDate, todayStr } from '../../utils/dates';
@@ -90,7 +90,7 @@ export default function FYSummary({ go }) {
           <div>
             <div className="label" style={{ marginBottom: 8 }}>Profit and loss · {fyLabel(fy)}{inProgress ? ' to date' : ''}</div>
             <div className="grid-4">
-              <StatCard color="var(--accent)" value={money0(sum.income)} label="Income" sub={incomeRows.map(c => c.label.toLowerCase()).join(', ') || '—'} />
+              <StatCard color="var(--accent)" value={money0(sum.income)} label="Income" sub={incomeRows.map(c => categoryShort(c.id).toLowerCase()).join(', ') || '—'} />
               <StatCard color="var(--red)" value={money0(sum.operating)} label="Operating expenses" sub={`${opRows.length} categories`} />
               <StatCard color="var(--blue)" value={money0(sum.operatingNet)} label="Operating net" sub="Before capital" />
               <StatCard color="var(--text)" value={money(capitalTotal)} label="Capital items" sub="Vehicles, loan repayments" />
@@ -110,10 +110,10 @@ export default function FYSummary({ go }) {
           <div className="table-wrap"><table className="fin-grid">
             <thead><tr><th>Category</th>{months.map(m => <th key={m}>{monthLabel(m).slice(0, 3)}</th>)}<th>Total</th></tr></thead>
             <tbody>
-              <tr className="group"><td colSpan={14}>Income</td></tr>
-              {incomeRows.map(c => <tr key={c.id}><td>{c.label}</td>{months.map(m => <td key={m}>{cell(byMonth[c.id]?.[m])}</td>)}<td style={{ fontWeight: 700 }}>{money0(rowTotal(c.id))}</td></tr>)}
-              <tr className="group"><td colSpan={14}>Operating expenses</td></tr>
-              {opRows.map(c => <tr key={c.id}><td>{c.label}</td>{months.map(m => <td key={m}>{cell(byMonth[c.id]?.[m])}</td>)}<td style={{ fontWeight: 700 }}>{money0(-rowTotal(c.id))}</td></tr>)}
+              <tr className="group"><td>Income</td><td colSpan={13} /></tr>
+              {incomeRows.map(c => <tr key={c.id}><td title={c.label}>{categoryShort(c.id)}</td>{months.map(m => <td key={m}>{cell(byMonth[c.id]?.[m])}</td>)}<td style={{ fontWeight: 700 }}>{money0(rowTotal(c.id))}</td></tr>)}
+              <tr className="group"><td>Operating expenses</td><td colSpan={13} /></tr>
+              {opRows.map(c => <tr key={c.id}><td title={c.label}>{categoryShort(c.id)}</td>{months.map(m => <td key={m}>{cell(byMonth[c.id]?.[m])}</td>)}<td style={{ fontWeight: 700 }}>{money0(-rowTotal(c.id))}</td></tr>)}
               <tr className="total"><td>Total income</td>{months.map(m => <td key={m}>{cell(monthIncome(m))}</td>)}<td>{money0(sum.income)}</td></tr>
               <tr className="total"><td>Total operating expenses</td>{months.map(m => <td key={m}>{cell(monthOp(m))}</td>)}<td>{money0(sum.operating)}</td></tr>
               <tr className="total"><td>Operating net</td>{months.map(m => { const v = monthIncome(m) - monthOp(m); return <td key={m} className={v < 0 ? 'fin-neg' : ''}>{v ? money0(v) : '—'}</td>; })}<td className={sum.operatingNet < 0 ? 'fin-neg' : ''}>{money0(sum.operatingNet)}</td></tr>
@@ -126,18 +126,18 @@ export default function FYSummary({ go }) {
             <div className="card-head"><span className="card-title">Capital items</span><span className="text-sm text-muted">Depreciation is left to your accountant</span></div>
             {capitalLines.length === 0 ? <div className="text-sm text-muted" style={{ padding: 20 }}>No capital items this year.</div> : (
               <div className="table-wrap"><table className="table">
-                <thead><tr><th>Date</th><th>Item</th><th>Category</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
-                <tbody>{capitalLines.map((l, i) => <tr key={i} style={{ cursor: 'default' }}><td className="text-muted" style={{ whiteSpace: 'nowrap' }}>{formatDate(l.date)}</td><td>{l.label || l.description}{l.vehicleId ? <span className="text-muted"> · {data.vehicles.find(v => v.id === l.vehicleId)?.plate}</span> : ''}</td><td>{categoryLabel(l.category)}</td><td style={{ textAlign: 'right' }}><AmountCell value={l.amount} bold={false} /></td></tr>)}
-                  <tr style={{ cursor: 'default' }}><td colSpan={3} className="fw-600">Total capital</td><td className="fw-600" style={{ textAlign: 'right' }}>{money(capitalTotal)}</td></tr></tbody>
+                <thead><tr><th>Date</th><th>Item</th><th className="col-hide-mobile">Category</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
+                <tbody>{capitalLines.map((l, i) => <tr key={i} style={{ cursor: 'default' }}><td className="text-muted" style={{ whiteSpace: 'nowrap' }}>{formatDate(l.date)}</td><td>{l.label || l.description}{l.vehicleId ? <span className="text-muted"> · {data.vehicles.find(v => v.id === l.vehicleId)?.plate}</span> : ''}</td><td className="col-hide-mobile">{categoryLabel(l.category)}</td><td style={{ textAlign: 'right' }}><AmountCell value={l.amount} bold={false} /></td></tr>)}
+                  <tr style={{ cursor: 'default' }}><td colSpan={2} className="fw-600">Total capital</td><td className="col-hide-mobile" /><td className="fw-600" style={{ textAlign: 'right' }}>{money(capitalTotal)}</td></tr></tbody>
               </table></div>)}
           </div>
           <div className="card">
             <div className="card-head"><span className="card-title">Bonds held at {formatDate(closingDate)}</span></div>
             {bondsAtClose.length === 0 ? <div className="text-sm text-muted" style={{ padding: 20 }}>No bonds held.</div> : (
               <div className="table-wrap"><table className="table">
-                <thead><tr><th>Customer</th><th>Rental</th><th style={{ textAlign: 'right' }}>Bond</th></tr></thead>
-                <tbody>{bondsAtClose.map(r => <tr key={r.id} style={{ cursor: 'default' }}><td>{data.customers.find(c => c.id === r.customerId)?.name || '—'}</td><td className="text-muted">{r.contractNumber || ''} · since {formatDate(r.startDate).replace(/ \d{4}$/, '')}</td><td style={{ textAlign: 'right' }}>{money(r.bond.amount)}</td></tr>)}
-                  <tr style={{ cursor: 'default' }}><td colSpan={2} className="fw-600">Total liability</td><td className="fw-600" style={{ textAlign: 'right' }}>{money(bondsTotal)}</td></tr></tbody>
+                <thead><tr><th>Customer</th><th className="col-hide-mobile">Rental</th><th style={{ textAlign: 'right' }}>Bond</th></tr></thead>
+                <tbody>{bondsAtClose.map(r => <tr key={r.id} style={{ cursor: 'default' }}><td>{data.customers.find(c => c.id === r.customerId)?.name || '—'}</td><td className="text-muted col-hide-mobile">{r.contractNumber || ''} · since {formatDate(r.startDate).replace(/ \d{4}$/, '')}</td><td style={{ textAlign: 'right' }}>{money(r.bond.amount)}</td></tr>)}
+                  <tr style={{ cursor: 'default' }}><td className="fw-600">Total liability</td><td className="col-hide-mobile" /><td className="fw-600" style={{ textAlign: 'right' }}>{money(bondsTotal)}</td></tr></tbody>
               </table></div>)}
           </div>
         </div>
@@ -148,7 +148,7 @@ export default function FYSummary({ go }) {
             <div className="table-wrap"><table className="table">
               <thead><tr><th>Payee</th><th className="col-hide-mobile">Type</th><th className="col-hide-mobile">ABN</th><th>Categories</th><th style={{ textAlign: 'right' }}>Payments</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead>
               <tbody>{payeeRows.map(r => <tr key={r.id} style={{ cursor: 'default' }}><td className="fw-500">{r.name}</td><td className="col-hide-mobile text-muted">{PAYEE_KINDS[r.kind] || r.kind}</td><td className="col-hide-mobile text-muted">{r.abn || '—'}</td><td className="text-sm">{Object.entries(r.byCategory).sort((a, b) => b[1] - a[1]).map(([c, v]) => `${categoryLabel(c)} ${money0(v)}`).join(' · ')}</td><td style={{ textAlign: 'right' }}>{r.count}</td><td style={{ textAlign: 'right' }} className="fw-600">{money(r.total)}</td></tr>)}
-                <tr style={{ cursor: 'default' }}><td colSpan={5} className="fw-600">Total</td><td className="fw-600" style={{ textAlign: 'right' }}>{money(payeeRows.reduce((s, r) => s + r.total, 0))}</td></tr></tbody>
+                <tr style={{ cursor: 'default' }}><td className="fw-600">Total</td><td className="col-hide-mobile" /><td className="col-hide-mobile" /><td colSpan={2} /><td className="fw-600" style={{ textAlign: 'right' }}>{money(payeeRows.reduce((s, r) => s + r.total, 0))}</td></tr></tbody>
             </table></div>
           </div>
         )}

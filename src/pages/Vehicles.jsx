@@ -8,6 +8,7 @@ import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
 import { formatDate, daysUntil, todayStr } from '../utils/dates';
+import { readingsFor, formatKm, ODOMETER_SOURCES, confirmOdometer } from '../utils/odometer';
 
 const EF = {
   plate: '', name: '', make: '', model: '', year: '', colour: '', engineCapacity: '',
@@ -16,8 +17,11 @@ const EF = {
 };
 
 export default function Vehicles() {
-  const { data, add, update, remove } = useStore();
+  const { data, add, update, remove, addOdometerReading, removeOdometerReading } = useStore();
   const [showAdd, setShowAdd] = useState(false);
+  const [readingForm, setReadingForm] = useState(null); // { reading, readAt, note } while the Record reading modal is open
+  const [showAllReadings, setShowAllReadings] = useState(false);
+  const RECENT_READINGS = 1;
   const [editV, setEditV] = useState(null);
   const [detailV, setDetailV] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
@@ -140,7 +144,11 @@ export default function Vehicles() {
     setSaving(true);
     try {
       if (editV) { await update('vehicles', editV.id, form); setEditV(null); }
-      else { await add('vehicles', form); setShowAdd(false); }
+      else {
+        const v = await add('vehicles', form);
+        if (form.odometer) await addOdometerReading({ vehicleId: v.id, reading: form.odometer, readAt: todayStr(), note: 'Starting reading' });
+        setShowAdd(false);
+      }
       setForm(EF);
     } finally { setSaving(false); }
   };
@@ -248,7 +256,9 @@ export default function Vehicles() {
         <div className="field"><label className="label">Purchase Price ($)</label><input className="input" type="number" min="0" value={form.purchasePrice} onChange={e => sf('purchasePrice', e.target.value)} placeholder="e.g. 3500" /></div>
       </div>
       <div className="grid-2">
-        <div className="field"><label className="label">Current Odometer (km)</label><input className="input" type="number" min="0" value={form.odometer} onChange={e => sf('odometer', e.target.value)} placeholder="e.g. 4250" /></div>
+        {editV
+          ? <div className="field"><label className="label">Odometer</label><div className="text-sm text-muted" style={{ paddingTop: 8 }}>{formatKm(editV.odometer)}{editV.odometerAt ? ` as at ${formatDate(editV.odometerAt)}` : ''}. Record new readings from the vehicle's Odometer section.</div></div>
+          : <div className="field"><label className="label">Starting Odometer (km)</label><input className="input" type="number" min="0" value={form.odometer} onChange={e => sf('odometer', e.target.value)} placeholder="e.g. 4250" /></div>}
         <div className="field"><label className="label">Next Service Date</label><input className="input" type="date" value={form.nextServiceDate} onChange={e => sf('nextServiceDate', e.target.value)} /></div>
       </div>
       <div className="form-divider"><span>Condition</span></div>
@@ -301,7 +311,7 @@ export default function Vehicles() {
                 const regoWarn = rd !== null && rd <= 30;
                 const makeModel = [v.make, v.model].filter(Boolean).join(' ') || v.name || '—';
                 return (
-                  <tr key={v.id} onClick={() => setDetailV(v)}>
+                  <tr key={v.id} onClick={() => { setDetailV(v); setShowAllReadings(false); }}>
                     <td>
                       <div className="fw-600">{v.plate}</div>
                       {v.name && <div className="text-sm text-muted">{v.name}</div>}
@@ -311,7 +321,7 @@ export default function Vehicles() {
                       <div className="text-sm text-muted">{v.year || ''} · <span style={{ textTransform: 'capitalize' }}>{v.type}</span></div>
                     </td>
                     <td className="text-muted col-hide-mobile">{v.colour || '—'}</td>
-                    <td className="text-muted col-hide-mobile">{v.odometer ? Number(v.odometer).toLocaleString() + ' km' : '—'}</td>
+                    <td className="text-muted col-hide-mobile">{v.odometer ? <>{Number(v.odometer).toLocaleString()} km{v.odometerAt && <div className="text-sm">{formatDate(v.odometerAt)}</div>}</> : '—'}</td>
                     <td>{statusBadge(v.status)}</td>
                     <td className="col-hide-mobile">{v.purchaseDate ? formatDate(v.purchaseDate) : '—'}</td>
                     <td style={{ color: regoWarn ? (rd < 0 ? 'var(--red)' : 'var(--amber)') : 'inherit' }}>
@@ -339,6 +349,24 @@ export default function Vehicles() {
         {renderForm()}
       </Modal>
 
+      <Modal open={!!readingForm} onClose={() => setReadingForm(null)} title={`Record odometer reading${selected ? ` · ${selected.plate}` : ''}`} width={440}
+        footer={<><button className="btn btn-secondary" onClick={() => setReadingForm(null)}>Cancel</button><button className="btn btn-primary" disabled={saving || !readingForm?.reading || !readingForm?.readAt} onClick={async () => {
+          if (!confirmOdometer(data.odometerReadings, selected.id, readingForm.reading, readingForm.readAt)) return;
+          setSaving(true);
+          try { await addOdometerReading({ vehicleId: selected.id, ...readingForm }); setReadingForm(null); } finally { setSaving(false); }
+        }}>{saving ? 'Saving…' : 'Save reading'}</button></>}>
+        {readingForm && (
+          <>
+            <div className="grid-2">
+              <div className="field"><label className="label">Odometer (km) *</label><input className="input" type="number" min="0" autoFocus value={readingForm.reading} onChange={e => setReadingForm(f => ({ ...f, reading: e.target.value }))} placeholder="e.g. 4250" /></div>
+              <div className="field"><label className="label">Date *</label><input className="input" type="date" value={readingForm.readAt} onChange={e => setReadingForm(f => ({ ...f, readAt: e.target.value }))} /></div>
+            </div>
+            <div className="field"><label className="label">Note</label><input className="input" value={readingForm.note} onChange={e => setReadingForm(f => ({ ...f, note: e.target.value }))} placeholder="e.g. Checked in the garage" /></div>
+            <span className="field-hint">The vehicle's current odometer is always the latest-dated reading, whichever form it came from.</span>
+          </>
+        )}
+      </Modal>
+
       <Modal open={!!editV} onClose={() => setEditV(null)} title="Edit Vehicle" width={560}
         footer={<><button className="btn btn-secondary" onClick={() => setEditV(null)}>Cancel</button><button className="btn btn-primary" onClick={saveVehicle} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button></>}>
         {renderForm()}
@@ -363,7 +391,7 @@ export default function Vehicles() {
               {selected.year && <div><div className="label">Year</div><div style={{ marginTop: 3 }}>{selected.year}</div></div>}
               {selected.colour && <div><div className="label">Colour</div><div style={{ marginTop: 3 }}>{selected.colour}</div></div>}
               {selected.engineCapacity && <div><div className="label">Engine</div><div style={{ marginTop: 3 }}>{selected.engineCapacity}</div></div>}
-              {selected.odometer && <div><div className="label">Current Odometer</div><div style={{ marginTop: 3, fontWeight: 600 }}>{Number(selected.odometer).toLocaleString()} km</div></div>}
+              {selected.odometer && <div><div className="label">Current Odometer</div><div style={{ marginTop: 3, fontWeight: 600 }}>{Number(selected.odometer).toLocaleString()} km</div>{selected.odometerAt && <div className="text-sm text-muted">{formatDate(selected.odometerAt)} · {ODOMETER_SOURCES[selected.odometerSource] || selected.odometerSource}</div>}</div>}
               {selected.purchaseDate && <div><div className="label">Purchase Date</div><div style={{ marginTop: 3 }}>{formatDate(selected.purchaseDate)}</div></div>}
               {selected.purchasePrice && <div><div className="label">Purchase Price</div><div style={{ marginTop: 3 }}>${Number(selected.purchasePrice).toLocaleString()}</div></div>}
               {selected.nextServiceDate && (
@@ -380,6 +408,41 @@ export default function Vehicles() {
               </div>
             )}
             {selected.notes && <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '12px 14px', marginBottom: 20, fontSize: 14, color: 'var(--muted)' }}>{selected.notes}</div>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div className="drawer-section-title" style={{ marginBottom: 0 }}>Odometer</div>
+              <button className="btn btn-secondary btn-sm" onClick={() => setReadingForm({ reading: '', readAt: todayStr(), note: '' })}>+ Record reading</button>
+            </div>
+            {(() => {
+              const rows = readingsFor(data.odometerReadings, selected.id);
+              if (rows.length === 0) return <p className="text-sm text-muted mb-20">No readings yet. Rental starts, returns and services add them automatically.</p>;
+              const shown = showAllReadings ? rows : rows.slice(0, RECENT_READINGS);
+              return (
+                <div className="mb-20">
+                  {shown.map((r, i) => {
+                    const prev = rows[i + 1];
+                    const diff = prev ? Number(r.reading) - Number(prev.reading) : null;
+                    return (
+                      <div key={r.id} className="history-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <div>
+                            <div className="fw-600" style={{ fontSize: 14 }}>{formatKm(r.reading)} {i === 0 && <Badge variant="green">Current</Badge>}</div>
+                            <div className="text-sm text-muted">{formatDate(r.readAt)} · {ODOMETER_SOURCES[r.source] || r.source}{diff !== null && <span style={{ color: diff < 0 ? 'var(--red)' : 'inherit' }}> · {diff >= 0 ? '+' : ''}{diff.toLocaleString()} km</span>}</div>
+                            {r.note && <div className="text-sm" style={{ marginTop: 2 }}>{r.note}</div>}
+                          </div>
+                          {r.source === 'manual' && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => { if (window.confirm('Delete this reading?')) removeOdometerReading(r.id); }}>Delete</button>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {rows.length > RECENT_READINGS && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => setShowAllReadings(v => !v)}>
+                      {showAllReadings ? 'Show latest only' : `Show history (${rows.length - 1} more)`}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="drawer-section-title">Registration Certificate</div>
             <div style={{ marginBottom: 20 }}>
               {selected.regoDocPath ? (

@@ -62,7 +62,7 @@ export default function CustomerIntake() {
         emergency_phone:   form.emergencyPhone || null,
         hotel_address:     form.hotelAddress || null,
         license_ref:       needsLicence ? (form.licenseRef || null) : null,
-        licence_photo:     needsLicence ? (form.licencePhoto || null) : null,
+        licence_photo:     form.licencePhoto || null,
         vehicle_type:      form.vehicleType,
         notes:             'Submitted via intake form',
       });
@@ -208,26 +208,30 @@ export default function CustomerIntake() {
               </div>
             </div>
 
-            {/* Driver's Licence — only for vehicles that need one */}
-            {needsLicence && (<>
+            {/* Driver's Licence (scooter, car) or optional photo ID (e-bike) */}
+            {form.vehicleType && (<>
             <div style={dividerStyle}>
               <div style={{ flex: 1, height: 1, background: '#e0dfd8' }} />
-              <span>Driver&apos;s Licence</span>
+              <span>{needsLicence ? "Driver's Licence" : 'Photo ID'}</span>
               <div style={{ flex: 1, height: 1, background: '#e0dfd8' }} />
             </div>
+            {needsLicence && (
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Licence Number</label>
+                <input style={inputStyle} value={form.licenseRef} onChange={e => sf('licenseRef', e.target.value)} placeholder="Your driver's licence number" />
+              </div>
+            )}
             <div style={fieldStyle}>
-              <label style={labelStyle}>Licence Number</label>
-              <input style={inputStyle} value={form.licenseRef} onChange={e => sf('licenseRef', e.target.value)} placeholder="Your driver's licence number" />
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Licence Photo / Scan *</label>
+              <label style={labelStyle}>{needsLicence ? 'Licence Photo / Scan *' : 'Photo ID'}</label>
               <p style={{ fontSize: 13, color: '#888', marginBottom: 8, lineHeight: 1.5 }}>
-                Take a photo, use your camera, or upload a file (JPG, PNG, PDF). Max 10MB.
+                {needsLicence
+                  ? 'Take a photo, use your camera, or upload a file (JPG, PNG, PDF). Max 10MB.'
+                  : 'Please upload a photo of your driver\'s licence, passport or other photo ID so we can confirm who the e-bike is hired to. JPG, PNG or PDF, max 10MB.'}
               </p>
               {form.licencePhoto ? (
                 <div>
                   {isImage
-                    ? <img src={form.licencePhoto} alt="Licence" style={{ maxWidth: '100%', borderRadius: 10, border: '1.5px solid #e0dfd8', marginBottom: 8 }} />
+                    ? <img src={form.licencePhoto} alt={needsLicence ? 'Licence' : 'Photo ID'} style={{ maxWidth: '100%', borderRadius: 10, border: '1.5px solid #e0dfd8', marginBottom: 8 }} />
                     : (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#f7f6f2', border: '1.5px solid #e0dfd8', borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useFinance } from '../../finance/FinanceContext';
 import { useStore } from '../../context/StoreContext';
 import { useSuggestions } from '../../finance/useSuggestions';
-import { addMonths, categoryLabel, categoriesOfType, fyLabel, fyMonths, fyOf, money, money0, monthKey, monthLabel, summarise } from '../../finance/categories';
+import { addMonths, categoryLabel, categoryShort, categoriesOfType, fyLabel, fyMonths, fyOf, money, money0, monthKey, monthLabel, summarise } from '../../finance/categories';
 import { inRange, monthlySummaries, categoryByMonth, bondsHeld } from '../../finance/reports';
 import { generateForecast } from '../../finance/forecast';
 import { formatDate, todayStr } from '../../utils/dates';
@@ -150,7 +150,6 @@ export default function Overview({ go }) {
           </tbody>
         </table></div>
       </div>
-      <style>{`@media (max-width: 900px) { .fin-overview-grid { grid-template-columns: 1fr !important; } }`}</style>
     </div>
   );
 }
@@ -158,10 +157,10 @@ export default function Overview({ go }) {
 function GridGroup({ label, rows, months, fmt }) {
   return (
     <>
-      <tr className="group"><td colSpan={months.length + 2}>{label}</td></tr>
+      <tr className="group"><td>{label}</td><td colSpan={months.length + 1} /></tr>
       {rows.map(r => (
         <tr key={r.category}>
-          <td>{categoryLabel(r.category)}</td>
+          <td title={categoryLabel(r.category)}>{categoryShort(r.category)}</td>
           {months.map(m => { const c = r.cells[m]; return <td key={m} className={`${c.kind === 'current' ? 'current' : c.kind === 'forecast' ? 'forecast' : ''}${c.override ? ' override' : ''}`} title={c.origin || (c.kind === 'current' ? `Month to date ${money(c.mtd)}` : '')}>{fmt(c.value)}</td>; })}
           <td style={{ fontWeight: 700 }}>{money0(months.reduce((s, m) => s + r.cells[m].value, 0))}</td>
         </tr>

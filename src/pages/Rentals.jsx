@@ -8,6 +8,7 @@ import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
 import { formatDate, daysBetween, todayStr, ageOn, isYoungRenter } from '../utils/dates';
 import { BOND_STATUSES, BOND_RETAIN_REASONS, bondLabel, bondVariant, closedBondStatus } from '../utils/bond';
+import { confirmOdometer, latestReading, describeReading } from '../utils/odometer';
 
 const EF = {
   customerId: '', vehicleId: '', startDate: todayStr(), endDate: '', contractNumber: '', notes: '', odometer: '', price: '', billingPeriod: 'weekly',
@@ -68,7 +69,7 @@ function CustomerPicker({ customers, value, onChange, startDate }) {
 }
 
 export default function Rentals() {
-  const { data, add, update, remove } = useStore();
+  const { data, add, update, remove, refresh } = useStore();
   const navigate = useNavigate();
   const [tab, setTab] = useState('active');
   const [showCreate, setShowCreate] = useState(false);
@@ -185,10 +186,12 @@ export default function Rentals() {
     if (!form.vehicleId) { alert('Please select a vehicle'); return; }
     if (!form.startDate) { alert('Start date is required'); return; }
     const bondAmount = form.bond.amount || data.settings?.defaultBond || '300';
+    if (form.odometer && !confirmOdometer(data.odometerReadings, form.vehicleId, form.odometer, form.startDate)) return;
     setSaving(true);
     try {
       const rental = await add('rentals', { ...form, bond: { ...form.bond, amount: bondAmount }, status: 'active' });
       await update('vehicles', form.vehicleId, { status: 'rented' });
+      await refresh(); // odometer log and vehicle odometer are updated by database triggers
       setShowCreate(false);
       setForm(EF);
       if (window.confirm('Rental created! Generate contract now?')) {
@@ -201,6 +204,7 @@ export default function Rentals() {
     if (!form.customerId) { alert('Please select a customer'); return; }
     if (!form.vehicleId) { alert('Please select a vehicle'); return; }
     if (!form.startDate) { alert('Start date is required'); return; }
+    if (form.odometer && !confirmOdometer(data.odometerReadings, form.vehicleId, form.odometer, form.startDate, editR.id)) return;
     setSaving(true);
     try {
       // If vehicle changed on an active rental, update both vehicle statuses
@@ -209,6 +213,7 @@ export default function Rentals() {
         await update('vehicles', form.vehicleId, { status: 'rented' });
       }
       await update('rentals', editR.id, { ...form });
+      await refresh(); // odometer log and vehicle odometer are updated by database triggers
       // Refresh the detail drawer if it's open for this rental
       if (detailR?.id === editR.id) setDetailR({ ...detailR, ...form });
       setEditR(null);
@@ -223,6 +228,7 @@ export default function Rentals() {
 
   const endRental = async () => {
     const r = endR;
+    if (odometerReturn.trim() && !confirmOdometer(data.odometerReadings, r.vehicleId, odometerReturn.trim(), todayStr())) return;
     let bondUpdate = r.bond ? { ...r.bond } : r.bond;
     let noteAppend = r.notes;
     if (r.bond?.amount && r.bond.status === 'held') {
@@ -244,9 +250,8 @@ export default function Rentals() {
     }
     const returnKm = odometerReturn.trim();
     await update('rentals', r.id, { status: 'completed', endDate: todayStr(), bond: bondUpdate, notes: noteAppend, odometerReturn: returnKm || null });
-    const vehicleUpdate = { status: 'available' };
-    if (returnKm) vehicleUpdate.odometer = returnKm;
-    await update('vehicles', r.vehicleId, vehicleUpdate);
+    await update('vehicles', r.vehicleId, { status: 'available' });
+    if (returnKm) await refresh(); // the return reading goes into the odometer log via a trigger
     const endedCustomer = data.customers.find(c => c.id === r.customerId);
     if (endedCustomer?.email) {
       callEdgeFunction('send-review-email', { rental_id: r.id, customer_email: endedCustomer.email, customer_name: endedCustomer.name });
@@ -319,6 +324,7 @@ export default function Rentals() {
           <div className="field">
             <label className="label">Odometer (km)</label>
             <input className="input" type="number" min="0" value={form.odometer} onChange={e => sf('odometer', e.target.value)} placeholder="e.g. 4250" />
+            {(() => { const l = latestReading(data.odometerReadings, form.vehicleId); return l ? <span className="field-hint">Last reading {describeReading(l)}</span> : null; })()}
           </div>
         </div>
       )}

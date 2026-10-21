@@ -10,11 +10,12 @@ import { autoMatches, linkedLine } from '../finance/maintenanceLink';
 import { money } from '../finance/categories';
 import MaintenanceLinkModal from '../components/MaintenanceLinkModal';
 import { CHECKLIST_TEMPLATES, templateFor, buildChecklist, checklistProgress, templateGroups } from '../utils/serviceChecklist';
+import { confirmOdometer, latestReading, describeReading } from '../utils/odometer';
 
 const EF = { vehicleId: '', type: 'service', description: '', date: todayStr(), nextServiceDate: '', cost: '', odometer: '', checklist: null };
 
 export default function Maintenance() {
-  const { data, add, update, remove } = useStore();
+  const { data, add, update, remove, refresh } = useStore();
   const fin = useFinance();
   const [tab, setTab] = useState('log');
   const [linkFor, setLinkFor] = useState(null);
@@ -106,13 +107,12 @@ export default function Maintenance() {
   const save = async () => {
     if (!form.vehicleId) { alert('Please select a vehicle'); return; }
     if (!form.date) { alert('Date is required'); return; }
+    if (form.odometer && !confirmOdometer(data.odometerReadings, form.vehicleId, form.odometer, form.date)) return;
     setSaving(true);
     try {
       await add('maintenance', { ...form });
-      const vehicleUpdate = {};
-      if (form.nextServiceDate) vehicleUpdate.nextServiceDate = form.nextServiceDate;
-      if (form.odometer) vehicleUpdate.odometer = form.odometer;
-      if (Object.keys(vehicleUpdate).length) await update('vehicles', form.vehicleId, vehicleUpdate);
+      if (form.nextServiceDate) await update('vehicles', form.vehicleId, { nextServiceDate: form.nextServiceDate });
+      if (form.odometer) await refresh(); // the reading goes into the odometer log via a trigger
       setShowAdd(false);
       setForm(EF);
     } finally { setSaving(false); }
@@ -121,13 +121,12 @@ export default function Maintenance() {
   const saveEdit = async () => {
     if (!form.vehicleId) { alert('Please select a vehicle'); return; }
     if (!form.date) { alert('Date is required'); return; }
+    if (form.odometer && !confirmOdometer(data.odometerReadings, form.vehicleId, form.odometer, form.date, editM.id)) return;
     setSaving(true);
     try {
       await update('maintenance', editM.id, { ...form });
-      const vehicleUpdate = {};
-      if (form.nextServiceDate) vehicleUpdate.nextServiceDate = form.nextServiceDate;
-      if (form.odometer) vehicleUpdate.odometer = form.odometer;
-      if (Object.keys(vehicleUpdate).length) await update('vehicles', form.vehicleId, vehicleUpdate);
+      if (form.nextServiceDate) await update('vehicles', form.vehicleId, { nextServiceDate: form.nextServiceDate });
+      await refresh(); // editing an old entry no longer overwrites the vehicle; the log is recomputed by date
       setEditM(null);
       setForm(EF);
     } finally { setSaving(false); }
@@ -205,6 +204,7 @@ export default function Maintenance() {
         <div className="field">
           <label className="label">Odometer (km)</label>
           <input className="input" type="number" min="0" value={form.odometer} onChange={e => sf('odometer', e.target.value)} placeholder="e.g. 4250" />
+          {(() => { const l = latestReading(data.odometerReadings, form.vehicleId); return l ? <span className="field-hint">Last reading {describeReading(l)}</span> : null; })()}
         </div>
       </div>
       <div className="field"><label className="label">Description</label><textarea className="textarea" rows={3} value={form.description} onChange={e => sf('description', e.target.value)} placeholder="What was done?" /></div>

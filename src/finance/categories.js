@@ -46,6 +46,8 @@ export const CATEGORIES = [
 const BY_ID = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 
 export const categoryLabel = (id) => BY_ID[id]?.label || (id ? id : 'Uncategorised');
+// Label without the bracketed explanation, for tight grids and card subtitles.
+export const categoryShort = (id) => categoryLabel(id).replace(/\s*\(.*$/, '');
 export const categoryType  = (id) => BY_ID[id]?.type || null;
 export const categoryTypeNote = (id) => { const t = categoryType(id); return t ? CATEGORY_TYPES[t].note : 'Needs a category'; };
 export const categoriesOfType = (type) => CATEGORIES.filter(c => c.type === type);

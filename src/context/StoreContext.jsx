@@ -14,6 +14,7 @@ const vehicleFromDb = (v) => ({
   conditionNotes: v.condition_notes, notes: v.notes,
   regoDocPath: v.rego_doc_path || null,
   odometer: v.odometer ? String(v.odometer) : '',
+  odometerAt: v.odometer_at || null, odometerSource: v.odometer_source || null,
 });
 
 const vehicleToDb = (v) => ({
@@ -25,7 +26,7 @@ const vehicleToDb = (v) => ({
   purchase_price: v.purchasePrice ? Number(v.purchasePrice) : null,
   condition_notes: v.conditionNotes || null, notes: v.notes || null,
   rego_doc_path: v.regoDocPath || null,
-  odometer: v.odometer ? Number(v.odometer) : null,
+  // odometer, odometer_at and odometer_source are derived by a trigger from odometer_readings
 });
 
 // licence_photo is a base64 data URL and can be several MB per row — never fetched in bulk,
@@ -126,6 +127,11 @@ const DEFAULT_SETTINGS = {
   insuranceExcess: '700',
 };
 
+const readingFromDb = (r) => ({
+  id: r.id, vehicleId: r.vehicle_id, reading: r.reading, readAt: r.read_at,
+  source: r.source, sourceId: r.source_id || null, note: r.note || '', createdAt: r.created_at,
+});
+
 const signingFromDb = (s) => ({
   id: s.id, rentalId: s.rental_id, token: s.token, status: s.status,
   signerName: s.signer_name, signerIp: s.signer_ip,
@@ -133,7 +139,7 @@ const signingFromDb = (s) => ({
 });
 
 export function StoreProvider({ children }) {
-  const [data, setData] = useState({ vehicles: [], customers: [], rentals: [], maintenance: [], settings: DEFAULT_SETTINGS, signingRequests: [] });
+  const [data, setData] = useState({ vehicles: [], customers: [], rentals: [], maintenance: [], settings: DEFAULT_SETTINGS, signingRequests: [], odometerReadings: [] });
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState({});
 
@@ -146,6 +152,7 @@ export function StoreProvider({ children }) {
       { key: 'maintenance',     fromDb: maintenanceFromDb, query: supabase.from('maintenance').select('*').order('created_at') },
       { key: 'settings',        fromDb: settingsFromDb,    query: supabase.from('settings').select('*').eq('id', 1).single() },
       { key: 'signingRequests', fromDb: signingFromDb,     query: supabase.from('signing_requests').select('*').order('created_at', { ascending: false }) },
+      { key: 'odometerReadings', fromDb: readingFromDb,    query: supabase.from('odometer_readings').select('*').order('read_at', { ascending: false }) },
     ];
     await Promise.allSettled(fetches.map(async ({ key, fromDb, query }) => {
       const { data: rows, error } = await query;
@@ -192,6 +199,22 @@ export function StoreProvider({ children }) {
     const { error } = await supabase.from(type).delete().eq('id', id);
     if (error) throw error;
     setData(d => ({ ...d, [type]: d[type].filter(i => i.id !== id) }));
+    // Deleting a rental or service entry removes its odometer readings by trigger; reload the derived vehicle figure.
+    if (type === 'rentals' || type === 'maintenance') await refresh();
+  };
+
+  // Manual odometer readings. Rental and service readings are mirrored by database triggers, and the
+  // vehicle's current odometer is recomputed server-side, so reload after every change.
+  const addOdometerReading = async ({ vehicleId, reading, readAt, note }) => {
+    const { error } = await supabase.from('odometer_readings').insert({ vehicle_id: vehicleId, reading: Number(reading), read_at: readAt, source: 'manual', note: note || null });
+    if (error) throw error;
+    await refresh();
+  };
+
+  const removeOdometerReading = async (id) => {
+    const { error } = await supabase.from('odometer_readings').delete().eq('id', id);
+    if (error) throw error;
+    await refresh();
   };
 
   const updateSettings = async (updates) => {
@@ -202,7 +225,7 @@ export function StoreProvider({ children }) {
   };
 
   return (
-    <StoreContext.Provider value={{ data, loading, errors, add, update, remove, updateSettings, refresh, getCustomerPhoto }}>
+    <StoreContext.Provider value={{ data, loading, errors, add, update, remove, updateSettings, refresh, getCustomerPhoto, addOdometerReading, removeOdometerReading }}>
       {children}
     </StoreContext.Provider>
   );

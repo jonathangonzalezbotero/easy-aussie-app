@@ -181,12 +181,12 @@ export default function FinanceSettings({ go }) {
             <div className="field"><label className="label">Target occupancy · {Math.round(settings.targetOccupancy * 100)}%</label>
               <input type="range" min="0" max="100" step="5" value={Math.round(settings.targetOccupancy * 100)} onChange={e => setS('targetOccupancy', Number(e.target.value) / 100)} />
               <span className="field-hint">Share of each week a rentable vehicle is out on hire.</span></div>
-            <table className="table"><thead><tr><th>Vehicle type</th><th>Rentable</th><th>Weekly rate</th><th style={{ textAlign: 'right' }}>At target</th></tr></thead>
+            <div className="table-wrap"><table className="table"><thead><tr><th>Vehicle type</th><th>Rentable</th><th>Weekly rate</th><th style={{ textAlign: 'right' }}>At target</th></tr></thead>
               <tbody>
-                <tr style={{ cursor: 'default' }}><td>Scooter</td><td>{scooters}</td><td><input className="input" type="number" style={{ width: 90, padding: '5px 8px' }} value={settings.scooterWeeklyRate} onChange={e => setS('scooterWeeklyRate', Number(e.target.value))} /></td><td style={{ textAlign: 'right' }}>{money0(scooters * settings.scooterWeeklyRate * settings.targetOccupancy)}</td></tr>
-                <tr style={{ cursor: 'default' }}><td>E-bike</td><td>{ebikes}</td><td><input className="input" type="number" style={{ width: 90, padding: '5px 8px' }} value={settings.ebikeWeeklyRate} onChange={e => setS('ebikeWeeklyRate', Number(e.target.value))} /></td><td style={{ textAlign: 'right' }}>{money0(ebikes * settings.ebikeWeeklyRate * settings.targetOccupancy)}</td></tr>
+                <tr style={{ cursor: 'default' }}><td>Scooter</td><td>{scooters}</td><td><input className="input" type="number" style={{ width: 80, padding: '5px 8px' }} value={settings.scooterWeeklyRate} onChange={e => setS('scooterWeeklyRate', Number(e.target.value))} /></td><td style={{ textAlign: 'right' }}>{money0(scooters * settings.scooterWeeklyRate * settings.targetOccupancy)}</td></tr>
+                <tr style={{ cursor: 'default' }}><td>E-bike</td><td>{ebikes}</td><td><input className="input" type="number" style={{ width: 80, padding: '5px 8px' }} value={settings.ebikeWeeklyRate} onChange={e => setS('ebikeWeeklyRate', Number(e.target.value))} /></td><td style={{ textAlign: 'right' }}>{money0(ebikes * settings.ebikeWeeklyRate * settings.targetOccupancy)}</td></tr>
                 <tr style={{ cursor: 'default' }}><td className="fw-600">Fleet target</td><td className="fw-600">{scooters + ebikes}</td><td></td><td className="fw-600" style={{ textAlign: 'right' }}>{money0(weeklyTarget)} / week</td></tr>
-              </tbody></table>
+              </tbody></table></div>
             <div className="text-sm text-muted">Rentable = Available, Rented or Maintenance. Stolen and Sold vehicles are excluded. About {money0(weeklyTarget * 52 / 12)} a month.</div>
           </div>
         </Section>
