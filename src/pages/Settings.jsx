@@ -47,6 +47,11 @@ export default function Settings() {
               <input className="input" type="number" min="0" value={form.defaultBond || ''} onChange={e => sf('defaultBond', e.target.value)} />
               <span className="field-hint">Used as default when creating new rentals</span>
             </div>
+            <div className="field">
+              <label className="label">Insurance Excess per Claim ($)</label>
+              <input className="input" type="number" min="0" value={form.insuranceExcess || ''} onChange={e => sf('insuranceExcess', e.target.value)} />
+              <span className="field-hint">Shown in the contract as the amount charged to the card on file per insurance claim (scooters and cars)</span>
+            </div>
             <div>
               <button className="btn btn-primary" onClick={save} disabled={saving}>
                 {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Settings'}

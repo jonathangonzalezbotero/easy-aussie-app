@@ -139,15 +139,21 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
         {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : ongoing]].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
-    { num: '3', title: 'Payment & Security Bond', content: (
+    { num: '3', title: 'Payment, Security Bond & Card Authorisation', content: (
       <div style={bodyText}>
         <RateBlock />
-        <p style={{ marginBottom: 8 }}>Rental fees must be paid before scooter key handover.</p>
-        <p style={{ marginBottom: 8 }}>A refundable security bond of <strong>${d.bondAmount} AUD</strong> is required.</p>
-        <p style={{ marginBottom: 4 }}>The bond may be used to cover:</p>
-        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
-          {['Insurance excess', 'Damage, loss, or theft', 'Traffic fines, tolls, penalties', 'Late return, cleaning, or recovery costs'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
-        </ul>
+        <div><strong>3.1 Rental Fee</strong><p>The Rental Fee of <strong>{d.price ? `$${fmtMoney(d.price)} AUD ${perUnit}` : `$_______________ AUD ${perUnit}`}</strong> must be paid in full via bank transfer or an approved payment method prior to scooter key handover.</p></div>
+        <div style={{ marginTop: 10 }}><strong>3.2 Security Bond &amp; Card on File</strong><p>The Renter must provide a security deposit of <strong>${d.bondAmount} AUD</strong> via bank transfer or credit/debit card. Additionally, the Renter agrees to provide a valid credit or debit card to be securely stored on file via the Owner's digital payment gateway (e.g. Stripe) for the duration of the rental period.</p></div>
+        <div style={{ marginTop: 10 }}><strong>3.3 Authority to Charge Saved Card</strong><p style={{ marginBottom: 4 }}>The Renter explicitly authorises the Owner to automatically charge the saved credit/debit card on file to recover any outstanding balances, costs, or liabilities incurred under this Agreement. The card on file may be charged for:</p>
+          <ul style={{ marginLeft: 20, marginBottom: 8 }}>
+            {[
+              `The standard insurance excess of $${fmtMoney(d.insuranceExcess)} AUD per claim in the event of an accident, third-party property damage, or insurance claim.`,
+              'The full cost of repairs, replacement, or loss resulting from damage, neglect, or theft of the moped (as no comprehensive insurance is included).',
+              'Unpaid traffic infringements, parking fines, tolls, speed camera penalties, and associated administrative processing fees.',
+              'Late return fees, professional cleaning fees, or vehicle recovery/towing costs.',
+            ].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+          </ul>
+        </div>
         <p>Bond refunds are processed after inspection to check for fines and may take up to 24 hours.</p>
       </div>
     )},
@@ -166,14 +172,25 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
         <div style={{ marginTop: 10 }}><strong>5.3 Insurance</strong><p>The moped is covered by <strong>Compulsory Third Party (CTP)</strong> insurance, which covers bodily injury to other people, and <strong>Third Party Property Damage</strong> insurance, which covers damage to other people's property caused by the Renter. Neither policy covers damage to or theft of the moped itself. The Renter remains fully liable for any loss or damage to the moped.</p></div>
       </div>
     )},
-    { num: '7', title: 'Condition of the Scooter', content: (
+    { num: '6', title: 'Condition & Pre-Ride Inspection', content: (
       <div style={bodyText}>
-        <p><strong>At the Start:</strong> The Owner confirms the moped is in good working and roadworthy condition.</p>
+        <div><strong>6.1 Owner's Declaration</strong><p>The Owner confirms the moped is supplied in good working and roadworthy condition. Existing cosmetic damage at the time of handover is strictly limited to:</p></div>
         <div style={{ border: '1px solid #d0d0cc', borderRadius: 8, padding: '12px 14px', margin: '8px 0' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Existing damage (if any)</div>
           <div style={{ fontSize: 13.5, minHeight: 28, color: d.vehicleCondition ? '#c05000' : '#999' }}>{d.vehicleCondition || 'None'}</div>
         </div>
-        <p><strong>At the End:</strong> The Renter must return the moped in the same condition, except for fair wear and tear, and with the same level of fuel.</p>
+        <div style={{ marginTop: 10 }}><strong>6.2 Renter's Pre-Ride Inspection</strong><p style={{ marginBottom: 4 }}>Before taking physical possession of the keys and operating the vehicle on public roads, the Renter is legally required to conduct an on-site physical inspection and hereby confirms that:</p>
+          <ul style={{ marginLeft: 20, marginBottom: 8 }}>
+            {[
+              'The front and rear brakes are fully responsive and functional.',
+              'All lights, turn signals, and the horn operate correctly.',
+              'The tyres are inflated, have visible tread, and show no obvious cracks, wear, or defects.',
+              'The steering column moves freely, securely, and without catching.',
+            ].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+          </ul>
+        </div>
+        <div style={{ marginTop: 10 }}><strong>6.3 Acceptance of Risk &amp; Mechanical Soundness</strong><p>By signing this Agreement and taking possession of the vehicle on the street, the Renter acknowledges they have inspected the vehicle on-site, find it structurally and mechanically safe to operate, and accept the moped in its current physical condition.</p></div>
+        <div style={{ marginTop: 10 }}><strong>6.4 Return Condition</strong><p>At the end of the rental period, the Renter must return the moped to the designated street location in the exact same condition, allowing only for reasonable fair wear and tear, and with the same level of fuel as provided at handover.</p></div>
       </div>
     )},
     { num: '8',  title: 'Prohibited Uses', content: (
@@ -213,15 +230,20 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
         {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : ongoing]].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
-    { num: '3', title: 'Payment & Security Bond', content: (
+    { num: '3', title: 'Payment, Security Bond & Card Authorisation', content: (
       <div style={bodyText}>
         <RateBlock />
-        <p style={{ marginBottom: 8 }}>Rental fees must be paid prior to e-bike handover.</p>
-        <p style={{ marginBottom: 8 }}>A refundable security bond of <strong>${d.bondAmount} AUD</strong> is required.</p>
-        <p style={{ marginBottom: 4 }}>The bond may be used to cover:</p>
-        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
-          {['Damage, loss, or theft of the e-bike or accessories', 'Traffic fines or penalties incurred during the rental', 'Late return or recovery costs', 'Cleaning costs where the e-bike is returned in an unacceptable condition'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
-        </ul>
+        <div><strong>3.1 Rental Fee</strong><p>The Rental Fee of <strong>{d.price ? `$${fmtMoney(d.price)} AUD ${perUnit}` : `$_______________ AUD ${perUnit}`}</strong> must be paid in full via bank transfer or an approved payment method prior to e-bike handover.</p></div>
+        <div style={{ marginTop: 10 }}><strong>3.2 Security Bond &amp; Card on File</strong><p>The Renter must provide a security deposit of <strong>${d.bondAmount} AUD</strong> via bank transfer or credit/debit card. Additionally, the Renter agrees to provide a valid credit or debit card to be securely stored on file via the Owner's digital payment gateway (e.g. Stripe) for the duration of the rental period.</p></div>
+        <div style={{ marginTop: 10 }}><strong>3.3 Authority to Charge Saved Card</strong><p style={{ marginBottom: 4 }}>The Renter explicitly authorises the Owner to automatically charge the saved credit/debit card on file to recover any outstanding balances, costs, or liabilities incurred under this Agreement. The card on file may be charged for:</p>
+          <ul style={{ marginLeft: 20, marginBottom: 8 }}>
+            {[
+              'The full cost of repairs, replacement, or loss resulting from damage, neglect, or theft of the e-bike or its accessories (no insurance is included).',
+              'Unpaid traffic infringements, fines, penalties, and associated administrative processing fees.',
+              'Late return fees, professional cleaning fees where the e-bike is returned in an unacceptable condition, or recovery costs.',
+            ].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+          </ul>
+        </div>
         <p>Bond refunds are processed after inspection and may take up to 24 hours.</p>
       </div>
     )},
@@ -285,15 +307,21 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
         {[['Start Date', fmtDate(d.startDate)], ['End Date', d.endDate ? fmtDate(d.endDate) : ongoing]].map(([l, v]) => <Field key={l} label={l} value={v} />)}
       </div>
     )},
-    { num: '3', title: 'Payment & Security Bond', content: (
+    { num: '3', title: 'Payment, Security Bond & Card Authorisation', content: (
       <div style={bodyText}>
         <RateBlock />
-        <p style={{ marginBottom: 8 }}>Rental fees must be paid before vehicle key handover.</p>
-        <p style={{ marginBottom: 8 }}>A refundable security bond of <strong>${d.bondAmount} AUD</strong> is required.</p>
-        <p style={{ marginBottom: 4 }}>The bond may be used to cover:</p>
-        <ul style={{ marginLeft: 20, marginBottom: 8 }}>
-          {['Insurance excess', 'Damage, loss, or theft of the vehicle', 'Traffic fines, tolls, or penalties', 'Late return, cleaning, refuelling, or recovery costs'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
-        </ul>
+        <div><strong>3.1 Rental Fee</strong><p>The Rental Fee of <strong>{d.price ? `$${fmtMoney(d.price)} AUD ${perUnit}` : `$_______________ AUD ${perUnit}`}</strong> must be paid in full via bank transfer or an approved payment method prior to vehicle key handover.</p></div>
+        <div style={{ marginTop: 10 }}><strong>3.2 Security Bond &amp; Card on File</strong><p>The Renter must provide a security deposit of <strong>${d.bondAmount} AUD</strong> via bank transfer or credit/debit card. Additionally, the Renter agrees to provide a valid credit or debit card to be securely stored on file via the Owner's digital payment gateway (e.g. Stripe) for the duration of the rental period.</p></div>
+        <div style={{ marginTop: 10 }}><strong>3.3 Authority to Charge Saved Card</strong><p style={{ marginBottom: 4 }}>The Renter explicitly authorises the Owner to automatically charge the saved credit/debit card on file to recover any outstanding balances, costs, or liabilities incurred under this Agreement. The card on file may be charged for:</p>
+          <ul style={{ marginLeft: 20, marginBottom: 8 }}>
+            {[
+              `The standard insurance excess of $${fmtMoney(d.insuranceExcess)} AUD per claim in the event of an accident, third-party property damage, or insurance claim.`,
+              'The full cost of repairs, replacement, or loss resulting from damage, neglect, or theft of the vehicle (as no comprehensive insurance is included).',
+              'Unpaid traffic infringements, parking fines, tolls, speed camera penalties, and associated administrative processing fees.',
+              'Late return fees, professional cleaning fees, refuelling costs, or vehicle recovery/towing costs.',
+            ].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
+          </ul>
+        </div>
         <p>Bond refunds are processed after inspection to check for damage and outstanding fines, and may take up to 24 hours.</p>
       </div>
     )},

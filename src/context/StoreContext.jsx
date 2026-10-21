@@ -109,11 +109,13 @@ const maintenanceToDb = (m) => ({
 const settingsFromDb = (s) => ({
   ownerCompany: s.owner_company, ownerABN: s.owner_abn,
   ownerResponsible: s.owner_responsible, defaultBond: s.default_bond,
+  insuranceExcess: s.insurance_excess,
 });
 
 const settingsToDb = (s) => ({
   owner_company: s.ownerCompany, owner_abn: s.ownerABN,
   owner_responsible: s.ownerResponsible, default_bond: s.defaultBond,
+  insurance_excess: s.insuranceExcess,
 });
 
 // ── Provider ─────────────────────────────────────────────────────────────────
@@ -121,6 +123,7 @@ const settingsToDb = (s) => ({
 const DEFAULT_SETTINGS = {
   ownerCompany: 'Easy Aussie AU Pty Ltd', ownerABN: '20 680 626 251',
   ownerResponsible: 'Jonathan Alexander Gonzalez Botero', defaultBond: '300',
+  insuranceExcess: '700',
 };
 
 const signingFromDb = (s) => ({

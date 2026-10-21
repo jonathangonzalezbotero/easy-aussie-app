@@ -96,7 +96,8 @@ create table if not exists settings (
   owner_company      text default 'Easy Aussie AU Pty Ltd',
   owner_abn          text default '20 680 626 251',
   owner_responsible  text default 'Jonathan Alexander Gonzalez Botero',
-  default_bond       text default '300'
+  default_bond       text default '300',
+  insurance_excess   text default '700'
 );
 
 -- Insert the single settings row

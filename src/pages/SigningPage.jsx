@@ -48,6 +48,7 @@ function buildD(rental, settings, signedName = null, signedAt = null) {
     startDate:        rental.start_date   || '',
     endDate:          rental.end_date     || '',
     bondAmount:       rental.bond_amount  ? String(rental.bond_amount) : (s.default_bond || '300'),
+    insuranceExcess:  s.insurance_excess || '700',
     price:            rental.price        || '',
     billingPeriod:    rental.billing_period || 'weekly',
     contractNumber:   rental.contract_number || '',

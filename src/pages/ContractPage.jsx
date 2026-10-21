@@ -54,6 +54,7 @@ export default function ContractPage() {
     startDate:        rental.startDate || '',
     endDate:          rental.endDate || '',
     bondAmount:       rental.bond?.amount || settings.defaultBond || '300',
+    insuranceExcess:  settings.insuranceExcess || '700',
     price:            rental.price || '',
     billingPeriod:    rental.billingPeriod || 'weekly',
     contractNumber:   rental.contractNumber || '',

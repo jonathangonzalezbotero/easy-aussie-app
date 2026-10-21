@@ -90,7 +90,7 @@ Setup: run `supabase/migration_finance.sql` then `supabase/migration_finance_pay
 - **Vehicles**: `{ id, plate, name, make, model, year, colour, status, regoExpiry, nextServiceDate, engineCapacity, type, fleetGroup, purchaseDate, conditionNotes, notes }`
 - **Customers**: `{ id, name, dateOfBirth, phone, email, address, occupation, emergencyContact, emergencyPhone, hotelAddress, licenseRef, licencePhoto, notes }`
 - **Rentals**: `{ id, customerId, vehicleId, startDate, endDate, status, bond: { amount, method, status, refundedAmount, retainedAmount, retainReason, refundMethod, refundDate }, rentPaidBy, stripeSubscriptionId, price, billingPeriod ("weekly" = price is per week | "fixed" = price is a single amount for the whole rental period, default weekly), shopifyRef, contractRef, notes }`
-- **Settings**: `{ ownerCompany, ownerABN, ownerResponsible, defaultBond }` — single row (id=1)
+- **Settings**: `{ ownerCompany, ownerABN, ownerResponsible, defaultBond, insuranceExcess }` — single row (id=1). `insuranceExcess` is the per-claim excess printed in contract clause 3.3 (`migration_insurance_excess.sql`).
 - **Finance** (`useFinance()`): `accounts`, `transactions` (with `splits`), `rules`, `recurring`, `overrides`, `imports`, `subscriptions`, `regoRenewals`, `settings` `{ cutoverDate, directorLoanOpening, directorLoanOpeningDate, targetOccupancy, scooterWeeklyRate, ebikeWeeklyRate, reminderEnabled, reminderEmail, stripeLastSync, stripeSyncFrom }`
 
 Dates are always `YYYY-MM-DD` strings. `formatDate` in `src/utils/dates.js` renders in Australian locale (en-AU).
