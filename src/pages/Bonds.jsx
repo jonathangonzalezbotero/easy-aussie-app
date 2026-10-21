@@ -126,7 +126,7 @@ export default function Bonds() {
         <h1 className="page-title">Bonds</h1>
       </div>
 
-      <div className="grid-4 mb-24" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div className="grid-4 fin-3 mb-24">
         <div className="stat-card" style={{ borderTopColor: 'var(--amber)', cursor: 'default' }}>
           <div className="stat-value" style={{ color: 'var(--amber)' }}>${totalHeld.toLocaleString()}</div>
           <div className="stat-label">Currently held</div>

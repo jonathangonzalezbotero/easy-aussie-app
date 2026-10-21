@@ -4,7 +4,9 @@ import { useStore } from '../context/StoreContext';
 import Badge from '../components/shared/Badge';
 import { bondLabel, bondVariant } from '../utils/bond';
 import EmptyState from '../components/shared/EmptyState';
-import { formatDate, daysUntil } from '../utils/dates';
+import { formatDate, daysUntil, todayStr } from '../utils/dates';
+import { useFinance } from '../finance/FinanceContext';
+import { overdueRentals } from '../finance/rent';
 
 export default function Dashboard() {
   const { data } = useStore();
@@ -56,6 +58,9 @@ export default function Dashboard() {
   const weeklyRevenue = weeklyRentals.reduce((s, r) => s + (Number(r.price) || 0), 0);
   const rentalsWithPrice = weeklyRentals.filter(r => r.price).length;
 
+  const fin = useFinance();
+  const overdue = fin && !fin.error && !fin.loading ? overdueRentals({ rentals: data.rentals, transactions: fin.transactions, subscriptions: fin.subscriptions, today: todayStr() }) : [];
+
   const alerts = [];
   data.vehicles.forEach(v => {
     if (v.status === 'stolen' || v.status === 'sold') return;
@@ -75,7 +80,7 @@ export default function Dashboard() {
     { label: 'Vehicles', value: data.vehicles.length, sub: `${availableVehicles.length} available`, color: 'var(--accent)', to: '/vehicles' },
     { label: 'Weekly Revenue', value: `$${weeklyRevenue.toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`, sub: `${weeklyRentals.length} weekly · ${rentalsWithPrice} priced${fixedCount ? ` · ${fixedCount} fixed-price excluded` : ''}`, color: 'var(--blue)', to: '/rentals' },
     { label: 'Bonds Held', value: `$${totalBondHeld.toLocaleString()}`, sub: `${heldBonds.length} outstanding`, color: 'var(--amber)', to: '/bonds' },
-    { label: 'Alerts', value: alerts.length, sub: alerts.length ? 'Needs attention' : 'All clear', color: alerts.length ? 'var(--red)' : 'var(--accent)', to: '/' },
+    { label: 'Alerts', value: alerts.length + overdue.length, sub: overdue.length ? `${overdue.length} rent overdue` : alerts.length ? 'Needs attention' : 'All clear', color: alerts.length + overdue.length ? 'var(--red)' : 'var(--accent)', to: '/' },
   ];
 
   return (
@@ -96,6 +101,31 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {overdue.length > 0 && (
+        <div className="card mb-20" style={{ borderColor: 'var(--red)' }}>
+          <div className="card-head"><span className="card-title">Rent not received</span><Badge variant="red">{overdue.length}</Badge></div>
+          {overdue.map(o => {
+            const c = data.customers.find(x => x.id === o.rental.customerId);
+            const v = data.vehicles.find(x => x.id === o.rental.vehicleId);
+            return (
+              <div key={o.rental.id} className="alert-row alert-danger" style={{ cursor: 'default', flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ flex: '1 1 240px', fontSize: 14 }}>
+                  <div className="fw-600">{c?.name || '—'} · {v?.plate || ''}{o.rental.contractNumber ? ` · ${o.rental.contractNumber}` : ''}</div>
+                  <div className="text-sm text-muted">{o.reason}.{o.lastPaid ? ` Last paid ${formatDate(o.lastPaid)}.` : ''}{o.amount ? ` Expected $${o.amount}${o.rental.billingPeriod === 'fixed' ? '' : ' / week'}.` : ''}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {c?.phone && <a className="btn btn-secondary btn-sm" href={`tel:${c.phone.replace(/\s/g, '')}`} style={{ textDecoration: 'none' }}>Call</a>}
+                  {c?.phone && <a className="btn btn-secondary btn-sm" href={`sms:${c.phone.replace(/\s/g, '')}?&body=${encodeURIComponent(`Hi ${(c.name || '').split(' ')[0]}, the weekly rent for the ${v?.name || v?.plate || 'scooter'} hasn't come through this week. Could you check the payment? Thanks, Easy Aussie`)}`} style={{ textDecoration: 'none' }}>Text</a>}
+                  {c?.email && <a className="btn btn-secondary btn-sm" href={`mailto:${c.email}`} style={{ textDecoration: 'none' }}>Email</a>}
+                  <button className="btn btn-ghost btn-sm" onClick={() => navigate('/rentals')}>Rental</button>
+                </div>
+              </div>
+            );
+          })}
+          <div className="text-sm text-muted" style={{ padding: '8px 20px' }}>Based on rental income lines in Finance (Stripe syncs daily) with a 2-day grace. A cash or bank payment counts once it is recorded or confirmed against the rental.</div>
+        </div>
+      )}
 
       <div className="card mb-20">
         <div className="card-head">

@@ -193,7 +193,7 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
           <div>
             {form.splits.map((s, i) => (
               <div key={i} className="fin-split-line">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px auto', gap: 8, alignItems: 'end' }}>
+                <div className="fin-split-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 110px auto', gap: 8, alignItems: 'end' }}>
                   <div className="field"><label className="label">Line {i + 1} · category</label><CategorySelect value={s.category} onChange={v => setSplit(i, 'category', v)} /></div>
                   <div className="field"><label className="label">Amount</label><input className="input" type="number" step="0.01" value={s.amount} onChange={e => setSplit(i, 'amount', e.target.value)} /></div>
                   <button className="btn btn-ghost btn-sm" onClick={() => setForm(f => ({ ...f, splits: f.splits.filter((_, j) => j !== i) }))} disabled={form.splits.length <= 2}>×</button>
@@ -303,7 +303,7 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
         <div className="field"><label className="label">Notes</label><textarea className="textarea" rows={2} value={form.notes} onChange={e => sf('notes', e.target.value)} placeholder="Add a note" /></div>
         {err && <div style={{ color: 'var(--red)', fontSize: 13 }}>{err}</div>}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', paddingTop: 6, borderTop: '1px solid var(--border)' }}>
+        <div className="fin-drawer-footer" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', paddingTop: 6, borderTop: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', gap: 6 }}>
             {tx && tx.matchStatus !== 'ignored' && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={ignore} disabled={saving}>Mark as ignored</button>}
             {tx && tx.source === 'manual' && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={del} disabled={saving}>Delete</button>}

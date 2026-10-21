@@ -164,7 +164,7 @@ export default function Reconcile({ go }) {
                 <div>
                   <div className="label">Bank line</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-                    <div><div className="fin-mono" style={{ fontSize: 16, fontWeight: 600 }}>{current.description}</div><div className="text-sm text-muted">{formatDate(current.date)} · <AccountBadge account={account} /> · {current.source === 'bank_csv' ? 'Bank CSV' : current.source}{current.createdAt ? ` imported ${formatTimestamp(current.createdAt)}` : ''}</div></div>
+                    <div style={{ minWidth: 0, flex: '1 1 220px' }}><div className="fin-mono" style={{ fontSize: 16, fontWeight: 600, overflowWrap: 'anywhere' }}>{current.description}</div><div className="text-sm text-muted">{formatDate(current.date)} · <AccountBadge account={account} /> · {current.source === 'bank_csv' ? 'Bank CSV' : current.source}{current.createdAt ? ` imported ${formatTimestamp(current.createdAt)}` : ''}</div></div>
                     <div style={{ fontSize: 30, fontWeight: 700 }}><AmountCell value={current.amount} /></div>
                   </div>
                 </div>
@@ -188,7 +188,7 @@ export default function Reconcile({ go }) {
                   {sug && !customer && !rental && <div className="fw-600">{categoryLabel(sug.category)} <span className="text-sm text-muted">· {categoryTypeNote(sug.category)}</span></div>}
 
                   {sug?.bondCheck && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 12 }}>
+                    <div className="fin-3" style={{ display: 'grid', gap: 8, marginTop: 12 }}>
                       <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}><div className="text-sm text-muted">Bond on rental</div><div style={{ fontSize: 20, fontWeight: 700 }}>{money(sug.bondCheck.bond)}</div></div>
                       <div style={{ border: `1.5px solid ${sug.bondCheck.match === 'equal' ? 'var(--accent)' : 'var(--border)'}`, background: sug.bondCheck.match === 'equal' ? 'var(--accent-light)' : 'white', borderRadius: 10, padding: 12 }}><div className="text-sm text-muted">{sug.kind === 'bond_refund' ? 'This refund' : 'Received'}</div><div style={{ fontSize: 20, fontWeight: 700 }}>{money(sug.kind === 'bond_refund' ? sug.bondCheck.refunded : sug.bondCheck.received)} {sug.bondCheck.match === 'equal' && '✓'}</div></div>
                       <div style={{ border: '1px solid var(--border)', background: sug.bondCheck.match === 'equal' ? 'white' : 'var(--amber-bg)', borderRadius: 10, padding: 12 }}><div className="text-sm text-muted">Difference</div><div style={{ fontSize: 20, fontWeight: 700, color: sug.bondCheck.match === 'equal' ? 'var(--muted)' : 'var(--amber)' }}>{sug.bondCheck.match === 'equal' ? 'none' : sug.bondCheck.match === 'under' ? `${money(sug.bondCheck.kept ?? sug.bondCheck.short)} ${sug.kind === 'bond_refund' ? 'kept' : 'short'}` : `${money(sug.bondCheck.extra)} extra`}</div></div>
@@ -218,7 +218,7 @@ export default function Reconcile({ go }) {
 
                 <SideEffectNote items={effects} />
 
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div className="fin-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                   <button className="btn btn-primary" onClick={confirm} disabled={!canConfirm}>{busy ? 'Saving…' : sug ? 'Confirm and next' : 'Choose category'} <Kbd k="↵" /></button>
                   <button className="btn btn-secondary" onClick={() => setEditing(current)}>Choose different <Kbd k="C" /></button>
                   <button className="btn btn-secondary" onClick={() => setEditing(current)}>Split manually <Kbd k="S" /></button>

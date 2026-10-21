@@ -165,7 +165,7 @@ export default function ImportCsvModal({ open, onClose, onDone, accountId: initi
 
       {step === 3 && (
         <>
-          <div className="grid-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          <div className="grid-4 fin-3" style={{ gap: 10 }}>
             {[['new', 'New lines', 'var(--accent)'], ['duplicate', 'Already imported', 'var(--muted)'], ['cutover', 'Before cut-over', 'var(--amber)']].map(([k, label, color]) => (
               <div key={k} style={{ border: `1.5px solid ${k === 'new' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 10, padding: 12 }}>
                 <div style={{ fontSize: 24, fontWeight: 700, color }}>{counts[k]}</div><div className="text-sm text-muted">{label}</div></div>))}

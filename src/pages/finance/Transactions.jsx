@@ -172,7 +172,7 @@ export default function Transactions({ go }) {
           <EmptyState icon="▦" message={fin.transactions.length === 0 ? 'No transactions yet. Import a bank CSV or your spreadsheet, or add a cash payment by hand.' : 'Nothing matches these filters.'}
             action={fin.transactions.length === 0 ? <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}><button className="btn btn-primary" onClick={() => setShowImport(true)}>Import bank CSV</button><button className="btn btn-secondary" onClick={() => setShowSheet(true)}>Import spreadsheet history</button></div> : null} />
         ) : (
-          <div className="table-wrap"><table className="table fin-table-hover">
+          <div className="table-wrap"><table className="table fin-table-hover fin-cards">
             <thead><tr>
               <th style={{ width: 36 }}><input type="checkbox" checked={allSelected} onChange={toggleAll} /></th>
               {sortTh('date', 'Date')}
@@ -194,7 +194,7 @@ export default function Transactions({ go }) {
                     <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={isSel} onChange={() => toggle(t.id)} /></td>
                     <td className="text-muted" style={{ whiteSpace: 'nowrap' }}>{formatDate(t.date).replace(/ \d{4}$/, '')}</td>
                     <td>
-                      <div className={t.source === 'bank_csv' ? 'fin-mono' : 'fw-500'} style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description || '—'}</div>
+                      <div className={`fin-desc ${t.source === 'bank_csv' ? 'fin-mono' : 'fw-500'}`}>{t.description || '—'}</div>
                       <div className="text-sm text-muted">{SOURCE_LABEL[t.source]}{t.notes ? ` · ${t.notes.slice(0, 40)}` : ''}</div>
                     </td>
                     <td style={{ textAlign: 'right' }}><AmountCell value={t.amount} /></td>

@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { useStore } from '../context/StoreContext';
 import { daysUntil } from '../utils/dates';
 import { useFinance } from '../finance/FinanceContext';
+import { overdueRentals } from '../finance/rent';
+import { todayStr } from '../utils/dates';
 
 const NAV = [
   { to: '/', id: 'dashboard', label: 'Dashboard' },
@@ -41,8 +43,9 @@ export default function Layout({ children }) {
     return n;
   }, 0);
 
+  const overdueCount = finance && !finance.error && !finance.loading ? overdueRentals({ rentals: data.rentals, transactions: finance.transactions, subscriptions: finance.subscriptions, today: todayStr() }).length : 0;
   const badges = {
-    dashboard: alertCount || null,
+    dashboard: (alertCount + overdueCount) || null,
     rentals: data.rentals.filter(r => r.status === 'active').length || null,
     bonds: data.rentals.filter(r => r.bond?.status === 'held').length || null,
     finance: finance?.queueCount || null,

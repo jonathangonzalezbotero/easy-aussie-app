@@ -48,7 +48,7 @@ export default function Payees({ go }) {
         </div>
       </div>
 
-      <div className="grid-4 mb-20" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div className="grid-4 fin-3 mb-20">
         <StatCard color="var(--red)" value={money(totals.month, { decimals: 0 })} label={`Paid in ${monthLabel(monthKey(today))}`} sub={`${rows.filter(r => r.month).length} payees`} />
         <StatCard color="var(--red)" value={money(totals.fy, { decimals: 0 })} label={`Paid in ${fyLabel(fy)}`} sub={`${rows.filter(r => r.fy).length} payees`} />
         <StatCard color="var(--amber)" value={unattributed.length} label="Expense lines without a payee" sub="Set one in the transaction drawer, or add match text to a payee" onClick={() => go('transactions', { payee: 'none' })} />
