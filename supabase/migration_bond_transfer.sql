@@ -2,3 +2,7 @@
 alter table rentals drop constraint if exists rentals_bond_status_check;
 alter table rentals add constraint rentals_bond_status_check
   check (bond_status in ('awaiting','held','refunded','partially_refunded','retained','transferred'));
+
+-- Why a Stripe subscription payment failed (decline reason from the payment intent / charge).
+alter table finance_stripe_subscriptions add column if not exists last_failure_reason text;
+alter table finance_stripe_subscriptions add column if not exists last_failed_at timestamptz;

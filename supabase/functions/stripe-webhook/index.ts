@@ -34,9 +34,19 @@ serve(async (req) => {
   const now = new Date().toISOString();
 
   if (event.type === 'invoice.payment_failed' && obj.subscription) {
-    await db.from('finance_stripe_subscriptions').upsert({ id: obj.subscription, customer_email: obj.customer_email || null, customer_name: obj.customer_name || null, amount: (obj.amount_due || 0) / 100, status: 'past_due', past_due_since: now, last_failed_amount: (obj.amount_due || 0) / 100, updated_at: now });
+    let reason: string | null = null;
+    const key = Deno.env.get('STRIPE_SECRET_KEY');
+    if (key && obj.payment_intent) {
+      try {
+        const r = await fetch(`https://api.stripe.com/v1/payment_intents/${obj.payment_intent}`, { headers: { Authorization: `Bearer ${key}` } });
+        const pi = await r.json(); const e = pi.last_payment_error;
+        if (e) reason = [e.decline_code || e.code, e.message].filter(Boolean).join(' · ');
+      } catch { /* leave null */ }
+    }
+    if (!reason && obj.next_payment_attempt) reason = `Payment failed · Stripe retries ${new Date(obj.next_payment_attempt * 1000).toISOString().slice(0, 10)}`;
+    await db.from('finance_stripe_subscriptions').upsert({ id: obj.subscription, customer_email: obj.customer_email || null, customer_name: obj.customer_name || null, amount: (obj.amount_due || 0) / 100, status: 'past_due', past_due_since: now, last_failed_amount: (obj.amount_due || 0) / 100, last_failure_reason: reason, last_failed_at: now, updated_at: now });
   } else if ((event.type === 'invoice.paid' || event.type === 'invoice.payment_succeeded') && obj.subscription) {
-    await db.from('finance_stripe_subscriptions').upsert({ id: obj.subscription, customer_email: obj.customer_email || null, customer_name: obj.customer_name || null, amount: (obj.amount_paid || 0) / 100, status: 'active', past_due_since: null, last_failed_amount: null, updated_at: now });
+    await db.from('finance_stripe_subscriptions').upsert({ id: obj.subscription, customer_email: obj.customer_email || null, customer_name: obj.customer_name || null, amount: (obj.amount_paid || 0) / 100, status: 'active', past_due_since: null, last_failed_amount: null, last_failure_reason: null, last_failed_at: null, updated_at: now });
   } else if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
     const price = obj.items?.data?.[0]?.price;
     await db.from('finance_stripe_subscriptions').upsert({ id: obj.id, status: obj.status, amount: price ? (price.unit_amount || 0) / 100 : null, interval: price?.recurring?.interval || null, past_due_since: obj.status === 'past_due' ? now : null, updated_at: now });

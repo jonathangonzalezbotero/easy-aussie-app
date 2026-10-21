@@ -51,7 +51,7 @@ const settingsToDb = (s) => ({
 
 const importFromDb = (i) => ({ id: i.id, accountId: i.account_id, kind: i.kind, fileName: i.file_name, lineCount: i.line_count, newCount: i.new_count, skippedCount: i.skipped_count, fromDate: i.from_date, toDate: i.to_date, closingBalance: i.closing_balance == null ? null : Number(i.closing_balance), createdAt: i.created_at });
 
-const subFromDb = (s) => ({ id: s.id, customerEmail: s.customer_email, customerName: s.customer_name, amount: s.amount == null ? null : Number(s.amount), interval: s.interval, status: s.status, pastDueSince: s.past_due_since, lastFailedAmount: s.last_failed_amount == null ? null : Number(s.last_failed_amount), updatedAt: s.updated_at });
+const subFromDb = (s) => ({ id: s.id, customerEmail: s.customer_email, customerName: s.customer_name, amount: s.amount == null ? null : Number(s.amount), interval: s.interval, status: s.status, pastDueSince: s.past_due_since, lastFailedAmount: s.last_failed_amount == null ? null : Number(s.last_failed_amount), lastFailureReason: s.last_failure_reason || '', lastFailedAt: s.last_failed_at || null, updatedAt: s.updated_at });
 
 const regoFromDb = (r) => ({ id: r.id, vehicleId: r.vehicle_id, renewalDate: r.renewal_date, expiryDate: r.expiry_date, duration: r.duration, cost: r.cost == null ? null : Number(r.cost) });
 

@@ -88,7 +88,7 @@ export default function Overview({ go }) {
 
       {(pastDue.length > 0 || nabAge === null || nabAge > 7 || queue.length > 0) && (
         <div className="fin-alerts">
-          {pastDue.length > 0 && <AlertStrip tone="red" title={`${pastDue.length} Stripe subscription${pastDue.length > 1 ? 's' : ''} past due`} detail={pastDue.map(s => `${s.customerName || s.customerEmail} · ${s.lastFailedAmount ? money0(s.lastFailedAmount) : ''}`).join(' · ')} action="View rentals" onAction={() => navigate('/rentals')} />}
+          {pastDue.length > 0 && <AlertStrip tone="red" title={`${pastDue.length} Stripe subscription${pastDue.length > 1 ? 's' : ''} past due`} detail={pastDue.map(s => [s.customerName || s.customerEmail, s.lastFailedAmount ? money0(s.lastFailedAmount) : null, s.lastFailureReason || 'reason not synced yet'].filter(Boolean).join(' · ')).join(' — ')} action="View rentals" onAction={() => navigate('/rentals')} />}
           {(nabAge === null || nabAge > 7) && <AlertStrip tone="amber" title={nabAge === null ? 'No bank CSV imported yet' : 'No bank CSV this week'} detail={nab ? `${nab.name}${nab.lastImportAt ? ` last imported ${formatDate(nab.lastImportAt.slice(0, 10))}` : ''}` : ''} action="Import CSV" onAction={() => go('settings')} />}
           {queue.length > 0 && <AlertStrip tone="blue" title={`${queue.length} transaction${queue.length > 1 ? 's' : ''} to reconcile`} detail={queueKinds} action="Open queue" onAction={() => go('reconcile')} />}
         </div>

@@ -34,6 +34,29 @@ async function stripeList(path: string, params: Record<string, string>, key: str
 
 const isoDate = (unix: number) => new Date(unix * 1000).toISOString().slice(0, 10);
 
+const DECLINE: Record<string, string> = {
+  insufficient_funds: 'Insufficient funds on the card', card_declined: 'Card declined by the bank', expired_card: 'Card has expired',
+  incorrect_cvc: 'Wrong security code', processing_error: 'Bank processing error, Stripe will retry', do_not_honor: 'Bank refused the payment (do not honor)',
+  lost_card: 'Card reported lost', stolen_card: 'Card reported stolen', authentication_required: 'Bank requires the customer to authenticate',
+  generic_decline: 'Card declined, no reason given by the bank', card_velocity_exceeded: 'Card limit reached', payment_method_missing: 'No card on file',
+};
+// Human reason for a failed invoice: payment intent error first, then the charge's outcome.
+async function failureReason(invoiceId: string, key: string): Promise<{ reason: string | null; at: string | null; amount: number | null }> {
+  try {
+    const res = await fetch(`${STRIPE}/invoices/${invoiceId}?expand[]=payment_intent&expand[]=charge`, { headers: { Authorization: `Bearer ${key}` } });
+    const inv = await res.json();
+    if (!res.ok) return { reason: null, at: null, amount: null };
+    const err = inv.payment_intent?.last_payment_error;
+    const ch = inv.charge;
+    const code = err?.decline_code || err?.code || ch?.outcome?.reason || ch?.failure_code || null;
+    const msg = err?.message || ch?.outcome?.seller_message || ch?.failure_message || null;
+    const attempts = inv.attempt_count ? ` · attempt ${inv.attempt_count}` : '';
+    const next = inv.next_payment_attempt ? ` · Stripe retries ${isoDate(inv.next_payment_attempt)}` : '';
+    const reason = code || msg ? `${DECLINE[code] || msg || code}${attempts}${next}` : (!inv.default_payment_method && !inv.customer ? 'No payment method on file' : null);
+    return { reason, at: ch?.created ? new Date(ch.created * 1000).toISOString() : null, amount: inv.amount_due != null ? inv.amount_due / 100 : null };
+  } catch { return { reason: null, at: null, amount: null }; }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
@@ -90,10 +113,16 @@ serve(async (req) => {
 
     // Subscriptions mirror (for the past-due alert and rental linking)
     const subs = await stripeList('subscriptions', { status: 'all', 'expand[]': 'data.customer' }, stripeKey);
-    const subRows = subs.filter(s => ['active', 'past_due', 'unpaid', 'trialing', 'canceled'].includes(s.status)).map(s => {
+    const subRows = [];
+    for (const s of subs.filter(s => ['active', 'past_due', 'unpaid', 'trialing', 'canceled'].includes(s.status))) {
       const item = s.items?.data?.[0]; const price = item?.price;
-      return { id: s.id, customer_email: s.customer?.email || null, customer_name: s.customer?.name || null, amount: price ? (price.unit_amount || 0) / 100 : null, interval: price?.recurring?.interval || null, status: s.status, past_due_since: s.status === 'past_due' ? new Date(s.current_period_start * 1000).toISOString() : null, updated_at: new Date().toISOString() };
-    });
+      const row: any = { id: s.id, customer_email: s.customer?.email || null, customer_name: s.customer?.name || null, amount: price ? (price.unit_amount || 0) / 100 : null, interval: price?.recurring?.interval || null, status: s.status, past_due_since: s.status === 'past_due' ? new Date(s.current_period_start * 1000).toISOString() : null, updated_at: new Date().toISOString() };
+      if ((s.status === 'past_due' || s.status === 'unpaid') && s.latest_invoice) {
+        const f = await failureReason(typeof s.latest_invoice === 'string' ? s.latest_invoice : s.latest_invoice.id, stripeKey);
+        row.last_failure_reason = f.reason; row.last_failed_at = f.at; if (f.amount != null) row.last_failed_amount = f.amount;
+      } else { row.last_failure_reason = null; row.last_failed_at = null; row.last_failed_amount = null; }
+      subRows.push(row);
+    }
     if (subRows.length) { const { error } = await db.from('finance_stripe_subscriptions').upsert(subRows); if (error) throw error; }
     // Link subscriptions to rentals by customer email when not set
     for (const s of subs) {
