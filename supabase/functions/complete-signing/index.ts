@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { encode as base64Encode } from 'https://deno.land/std@0.177.0/encoding/base64.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -81,8 +82,8 @@ async function sendWelcomeEmail(supabase: ReturnType<typeof createClient>, renta
     if (pdfUrl) {
       const pdfRes = await fetch(pdfUrl);
       if (pdfRes.ok) {
-        const buffer = await pdfRes.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        // std base64 handles large files; spreading bytes into fromCharCode overflows the stack past ~100 KB.
+        const base64 = base64Encode(new Uint8Array(await pdfRes.arrayBuffer()));
         attachments.push({ filename: 'Scooter-Parking-Guide.pdf', content: base64 });
       }
     }
