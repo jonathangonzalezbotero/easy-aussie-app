@@ -5,7 +5,7 @@ import Drawer from '../components/shared/Drawer';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
-import { formatDate, formatTimestamp } from '../utils/dates';
+import { formatDate, formatTimestamp, ageOn, isYoungRenter } from '../utils/dates';
 
 const VEHICLE_TYPE_LABELS = { scooter: 'Scooter', ebike: 'E-bike', car: 'Car' };
 const EF = { name: '', dateOfBirth: '', phone: '', email: '', address: '', occupation: '', emergencyContact: '', emergencyPhone: '', hotelAddress: '', licenseRef: '', licencePhoto: '', vehicleType: '', notes: '' };
@@ -197,7 +197,12 @@ export default function Customers() {
                   const total  = data.rentals.filter(r => r.customerId === c.id).length;
                   return (
                     <tr key={c.id} onClick={() => setDetailC(c)}>
-                      <td className="fw-500">{c.name}</td>
+                      <td className="fw-500">
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {c.name}
+                          {isYoungRenter(c.dateOfBirth) && <Badge variant="amber">Under 25</Badge>}
+                        </span>
+                      </td>
                       <td className="text-muted">{c.phone || '—'}</td>
                       <td className="text-muted col-hide-mobile">{c.email || '—'}</td>
                       <td className="text-muted">{formatTimestamp(c.createdAt)}</td>
@@ -236,7 +241,7 @@ export default function Customers() {
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px', marginBottom: 20 }}>
               {[['Date of Birth', selected.dateOfBirth], ['Phone', selected.phone], ['Email', selected.email], ['Occupation', selected.occupation], ['Wants to Rent', VEHICLE_TYPE_LABELS[selected.vehicleType]]].map(([l, v]) =>
-                v ? <div key={l}><div className="label">{l}</div><div style={{ marginTop: 3, fontSize: 14 }}>{l === 'Date of Birth' ? formatDate(v) : v}</div></div> : null
+                v ? <div key={l}><div className="label">{l}</div><div style={{ marginTop: 3, fontSize: 14 }}>{l === 'Date of Birth' ? <>{formatDate(v)} <span className="text-muted">· {ageOn(v)} yrs</span>{isYoungRenter(v) && <> <Badge variant="amber">Under 25</Badge></>}</> : v}</div></div> : null
               )}
               {selected.address && <div style={{ gridColumn: '1/-1' }}><div className="label">Address</div><div style={{ marginTop: 3, fontSize: 14 }}>{selected.address}</div></div>}
               {selected.hotelAddress && <div style={{ gridColumn: '1/-1' }}><div className="label">Hotel / Airbnb</div><div style={{ marginTop: 3, fontSize: 14 }}>{selected.hotelAddress}</div></div>}

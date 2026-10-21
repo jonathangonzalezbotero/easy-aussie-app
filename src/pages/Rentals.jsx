@@ -6,7 +6,7 @@ import Drawer from '../components/shared/Drawer';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
-import { formatDate, daysBetween, todayStr } from '../utils/dates';
+import { formatDate, daysBetween, todayStr, ageOn, isYoungRenter } from '../utils/dates';
 import { BOND_STATUSES, BOND_RETAIN_REASONS, bondLabel, bondVariant, closedBondStatus } from '../utils/bond';
 
 const EF = {
@@ -21,7 +21,7 @@ const EMPTY_BOND = EF.bond;
 const RECENT_COUNT = 5;
 const MAX_RESULTS = 20;
 
-function CustomerPicker({ customers, value, onChange }) {
+function CustomerPicker({ customers, value, onChange, startDate }) {
   const [query, setQuery]   = useState('');
   const [open, setOpen]     = useState(false);
   const selected = customers.find(c => c.id === value);
@@ -54,7 +54,10 @@ function CustomerPicker({ customers, value, onChange }) {
           {results.length === 0 && <div style={{ padding: '10px 12px', fontSize: 13 }} className="text-muted">No matches</div>}
           {results.map(c => (
             <div key={c.id} className="picker-option" onMouseDown={() => { onChange(c.id); setQuery(''); setOpen(false); }}>
-              <div className="fw-500" style={{ fontSize: 14 }}>{c.name}</div>
+              <div className="fw-500" style={{ fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {c.name}
+                {isYoungRenter(c.dateOfBirth, startDate) && <Badge variant="amber">Under 25</Badge>}
+              </div>
               <div className="text-sm text-muted">{c.phone || c.email || ''}</div>
             </div>
           ))}
@@ -286,8 +289,17 @@ export default function Rentals() {
       <div className="grid-2">
         <div className="field">
           <label className="label">Customer *</label>
-          <CustomerPicker customers={customerOpts} value={form.customerId} onChange={id => sf('customerId', id)} />
+          <CustomerPicker customers={customerOpts} value={form.customerId} onChange={id => sf('customerId', id)} startDate={form.startDate} />
           {data.customers.length === 0 && <span className="field-hint">No customers yet — add one first</span>}
+          {(() => {
+            const c = data.customers.find(x => x.id === form.customerId);
+            if (!c || !isYoungRenter(c.dateOfBirth, form.startDate)) return null;
+            return (
+              <span className="field-hint" style={{ color: 'var(--amber)', fontWeight: 500 }}>
+                Under 25 (age {ageOn(c.dateOfBirth, form.startDate)} at start) — let them know prices may vary
+              </span>
+            );
+          })()}
         </div>
         <div className="field">
           <label className="label">Vehicle *</label>

@@ -23,3 +23,23 @@ export const daysBetween = (a, b) => {
 };
 
 export const todayStr = () => new Date().toISOString().split('T')[0];
+
+// Whole years between a YYYY-MM-DD date of birth and a reference date (defaults to today).
+// Returns null when there is no date of birth.
+export const ageOn = (dob, onDate) => {
+  if (!dob) return null;
+  const b = new Date(dob + 'T12:00:00');
+  const d = onDate ? new Date(onDate + 'T12:00:00') : new Date();
+  if (isNaN(b) || isNaN(d)) return null;
+  let age = d.getFullYear() - b.getFullYear();
+  const beforeBirthday = d.getMonth() < b.getMonth() || (d.getMonth() === b.getMonth() && d.getDate() < b.getDate());
+  if (beforeBirthday) age -= 1;
+  return age;
+};
+
+// Renters under this age are flagged so the owner can mention that prices may vary.
+export const YOUNG_RENTER_AGE = 25;
+export const isYoungRenter = (dob, onDate) => {
+  const age = ageOn(dob, onDate);
+  return age !== null && age < YOUNG_RENTER_AGE;
+};
