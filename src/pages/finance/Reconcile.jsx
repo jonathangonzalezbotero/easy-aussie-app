@@ -7,7 +7,7 @@ import { useSuggestions } from '../../finance/useSuggestions';
 import { buildConfirm } from '../../finance/confirm';
 import { bondsHeld } from '../../finance/reports';
 import { entriesForTransaction, MAINTENANCE_CATEGORIES } from '../../finance/maintenanceLink';
-import { categoryLabel, categoryTypeNote, money } from '../../finance/categories';
+import { categoryLabel, categoryTypeNote, money, txName } from '../../finance/categories';
 import { useNavigate } from 'react-router-dom';
 import { formatDate, formatTimestamp } from '../../utils/dates';
 import { BOND_RETAIN_REASONS } from '../../utils/bond';
@@ -142,7 +142,7 @@ export default function Reconcile({ go }) {
                 return (
                   <div key={t.id} className={`fin-queue-item${current?.id === t.id ? ' active' : ''}${isDone ? ' done' : ''}`} onClick={() => !isDone && setIdx(open.findIndex(x => x.id === t.id))}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span className="text-sm text-muted">{formatDate(t.date).replace(/ \d{4}$/, '')} · {fin.accounts.find(a => a.id === t.accountId)?.name}</span><AmountCell value={t.amount} /></div>
-                    <div className="fin-mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: '2px 0' }}>{t.description}</div>
+                    <div className={t.label ? 'fw-500' : 'fin-mono'} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: '2px 0' }}>{txName(t)}</div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
                       {isDone ? <Badge variant={t.matchStatus === 'ignored' ? 'gray' : 'green'}>{t.matchStatus === 'ignored' ? 'Ignored' : 'Confirmed'}</Badge> : <StatusBadge status={s ? 'suggested' : 'unreviewed'} />}
                       <span className="text-muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isDone ? (t.splits.length ? t.splits.map(x => categoryLabel(x.category)).join(' + ') : categoryLabel(t.category)) : s ? `${categoryLabel(s.category)} · ${s.reason}` : 'No rule or match'}</span>

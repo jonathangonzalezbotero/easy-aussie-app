@@ -37,7 +37,7 @@ export default function VehicleFinanceCard({ vehicle }) {
           {rec != null && <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 10 }}><span className="text-muted">Purchase {money0(price)} recovered</span><div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3 }}><div style={{ width: `${Math.min(100, rec * 100)}%`, height: 6, background: rec >= 1 ? 'var(--accent)' : 'var(--amber)', borderRadius: 3 }} /></div><span className="fw-600">{Math.round(rec * 100)}%</span></div>}
           {lines.slice(0, 5).map((l, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, padding: '5px 0', borderTop: '1px solid var(--border)' }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span className="text-muted">{formatDate(l.date).replace(/ \d{4}$/, '')}</span> · {categoryLabel(l.category)} <span className="text-muted">· {l.description.slice(0, 28)}</span></span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span className="text-muted">{formatDate(l.date).replace(/ \d{4}$/, '')}</span> · {categoryLabel(l.category)} <span className="text-muted">· {(l.label || l.description).slice(0, 28)}</span></span>
               <span className="fw-600" style={{ color: Number(l.amount) < 0 ? 'var(--red)' : 'var(--accent)', whiteSpace: 'nowrap' }}>{money(l.amount, { sign: true })}</span>
             </div>))}
         </>

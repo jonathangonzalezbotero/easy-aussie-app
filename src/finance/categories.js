@@ -57,6 +57,9 @@ export const MATCH_STATUS = {
   ignored:    { label: 'Ignored',    variant: 'gray' },
 };
 
+// What to call a transaction in lists: the user's label when set, else the bank text.
+export const txName = (t) => (t?.label || t?.description || '');
+
 export const SOURCE_LABEL = { bank_csv: 'Bank CSV', stripe: 'Stripe', spreadsheet: 'Spreadsheet', manual: 'Manual' };
 
 // Account tone for the AccountBadge.

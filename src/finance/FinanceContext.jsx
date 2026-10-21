@@ -17,14 +17,14 @@ const txFromDb = (t) => ({
   balance: t.balance == null ? null : Number(t.balance), source: t.source, importId: t.import_id, externalId: t.external_id,
   raw: t.raw, category: t.category || '', matchStatus: t.match_status, suggestion: t.suggestion,
   customerId: t.customer_id, rentalId: t.rental_id, vehicleId: t.vehicle_id, payeeId: t.payee_id || null, linkedTransactionId: t.linked_transaction_id,
-  notes: t.notes || '', hasUndo: !!t.previous_state, confirmedAt: t.confirmed_at, createdAt: t.created_at, splits: [],
+  label: t.label || '', notes: t.notes || '', hasUndo: !!t.previous_state, confirmedAt: t.confirmed_at, createdAt: t.created_at, splits: [],
 });
 // Only the editable columns. Locked columns (date, amount, description) are passed only for manual lines.
 const txToDb = (t, { full = false } = {}) => ({
   ...(full ? { account_id: t.accountId, date: t.date, amount: Number(t.amount), description: t.description || '', source: t.source || 'manual', balance: t.balance == null || t.balance === '' ? null : Number(t.balance), raw: t.raw || null, external_id: t.externalId || null, import_id: t.importId || null } : {}),
   category: t.category || null, match_status: t.matchStatus || 'unreviewed', suggestion: t.suggestion || null,
   customer_id: t.customerId || null, rental_id: t.rentalId || null, vehicle_id: t.vehicleId || null, payee_id: t.payeeId || null,
-  linked_transaction_id: t.linkedTransactionId || null, notes: t.notes || null, updated_at: new Date().toISOString(),
+  linked_transaction_id: t.linkedTransactionId || null, label: t.label?.trim() || null, notes: t.notes || null, updated_at: new Date().toISOString(),
 });
 
 const ruleFromDb = (r) => ({ id: r.id, pattern: r.pattern, category: r.category, accountId: r.account_id, payeeId: r.payee_id || null, priority: r.priority ?? 100, active: r.active !== false });
@@ -159,6 +159,7 @@ export function FinanceProvider({ children }) {
     if ('category' in updates) dbPatch.category = updates.category || null;
     if ('matchStatus' in updates) dbPatch.match_status = updates.matchStatus;
     if ('payeeId' in updates) dbPatch.payee_id = updates.payeeId || null;
+    if ('label' in updates) dbPatch.label = updates.label?.trim() || null;
     dbPatch.updated_at = new Date().toISOString();
     const { error } = await supabase.from('finance_transactions').update(dbPatch).in('id', ids);
     if (error) throw error;

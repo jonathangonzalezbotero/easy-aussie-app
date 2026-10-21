@@ -11,7 +11,7 @@ export function vehicleLines(transactions, rentals) {
       const vehicleId = l.vehicleId || t.vehicleId || rentalVehicle[l.rentalId || t.rentalId] || null;
       const type = categoryType(l.category);
       if (!vehicleId || (type !== 'income' && type !== 'operating' && l.category !== 'vehicle_purchase')) continue;
-      out.push({ ...l, vehicleId, type, description: t.description, transactionId: t.id });
+      out.push({ ...l, vehicleId, type, description: t.description, label: t.label, transactionId: t.id });
     }
   }
   return out;

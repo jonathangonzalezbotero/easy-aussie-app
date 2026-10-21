@@ -4,7 +4,7 @@ import Badge from './shared/Badge';
 import { useStore } from '../context/StoreContext';
 import { useFinance } from '../finance/FinanceContext';
 import { transactionsForEntry, linkedLine } from '../finance/maintenanceLink';
-import { categoryLabel, money, toCents } from '../finance/categories';
+import { categoryLabel, money, toCents, txName } from '../finance/categories';
 import { formatDate } from '../utils/dates';
 import TransactionDrawer from '../pages/finance/TransactionDrawer';
 
@@ -70,7 +70,7 @@ export default function MaintenanceLinkModal({ entry, onClose, onDone }) {
     return (
       <div style={{ border: `1.5px solid ${l.exact ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 10, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
-          <div className="fw-600" style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.tx.description}{l.split ? <span className="text-muted"> · line {l.tx.splits.indexOf(l.split) + 1} of {l.tx.splits.length}</span> : ''}</div>
+          <div className="fw-600" style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{txName(l.tx)}{l.split ? <span className="text-muted"> · line {l.tx.splits.indexOf(l.split) + 1} of {l.tx.splits.length}</span> : ''}</div>
           <div className="text-sm text-muted">{formatDate(l.tx.date)} · {accountName(l.tx.accountId)} · {categoryLabel(l.category)}{l.sameVehicle ? ` · ${vehicle?.plate}` : l.otherVehicle ? ` · on ${v?.plate || 'another vehicle'}` : ' · no vehicle set'}</div>
         </div>
         <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -96,7 +96,7 @@ export default function MaintenanceLinkModal({ entry, onClose, onDone }) {
         {linked ? (
           <div style={{ border: `1.5px solid ${linked.amount === cost ? 'var(--accent)' : 'var(--amber)'}`, background: linked.amount === cost ? 'var(--accent-light)' : 'var(--amber-bg)', borderRadius: 10, padding: '10px 12px', fontSize: 14 }}>
             <div className="label" style={{ color: linked.amount === cost ? 'var(--accent)' : 'var(--amber)' }}>Paid · linked{linked.split ? ` to line ${linked.tx.splits.indexOf(linked.split) + 1} of ${linked.tx.splits.length}` : linked.tx.splits.length ? ' to the whole payment' : ''}</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span className="fw-600">{linked.tx.description}</span><span className="fw-600">{money(-linked.amount / 100)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><span className="fw-600">{txName(linked.tx)}</span><span className="fw-600">{money(-linked.amount / 100)}</span></div>
             <div className="text-sm text-muted">{formatDate(linked.tx.date)} · {accountName(linked.tx.accountId)} · {linked.split ? categoryLabel(linked.split.category) : linked.tx.splits.length ? 'split' : categoryLabel(linked.tx.category)}</div>
             {linked.stale && <div className="text-sm" style={{ color: 'var(--amber)', marginTop: 4 }}>The split line this job pointed at was changed. Re-link it below.</div>}
             {cost && linked.amount !== cost && !linked.stale && (

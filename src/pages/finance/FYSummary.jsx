@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useFinance } from '../../finance/FinanceContext';
 import { useStore } from '../../context/StoreContext';
 import { useSuggestions } from '../../finance/useSuggestions';
-import { CATEGORIES, categoriesOfType, categoryLabel, fyLabel, fyMonths, fyOf, fyRange, money, money0, monthLabel, summarise } from '../../finance/categories';
+import { CATEGORIES, categoriesOfType, categoryLabel, fyLabel, fyMonths, fyOf, fyRange, money, money0, monthLabel, summarise, txName } from '../../finance/categories';
 import { inRange, categoryByMonth, directorPosition } from '../../finance/reports';
 import { payeeSummary, PAYEE_KINDS } from '../../finance/payees';
 import { formatDate, todayStr } from '../../utils/dates';
@@ -32,7 +32,7 @@ export default function FYSummary({ go }) {
 
   const incomeRows = categoriesOfType('income').filter(c => byMonth[c.id]).map(c => ({ ...c, sign: 1 }));
   const opRows = categoriesOfType('operating').filter(c => byMonth[c.id]).map(c => ({ ...c, sign: -1 }));
-  const capitalLines = useMemo(() => live.flatMap(t => (t.splits.length ? t.splits : [t]).filter(l => categoriesOfType('capital').some(c => c.id === l.category)).map(l => ({ date: t.date, description: t.description, category: l.category, amount: Number(l.amount), vehicleId: l.vehicleId || t.vehicleId }))).sort((a, b) => a.date.localeCompare(b.date)), [live]);
+  const capitalLines = useMemo(() => live.flatMap(t => (t.splits.length ? t.splits : [t]).filter(l => categoriesOfType('capital').some(c => c.id === l.category)).map(l => ({ date: t.date, description: t.description, label: t.label, category: l.category, amount: Number(l.amount), vehicleId: l.vehicleId || t.vehicleId }))).sort((a, b) => a.date.localeCompare(b.date)), [live]);
   const capitalTotal = capitalLines.reduce((s, l) => s + Math.abs(l.amount), 0);
   // Bonds held at the end of the FY: held now, or refunded after the FY end
   const bondsAtClose = data.rentals.filter(r => r.bond?.amount && (r.startDate || '') <= closingDate && (r.bond.status === 'held' || (['refunded', 'partially_refunded', 'retained', 'transferred'].includes(r.bond.status) && r.bond.refundDate && r.bond.refundDate > closingDate)));
@@ -52,7 +52,7 @@ export default function FYSummary({ go }) {
     for (const t of all) {
       const acc = fin.accounts.find(a => a.id === t.accountId)?.name || '';
       const lines = t.splits.length ? t.splits : [{ ...t }];
-      for (const l of lines) rows.push([t.date, acc, t.description, Number(l.amount).toFixed(2), categoryLabel(l.category), CATEGORIES.find(c => c.id === l.category)?.type || '', data.customers.find(c => c.id === (l.customerId || t.customerId))?.name || '', data.vehicles.find(v => v.id === (l.vehicleId || t.vehicleId))?.plate || '', t.matchStatus, t.source, t.notes || '']);
+      for (const l of lines) rows.push([t.date, acc, txName(t), Number(l.amount).toFixed(2), categoryLabel(l.category), CATEGORIES.find(c => c.id === l.category)?.type || '', data.customers.find(c => c.id === (l.customerId || t.customerId))?.name || '', data.vehicles.find(v => v.id === (l.vehicleId || t.vehicleId))?.plate || '', t.matchStatus, t.source, t.notes || '']);
     }
     const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `easy-aussie-${fyLabel(fy).replace(/\s/g, '-').replace('–', '-')}.csv`; a.click();
@@ -127,7 +127,7 @@ export default function FYSummary({ go }) {
             {capitalLines.length === 0 ? <div className="text-sm text-muted" style={{ padding: 20 }}>No capital items this year.</div> : (
               <div className="table-wrap"><table className="table">
                 <thead><tr><th>Date</th><th>Item</th><th>Category</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
-                <tbody>{capitalLines.map((l, i) => <tr key={i} style={{ cursor: 'default' }}><td className="text-muted" style={{ whiteSpace: 'nowrap' }}>{formatDate(l.date)}</td><td>{l.description}{l.vehicleId ? <span className="text-muted"> · {data.vehicles.find(v => v.id === l.vehicleId)?.plate}</span> : ''}</td><td>{categoryLabel(l.category)}</td><td style={{ textAlign: 'right' }}><AmountCell value={l.amount} bold={false} /></td></tr>)}
+                <tbody>{capitalLines.map((l, i) => <tr key={i} style={{ cursor: 'default' }}><td className="text-muted" style={{ whiteSpace: 'nowrap' }}>{formatDate(l.date)}</td><td>{l.label || l.description}{l.vehicleId ? <span className="text-muted"> · {data.vehicles.find(v => v.id === l.vehicleId)?.plate}</span> : ''}</td><td>{categoryLabel(l.category)}</td><td style={{ textAlign: 'right' }}><AmountCell value={l.amount} bold={false} /></td></tr>)}
                   <tr style={{ cursor: 'default' }}><td colSpan={3} className="fw-600">Total capital</td><td className="fw-600" style={{ textAlign: 'right' }}>{money(capitalTotal)}</td></tr></tbody>
               </table></div>)}
           </div>
@@ -158,7 +158,7 @@ export default function FYSummary({ go }) {
             <div className="card-head"><span className="card-title">Still unreconciled in {fyLabel(fy)}</span><button className="btn btn-secondary btn-sm" onClick={() => go('reconcile')}>Open in queue</button></div>
             <div className="table-wrap"><table className="table">
               <thead><tr><th>Date</th><th>Description</th><th className="col-hide-mobile">Account</th><th style={{ textAlign: 'right' }}>Amount</th><th>Why it is open</th></tr></thead>
-              <tbody>{open.map(t => <tr key={t.id} style={{ cursor: 'default' }}><td className="text-muted" style={{ whiteSpace: 'nowrap' }}>{formatDate(t.date)}</td><td className="fin-mono">{t.description}</td><td className="col-hide-mobile">{fin.accounts.find(a => a.id === t.accountId)?.name}</td><td style={{ textAlign: 'right' }}><AmountCell value={t.amount} bold={false} /></td><td className="text-sm">{whyOpen(t)}</td></tr>)}</tbody>
+              <tbody>{open.map(t => <tr key={t.id} style={{ cursor: 'default' }}><td className="text-muted" style={{ whiteSpace: 'nowrap' }}>{formatDate(t.date)}</td><td className={t.label ? '' : 'fin-mono'}>{txName(t)}</td><td className="col-hide-mobile">{fin.accounts.find(a => a.id === t.accountId)?.name}</td><td style={{ textAlign: 'right' }}><AmountCell value={t.amount} bold={false} /></td><td className="text-sm">{whyOpen(t)}</td></tr>)}</tbody>
             </table></div>
           </div>
         )}

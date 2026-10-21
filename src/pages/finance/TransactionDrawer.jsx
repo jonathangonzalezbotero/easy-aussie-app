@@ -36,13 +36,13 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
         category: tx.category === 'split' ? '' : tx.category, splitOn: tx.splits.length > 0 || !!presetSplits,
         splits: presetSplits ? presetSplits.map(s => ({ ...blankSplit(), ...s })) : tx.splits.length ? tx.splits.map(s => ({ ...s, amount: String(s.amount) })) : [blankSplit(), blankSplit()],
         customerId: tx.customerId || '', rentalId: tx.rentalId || '', vehicleId: tx.vehicleId || '', payeeId: tx.payeeId || '',
-        linkedTransactionId: tx.linkedTransactionId || '', notes: tx.notes || '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0],
+        linkedTransactionId: tx.linkedTransactionId || '', label: tx.label || '', notes: tx.notes || '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0],
         maintenanceId: presetMaintenanceId || data.maintenance.find(m => m.transactionId === tx.id && !m.splitId)?.id || '',
         jobSplitIndex: presetSplits ? 0 : null,
       });
     } else {
       const manualAccounts = fin.accounts.filter(a => a.feed === 'manual');
-      setForm({ accountId: defaultAccountId || manualAccounts[0]?.id || fin.accounts[0]?.id || '', date: todayStr(), amount: '', description: '', category: '', splitOn: false, splits: [blankSplit(), blankSplit()], customerId: '', rentalId: '', vehicleId: '', payeeId: '', linkedTransactionId: '', notes: '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0], maintenanceId: '' });
+      setForm({ accountId: defaultAccountId || manualAccounts[0]?.id || fin.accounts[0]?.id || '', date: todayStr(), amount: '', description: '', category: '', splitOn: false, splits: [blankSplit(), blankSplit()], customerId: '', rentalId: '', vehicleId: '', payeeId: '', linkedTransactionId: '', label: '', notes: '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0], maintenanceId: '' });
     }
   }, [open, tx, defaultAccountId, fin.accounts, data.maintenance, presetSplits, presetMaintenanceId]);
 
@@ -89,11 +89,13 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
       const splits = form.splitOn ? activeSplits.map(s => ({ id: s.id || undefined, category: s.category, amount: Number(s.amount), rentalId: s.rentalId || null, customerId: s.customerId || null, vehicleId: s.vehicleId || null, payeeId: s.payeeId || null, notes: s.notes || '' })) : [];
       let saved;
       if (isNew) {
-        saved = await fin.addTransaction({ accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() || categoryLabel(form.category), source: 'manual', category: splits.length ? 'split' : form.category, matchStatus: 'confirmed', customerId: form.customerId || null, rentalId: form.rentalId || null, vehicleId: form.vehicleId || null, payeeId: form.payeeId || null, linkedTransactionId: form.linkedTransactionId || null, notes: form.notes, splits });
+        saved = await fin.addTransaction({ accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() || categoryLabel(form.category), source: 'manual', category: splits.length ? 'split' : form.category, matchStatus: 'confirmed', customerId: form.customerId || null, rentalId: form.rentalId || null, vehicleId: form.vehicleId || null, payeeId: form.payeeId || null, linkedTransactionId: form.linkedTransactionId || null, label: form.label, notes: form.notes, splits });
         if (confirmPayload.rentalId) await fin.confirmTransaction({ ...confirmPayload, id: saved.id, splits });
       } else {
-        if (!locked) await fin.updateTransaction(tx.id, { accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() });
+        if (!locked) await fin.updateTransaction(tx.id, { accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim(), label: form.label });
+        else if ((form.label || '') !== (tx.label || '')) await fin.bulkUpdate([tx.id], { label: form.label });
         saved = await fin.confirmTransaction({ ...confirmPayload, splits });
+        saved = { ...saved, label: form.label };
       }
       // Service-log link: one entry per payment. Clearing the pick unlinks a previously linked entry.
       if (form.maintenanceId) {
@@ -150,7 +152,8 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
           </div>
         )}
         {tx && <div style={{ fontSize: 26, fontWeight: 700 }}><AmountCell value={tx.amount} /></div>}
-        {tx && <div className="fin-mono" style={{ background: 'var(--bg)', borderRadius: 8, padding: '10px 12px' }}>{tx.description || '—'}</div>}
+        {tx && <div className="fin-mono" style={{ background: 'var(--bg)', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--muted)' }}>{tx.description || '—'}</div>}
+        {tx && <div className="field"><label className="label">Your name for this line</label><input className="input" value={form.label} onChange={e => sf('label', e.target.value)} placeholder="e.g. Nicole bond · scooter 7EG12" /><span className="field-hint">Shown instead of the bank text in lists and reports. The bank text above stays for matching.</span></div>}
 
         {(isNew || !locked) && (
           <>

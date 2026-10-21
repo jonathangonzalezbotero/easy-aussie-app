@@ -51,7 +51,7 @@ export default function Transactions({ go }) {
       if (filters.category && !cats.includes(filters.category)) return false;
       if (filters.type && !cats.some(c => categoryType(c) === filters.type)) return false;
       if (q) {
-        const hay = [t.description, custName(t.customerId), plate(t.vehicleId), String(t.amount), categoryLabel(t.category), t.notes, fin.payees.find(p => p.id === t.payeeId)?.name || ''].join(' ').toLowerCase();
+        const hay = [t.description, t.label, custName(t.customerId), plate(t.vehicleId), String(t.amount), categoryLabel(t.category), t.notes, fin.payees.find(p => p.id === t.payeeId)?.name || ''].join(' ').toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -60,7 +60,7 @@ export default function Transactions({ go }) {
     list.sort((a, b) => {
       if (sort.col === 'date') return (a.date.localeCompare(b.date) || (a.createdAt || '').localeCompare(b.createdAt || '')) * mul;
       if (sort.col === 'amount') return (a.amount - b.amount) * mul;
-      if (sort.col === 'description') return a.description.localeCompare(b.description) * mul;
+      if (sort.col === 'description') return (a.label || a.description).localeCompare(b.label || b.description) * mul;
       if (sort.col === 'account') return (fin.accounts.find(x => x.id === a.accountId)?.name || '').localeCompare(fin.accounts.find(x => x.id === b.accountId)?.name || '') * mul;
       if (sort.col === 'category') return categoryLabel(a.category).localeCompare(categoryLabel(b.category)) * mul;
       if (sort.col === 'status') return a.matchStatus.localeCompare(b.matchStatus) * mul;
@@ -194,8 +194,8 @@ export default function Transactions({ go }) {
                     <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={isSel} onChange={() => toggle(t.id)} /></td>
                     <td className="text-muted" style={{ whiteSpace: 'nowrap' }}>{formatDate(t.date).replace(/ \d{4}$/, '')}</td>
                     <td>
-                      <div className={`fin-desc ${t.source === 'bank_csv' ? 'fin-mono' : 'fw-500'}`}>{t.description || '—'}</div>
-                      <div className="text-sm text-muted">{SOURCE_LABEL[t.source]}{t.notes ? ` · ${t.notes.slice(0, 40)}` : ''}</div>
+                      <div className={`fin-desc ${t.label || t.source !== 'bank_csv' ? 'fw-500' : 'fin-mono'}`}>{t.label || t.description || '—'}</div>
+                      <div className="text-sm text-muted fin-desc">{t.label ? `${t.description.slice(0, 40)} · ` : ''}{SOURCE_LABEL[t.source]}{t.notes ? ` · ${t.notes.slice(0, 40)}` : ''}</div>
                     </td>
                     <td style={{ textAlign: 'right' }}><AmountCell value={t.amount} /></td>
                     <td className="col-hide-mobile"><AccountBadge account={account} /></td>
