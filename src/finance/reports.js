@@ -78,9 +78,6 @@ export const directorPosition = (fin) => {
 export const cashPosition = (fin, rentals) => {
   const rows = fin.accounts.filter(a => a.kind !== 'personal').map(a => {
     let balance = a.balance, at = a.balanceAt || '', note = a.balanceAt ? 'entered' : '';
-    // Latest CSV closing balance wins when it is newer than (or there is no) typed-in figure.
-    const lastImport = fin.imports.filter(i => i.accountId === a.id && i.closingBalance != null && i.toDate).sort((x, y) => y.toDate.localeCompare(x.toDate))[0];
-    if (lastImport && (!at || lastImport.toDate >= at)) { balance = lastImport.closingBalance; at = lastImport.toDate; note = 'from the last CSV'; }
     if (a.feed === 'stripe' && fin.settings.stripeBalance != null && (!at || (fin.settings.stripeBalanceAt || '').slice(0, 10) >= at)) { balance = fin.settings.stripeBalance; at = (fin.settings.stripeBalanceAt || '').slice(0, 10); note = 'from Stripe'; }
     if (a.kind === 'cash' && balance == null) { balance = fin.transactions.filter(t => t.accountId === a.id && t.matchStatus !== 'ignored').reduce((s, t) => s + toCents(t.amount), 0) / 100; note = 'what you recorded'; }
     return { account: a, balance, at, note };
