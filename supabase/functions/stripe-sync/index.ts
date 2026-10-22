@@ -132,13 +132,7 @@ serve(async (req) => {
       if (r) await db.from('rentals').update({ stripe_subscription_id: s.id }).eq('id', r.id);
     }
 
-    let stripeBalance: number | null = null;
-    try {
-      const bres = await fetch(`${STRIPE}/balance`, { headers: { Authorization: `Bearer ${stripeKey}` } });
-      const bal = await bres.json();
-      if (bres.ok) stripeBalance = [...(bal.available || []), ...(bal.pending || [])].filter((b: any) => (b.currency || '').toLowerCase() === 'aud').reduce((s: number, b: any) => s + (b.amount || 0), 0) / 100;
-    } catch { /* leave null */ }
-    await db.from('finance_settings').upsert({ id: 1, stripe_last_sync: new Date().toISOString(), ...(stripeBalance == null ? {} : { stripe_balance: stripeBalance, stripe_balance_at: new Date().toISOString() }) });
+    await db.from('finance_settings').upsert({ id: 1, stripe_last_sync: new Date().toISOString() });
     await db.from('finance_accounts').update({ last_import_at: new Date().toISOString() }).eq('id', account.id);
     return new Response(JSON.stringify({ ok: true, charges: charges.length, inserted, subscriptions: subRows.length }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {

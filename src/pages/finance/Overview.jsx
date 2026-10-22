@@ -4,7 +4,7 @@ import { useFinance } from '../../finance/FinanceContext';
 import { useStore } from '../../context/StoreContext';
 import { useSuggestions } from '../../finance/useSuggestions';
 import { addMonths, categoryLabel, categoryShort, categoriesOfType, fyLabel, fyMonths, fyOf, money, money0, monthKey, monthLabel, summarise } from '../../finance/categories';
-import { inRange, monthlySummaries, categoryByMonth, bondsHeld, cashPosition } from '../../finance/reports';
+import { inRange, monthlySummaries, categoryByMonth, bondsHeld } from '../../finance/reports';
 import { generateForecast } from '../../finance/forecast';
 import { formatDate, todayStr } from '../../utils/dates';
 import { AlertStrip, PeriodSwitch, StatCard } from './bits';
@@ -32,7 +32,6 @@ export default function Overview({ go }) {
   const opCount = periodTx.filter(t => (t.splits.length ? t.splits : [t]).some(l => categoriesOfType('operating').some(c => c.id === l.category))).length;
   const capitalLabel = sum.capitalOut ? `After ${money0(sum.capitalOut)} director loan / capital` : 'No capital movements';
   const held = bondsHeld(data.rentals);
-  const cash = useMemo(() => cashPosition(fin, data.rentals), [fin, data.rentals]);
   const pendingRefunds = data.rentals.filter(r => r.bond?.status === 'held' && r.bond.refundedAmount !== '' && Number(r.bond.refundedAmount) > 0).length;
 
   // Alerts
@@ -94,28 +93,6 @@ export default function Overview({ go }) {
           {queue.length > 0 && <AlertStrip tone="blue" title={`${queue.length} transaction${queue.length > 1 ? 's' : ''} to reconcile`} detail={queueKinds} action="Open queue" onAction={() => go('reconcile')} />}
         </div>
       )}
-
-      <div className="label" style={{ marginBottom: 8 }}>Cash position · today, from the whole history</div>
-      <div className="grid-4 mb-20">
-        <StatCard color="var(--text)" value={money0(cash.business)} label="In the business accounts" sub={cash.rows.filter(r => r.actual != null).map(r => `${r.account.name} ${money0(r.actual)}`).join(' · ') || 'No balances known yet'} />
-        <StatCard color="var(--amber)" value={money0(cash.bonds)} label="Of which customers' bonds" sub={`${held.count} bond${held.count !== 1 ? 's' : ''} you must be able to give back`} onClick={() => navigate('/bonds')} />
-        <StatCard color={cash.free < 0 ? 'var(--red)' : 'var(--accent)'} value={money0(cash.free)} label="Your money" sub={cash.free < 0 ? `${money0(-cash.free)} short of covering the bonds` : 'After the bonds are set aside'} />
-        <StatCard color={cash.afterDirector < 0 ? 'var(--red)' : 'var(--blue)'} value={money0(cash.afterDirector)} label="After paying yourself" sub={`Business owes you ${money0(cash.director.total)}`} onClick={() => go('fy')} />
-      </div>
-      <div className="card mb-20">
-        <div className="card-head"><div><span className="card-title">Ledger vs bank, per account</span><div className="text-sm text-muted">A gap means money moved that is not in the ledger: a missed CSV, a line marked ignored, or an opening balance that is wrong.</div></div><button className="btn btn-secondary btn-sm" onClick={() => go('settings')}>Opening balances</button></div>
-        <div className="table-wrap"><table className="table">
-          <thead><tr><th>Account</th><th style={{ textAlign: 'right' }}>Ledger says</th><th style={{ textAlign: 'right' }}>Bank says</th><th className="col-hide-mobile">As at</th><th style={{ textAlign: 'right' }}>Gap</th></tr></thead>
-          <tbody>{cash.rows.map(r => (
-            <tr key={r.account.id} style={{ cursor: 'default' }}>
-              <td className="fw-500">{r.account.name}{!r.hasOpening && r.account.kind !== 'cash' && <div className="text-sm text-muted">No opening balance set</div>}</td>
-              <td style={{ textAlign: 'right' }}>{money0(r.ledger)}</td>
-              <td style={{ textAlign: 'right' }}>{r.actual == null ? <span className="text-muted">—</span> : money0(r.actual)}</td>
-              <td className="col-hide-mobile text-muted">{r.actualAt ? `${formatDate(r.actualAt)} · ${r.actualNote}` : r.actualNote || '—'}</td>
-              <td style={{ textAlign: 'right', fontWeight: 600, color: r.gap == null ? 'var(--muted)' : Math.abs(r.gap) < 1 ? 'var(--accent)' : 'var(--red)' }}>{r.gap == null ? '—' : Math.abs(r.gap) < 1 ? '✓' : money0(r.gap)}</td>
-            </tr>))}</tbody>
-        </table></div>
-      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 1fr)', gap: 14, alignItems: 'start' }} className="fin-overview-grid">
         <div>

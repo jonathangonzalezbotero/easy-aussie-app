@@ -4,8 +4,8 @@ import { supabase } from '../lib/supabase';
 const FinanceContext = createContext(null);
 
 // ── Normalizers ──────────────────────────────────────────────────────────────
-const accountFromDb = (a) => ({ id: a.id, name: a.name, kind: a.kind, feed: a.feed, accountHint: a.account_hint || '', sortOrder: a.sort_order || 0, lastImportAt: a.last_import_at, openingBalance: a.opening_balance == null ? '' : String(a.opening_balance), openingDate: a.opening_date || '' });
-const accountToDb = (a) => ({ name: a.name, kind: a.kind, feed: a.feed, account_hint: a.accountHint || null, sort_order: a.sortOrder || 0, last_import_at: a.lastImportAt || null, opening_balance: a.openingBalance === '' || a.openingBalance == null ? 0 : Number(a.openingBalance), opening_date: a.openingDate || null });
+const accountFromDb = (a) => ({ id: a.id, name: a.name, kind: a.kind, feed: a.feed, accountHint: a.account_hint || '', sortOrder: a.sort_order || 0, lastImportAt: a.last_import_at });
+const accountToDb = (a) => ({ name: a.name, kind: a.kind, feed: a.feed, account_hint: a.accountHint || null, sort_order: a.sortOrder || 0, last_import_at: a.lastImportAt || null });
 
 const splitFromDb = (s) => ({ id: s.id, transactionId: s.transaction_id, category: s.category, amount: Number(s.amount), rentalId: s.rental_id, customerId: s.customer_id, vehicleId: s.vehicle_id, payeeId: s.payee_id || null, notes: s.notes || '', sortOrder: s.sort_order || 0 });
 
@@ -41,7 +41,6 @@ const settingsFromDb = (s) => ({
   scooterWeeklyRate: Number(s.scooter_weekly_rate ?? 135), ebikeWeeklyRate: Number(s.ebike_weekly_rate ?? 55),
   reminderEnabled: s.reminder_enabled !== false, reminderEmail: s.reminder_email || '',
   stripeLastSync: s.stripe_last_sync, stripeSyncFrom: s.stripe_sync_from || '',
-  stripeBalance: s.stripe_balance == null ? null : Number(s.stripe_balance), stripeBalanceAt: s.stripe_balance_at || null,
 });
 const settingsToDb = (s) => ({
   cutover_date: s.cutoverDate || null, director_loan_opening: s.directorLoanOpening === '' ? 0 : Number(s.directorLoanOpening),

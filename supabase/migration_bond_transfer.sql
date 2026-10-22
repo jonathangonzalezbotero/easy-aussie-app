@@ -9,9 +9,3 @@ alter table finance_stripe_subscriptions add column if not exists last_failed_at
 
 -- Your own name for a transaction. The bank/Stripe description stays untouched for matching and duplicate checks.
 alter table finance_transactions add column if not exists label text;
-
--- Cash position: what each account held when the ledger starts, and Stripe's live balance.
-alter table finance_accounts add column if not exists opening_balance numeric default 0;
-alter table finance_accounts add column if not exists opening_date date;
-alter table finance_settings add column if not exists stripe_balance numeric;
-alter table finance_settings add column if not exists stripe_balance_at timestamptz;
