@@ -84,9 +84,9 @@ export default function FinanceSettings({ go }) {
         {local && <div style={{ display: 'flex', gap: 8 }}><button className="btn btn-secondary" onClick={() => setLocal(null)}>Discard</button><button className="btn btn-primary" onClick={saveSettings}>Save settings</button></div>}
       </div>
 
-      <Section title="Accounts" sub={`Where money moves. Opening balance = what the account held the day before its first ledger line; it makes "ledger vs bank" on the Overview add up.${settings.cutoverDate ? ` Bank CSV and Stripe lines are only accepted after ${formatDate(settings.cutoverDate)}.` : ''}`} action={<button className="btn btn-secondary btn-sm" onClick={() => setImportFor(fin.accounts.find(a => a.feed === 'csv')?.id)}>Import bank CSV</button>}>
+      <Section title="Accounts" sub={`Where money moves. Balances are updated by CSV imports and the Stripe sync, or typed in on the Overview.${settings.cutoverDate ? ` Bank CSV and Stripe lines are only accepted after ${formatDate(settings.cutoverDate)}.` : ''}`} action={<button className="btn btn-secondary btn-sm" onClick={() => setImportFor(fin.accounts.find(a => a.feed === 'csv')?.id)}>Import bank CSV</button>}>
         <div className="table-wrap"><table className="table">
-          <thead><tr><th>Account</th><th className="col-hide-mobile">Type</th><th>Feed</th><th>Last import or sync</th><th>Opening balance</th><th className="col-hide-mobile" style={{ textAlign: 'right' }}>Lines</th><th></th></tr></thead>
+          <thead><tr><th>Account</th><th className="col-hide-mobile">Type</th><th>Feed</th><th>Last import or sync</th><th style={{ textAlign: 'right' }}>Balance</th><th className="col-hide-mobile" style={{ textAlign: 'right' }}>Lines</th><th></th></tr></thead>
           <tbody>{fin.accounts.map(a => {
             const last = a.feed === 'stripe' ? fin.settings.stripeLastSync : a.lastImportAt;
             const age = last ? Math.floor((now - new Date(last)) / 86400000) : null;
@@ -96,7 +96,7 @@ export default function FinanceSettings({ go }) {
                 <td className="col-hide-mobile text-muted">{{ bank: 'Bank account', processor: 'Payment processor', personal: 'Your own card', cash: 'Cash' }[a.kind]}</td>
                 <td><Badge variant={a.feed === 'stripe' ? 'blue' : 'gray'}>{a.feed === 'csv' ? 'Bank CSV' : a.feed === 'stripe' ? 'Automatic' : 'Manual'}</Badge></td>
                 <td>{last ? <Badge variant={age > 7 && a.feed !== 'manual' ? 'amber' : 'green'}>{formatTimestamp(last)}{age > 7 ? ` · ${age} days ago` : ''}</Badge> : <span className="text-muted">—</span>}</td>
-                <td>{a.kind === 'personal' ? <span className="text-muted">—</span> : <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}><input className="input" type="number" step="0.01" style={{ width: 100, padding: '5px 8px' }} defaultValue={a.openingBalance} key={`ob-${a.id}-${a.openingBalance}`} onBlur={e => e.target.value !== a.openingBalance && fin.updateAccount(a.id, { openingBalance: e.target.value })} placeholder="0" /><input className="input" type="date" style={{ width: 140, padding: '5px 8px' }} defaultValue={a.openingDate} key={`od-${a.id}-${a.openingDate}`} onBlur={e => e.target.value !== a.openingDate && fin.updateAccount(a.id, { openingDate: e.target.value })} /></div>}</td>
+                <td style={{ textAlign: 'right' }}>{a.kind === 'personal' ? <span className="text-muted">—</span> : a.feed === 'stripe' ? (fin.settings.stripeBalance == null ? <span className="text-muted">sync</span> : money(fin.settings.stripeBalance)) : a.balance == null ? <span className="text-muted">—</span> : <span title={a.balanceAt ? `as at ${formatDate(a.balanceAt)}` : ''}>{money(a.balance)}</span>}</td>
                 <td className="col-hide-mobile" style={{ textAlign: 'right' }}>{lineCount(a.id).toLocaleString()}</td>
                 <td style={{ textAlign: 'right' }}>
                   {a.feed === 'csv' && <button className="btn btn-secondary btn-sm" onClick={() => setImportFor(a.id)}>Import</button>}

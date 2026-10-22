@@ -9,6 +9,7 @@ import { categoryLabel, categoryTypeNote, money, SOURCE_LABEL, toCents } from '.
 import { buildConfirm, splitRemainder } from '../../finance/confirm';
 import { unreimbursedExpenses, directorPosition, reimbursedByExpense, outstandingDrawings } from '../../finance/reports';
 import { entriesForTransaction, MAINTENANCE_CATEGORIES } from '../../finance/maintenanceLink';
+import { mirrorFor, mirrorOf, isMirror } from '../../finance/transfers';
 import { formatDate, todayStr } from '../../utils/dates';
 import { BOND_RETAIN_REASONS } from '../../utils/bond';
 import { AmountCell, AccountBadge, CategorySelect, SideEffectNote, StatusBadge } from './bits';
@@ -27,6 +28,7 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
+  const txs = fin.transactions;
   useEffect(() => {
     if (!open) return;
     setErr('');
@@ -37,14 +39,15 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
         splits: presetSplits ? presetSplits.map(s => ({ ...blankSplit(), ...s })) : tx.splits.length ? tx.splits.map(s => ({ ...s, amount: String(s.amount) })) : [blankSplit(), blankSplit()],
         customerId: tx.customerId || '', rentalId: tx.rentalId || '', vehicleId: tx.vehicleId || '', payeeId: tx.payeeId || '',
         linkedTransactionId: tx.linkedTransactionId || '', label: tx.label || '', notes: tx.notes || '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0],
+        toAccountId: mirrorOf(txs, tx.id)?.accountId || '',
         maintenanceId: presetMaintenanceId || data.maintenance.find(m => m.transactionId === tx.id && !m.splitId)?.id || '',
         jobSplitIndex: presetSplits ? 0 : null,
       });
     } else {
       const manualAccounts = fin.accounts.filter(a => a.feed === 'manual');
-      setForm({ accountId: defaultAccountId || manualAccounts[0]?.id || fin.accounts[0]?.id || '', date: todayStr(), amount: '', description: '', category: '', splitOn: false, splits: [blankSplit(), blankSplit()], customerId: '', rentalId: '', vehicleId: '', payeeId: '', linkedTransactionId: '', label: '', notes: '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0], maintenanceId: '' });
+      setForm({ accountId: defaultAccountId || manualAccounts[0]?.id || fin.accounts[0]?.id || '', date: todayStr(), amount: '', description: '', category: '', splitOn: false, splits: [blankSplit(), blankSplit()], customerId: '', rentalId: '', vehicleId: '', payeeId: '', linkedTransactionId: '', label: '', notes: '', refundMode: 'retain', retainReason: BOND_RETAIN_REASONS[0], maintenanceId: '', toAccountId: '' });
     }
-  }, [open, tx, defaultAccountId, fin.accounts, data.maintenance, presetSplits, presetMaintenanceId]);
+  }, [open, tx, defaultAccountId, fin.accounts, data.maintenance, presetSplits, presetMaintenanceId, txs]);
 
   const sug = tx ? suggestions[tx.id] : null;
   const account = fin.accounts.find(a => a.id === form?.accountId);
@@ -67,6 +70,9 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
   const splitsValid = !form.splitOn || (activeSplits.length >= 2 && remainder === 0 && activeSplits.every(s => s.category));
   const confirmPayload = buildConfirm(pseudoTx, { ...form, splits: form.splitOn ? activeSplits.map(s => ({ ...s, amount: Number(s.amount) })) : [] }, { rentals: data.rentals });
   const linkedExpense = form.linkedTransactionId ? fin.transactions.find(t => t.id === form.linkedTransactionId) : null;
+  const isTransfer = form.category === 'internal_transfer' && !form.splitOn;
+  const thisIsMirror = tx ? isMirror(tx) : false;
+  const otherAccounts = fin.accounts.filter(a => a.id !== form.accountId && a.kind !== 'personal');
   const canSave = form.accountId && form.date && form.amount !== '' && (form.splitOn ? splitsValid : !!form.category) && !saving;
   const isJob = form.splitOn ? activeSplits.some(s => MAINTENANCE_CATEGORIES.includes(s.category)) : MAINTENANCE_CATEGORIES.includes(form.category);
   const currentlyLinked = tx ? data.maintenance.find(m => m.transactionId === tx.id && !m.splitId) : null;
@@ -104,6 +110,18 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
         if (prev?.transactionId !== saved.id || (prev?.splitId || null) !== splitId) await updateStore('maintenance', form.maintenanceId, { transactionId: saved.id, splitId });
       }
       if (currentlyLinked && form.maintenanceId !== currentlyLinked.id) await updateStore('maintenance', currentlyLinked.id, { transactionId: null, splitId: null });
+      // Mirror line on the other account for internal transfers
+      if (!thisIsMirror) {
+        const mirror = mirrorOf(fin.transactions, saved.id);
+        if (isTransfer && form.toAccountId) {
+          const toAcc = fin.accounts.find(a => a.id === form.toAccountId); const fromAcc = fin.accounts.find(a => a.id === saved.accountId);
+          if (mirror && (mirror.accountId !== form.toAccountId || toCents(mirror.amount) !== -toCents(saved.amount) || mirror.date !== saved.date)) {
+            if (mirror.source === 'manual') await fin.updateTransaction(mirror.id, { accountId: form.toAccountId, date: saved.date, amount: -Number(saved.amount), description: `Transfer from ${fromAcc?.name || ''}`.trim() });
+          } else if (!mirror) await fin.addTransaction(mirrorFor(saved, toAcc, fromAcc));
+        } else if (mirror && mirror.source === 'manual' && !isTransfer) {
+          await fin.removeTransaction(mirror.id);
+        }
+      }
       onSaved?.(saved, confirmPayload.effects);
       onClose();
     } catch (e) { setErr(e.message || String(e)); } finally { setSaving(false); }
@@ -233,7 +251,17 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
           </>
         )}
 
-        {(form.category === 'reimbursement' || form.category === 'drawings_repaid' || form.linkedTransactionId) && (
+        {isTransfer && !thisIsMirror && (
+          <div className="field"><label className="label">{amountNum < 0 ? 'Money went to' : 'Money came from'}</label>
+            <select className="select" value={form.toAccountId} onChange={e => sf('toAccountId', e.target.value)}>
+              <option value="">Choose account…</option>
+              {otherAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            <span className="field-hint">{form.toAccountId ? `A matching line is kept on ${fin.accounts.find(a => a.id === form.toAccountId)?.name} so both balances are right. When that account's CSV is imported, the real bank line takes its place.` : 'Pick the other account so both sides of the transfer are recorded.'}</span></div>
+        )}
+        {thisIsMirror && <div style={{ background: 'var(--blue-bg)', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}>This is the other side of a transfer recorded on {fin.accounts.find(a => a.id === fin.transactions.find(t => t.id === tx.raw.mirror_of)?.accountId)?.name || 'another account'}. It is replaced automatically when this account's CSV is imported.</div>}
+
+        {(form.category === 'reimbursement' || form.category === 'drawings_repaid' || (form.linkedTransactionId && !isTransfer && !thisIsMirror)) && (
           <div>
             <div className="label" style={{ marginBottom: 6 }}>{isPayback ? 'Which personal expense does this pay back?' : 'Linked transaction'}</div>
             {linkedExpense ? (

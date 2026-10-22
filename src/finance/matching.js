@@ -56,6 +56,12 @@ export function suggestFor(tx, { rules, customers, rentals, vehicles, transactio
     if (rental && amt < 0) return bondRefundSuggestion(rental, tx, `reference ${code} found in description`);
   }
 
+  // 1a. Other side of a transfer between your own accounts
+  if (account && account.kind !== 'personal') {
+    const other = transactions.find(t => t.id !== tx.id && t.accountId !== tx.accountId && t.category === 'internal_transfer' && !t.raw?.mirror_of && toCents(t.amount) === -cents && daysApart(t.date, tx.date) <= 3 && accounts.find(a => a.id === t.accountId)?.kind !== 'personal');
+    if (other) return { kind: 'transfer', category: 'internal_transfer', linkedTransactionId: other.id, reason: `matches the transfer on ${accounts.find(a => a.id === other.accountId)?.name} on ${other.date}` };
+  }
+
   // 1b. Money in that matches a drawing not yet paid back → personal expense paid back
   if (amt > 0 && account?.kind === 'bank') {
     const repaid = {};

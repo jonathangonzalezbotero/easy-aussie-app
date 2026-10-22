@@ -15,3 +15,7 @@ alter table finance_accounts add column if not exists opening_balance numeric de
 alter table finance_accounts add column if not exists opening_date date;
 alter table finance_settings add column if not exists stripe_balance numeric;
 alter table finance_settings add column if not exists stripe_balance_at timestamptz;
+
+-- Today's balance per account, typed in or taken from the last CSV closing balance.
+alter table finance_accounts add column if not exists balance numeric;
+alter table finance_accounts add column if not exists balance_at date;

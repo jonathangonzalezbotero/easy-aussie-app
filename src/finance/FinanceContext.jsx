@@ -4,8 +4,8 @@ import { supabase } from '../lib/supabase';
 const FinanceContext = createContext(null);
 
 // ── Normalizers ──────────────────────────────────────────────────────────────
-const accountFromDb = (a) => ({ id: a.id, name: a.name, kind: a.kind, feed: a.feed, accountHint: a.account_hint || '', sortOrder: a.sort_order || 0, lastImportAt: a.last_import_at, openingBalance: a.opening_balance == null ? '' : String(a.opening_balance), openingDate: a.opening_date || '' });
-const accountToDb = (a) => ({ name: a.name, kind: a.kind, feed: a.feed, account_hint: a.accountHint || null, sort_order: a.sortOrder || 0, last_import_at: a.lastImportAt || null, opening_balance: a.openingBalance === '' || a.openingBalance == null ? 0 : Number(a.openingBalance), opening_date: a.openingDate || null });
+const accountFromDb = (a) => ({ id: a.id, name: a.name, kind: a.kind, feed: a.feed, accountHint: a.account_hint || '', sortOrder: a.sort_order || 0, lastImportAt: a.last_import_at, openingBalance: a.opening_balance == null ? '' : String(a.opening_balance), openingDate: a.opening_date || '', balance: a.balance == null ? null : Number(a.balance), balanceAt: a.balance_at || '' });
+const accountToDb = (a) => ({ name: a.name, kind: a.kind, feed: a.feed, account_hint: a.accountHint || null, sort_order: a.sortOrder || 0, last_import_at: a.lastImportAt || null, opening_balance: a.openingBalance === '' || a.openingBalance == null ? 0 : Number(a.openingBalance), opening_date: a.openingDate || null, balance: a.balance === '' || a.balance == null ? null : Number(a.balance), balance_at: a.balanceAt || null });
 
 const splitFromDb = (s) => ({ id: s.id, transactionId: s.transaction_id, category: s.category, amount: Number(s.amount), rentalId: s.rental_id, customerId: s.customer_id, vehicleId: s.vehicle_id, payeeId: s.payee_id || null, notes: s.notes || '', sortOrder: s.sort_order || 0 });
 
@@ -182,7 +182,12 @@ export function FinanceProvider({ children }) {
     if (error) throw error;
     const item = importFromDb(data);
     setState(s => ({ ...s, imports: [item, ...s.imports] }));
-    if (imp.accountId) await updateAccount(imp.accountId, { lastImportAt: new Date().toISOString() });
+    if (imp.accountId) {
+      const patch = { lastImportAt: new Date().toISOString() };
+      const acc = state.accounts.find(a => a.id === imp.accountId);
+      if (imp.closingBalance != null && imp.toDate && (!acc?.balanceAt || imp.toDate >= acc.balanceAt)) { patch.balance = imp.closingBalance; patch.balanceAt = imp.toDate; }
+      await updateAccount(imp.accountId, patch);
+    }
     return item;
   };
 
