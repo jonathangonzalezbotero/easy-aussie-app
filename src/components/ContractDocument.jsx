@@ -45,6 +45,8 @@ const Field = ({ label, value }) => (
   </div>
 );
 
+import { COVER_EXCLUSIONS, totalLiability } from '../utils/terms';
+
 export default function ContractDocument({ d, isEbike, isCar, contractRef = null, ownerSignature = true }) {
   const today = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -65,6 +67,30 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
   const perUnit    = weekly ? 'per week' : 'per rental period';
   const basisTitle = weekly ? 'Rental Period (Weekly Basis)' : 'Rental Period (Fixed Term)';
   const ongoing    = weekly ? 'Ongoing weekly rental' : 'As agreed';
+
+  // Liability option + surcharges (scooters and cars). Mirrors the wording the
+  // customer accepted on the intake page (src/utils/terms.js).
+  const reduced   = d.insuranceOption === 'reduced';
+  const noun      = isCar ? 'vehicle' : 'moped';
+  const feeNotes  = (
+    <>
+      {reduced && d.reducedExcessWeekly && (
+        <p style={{ marginTop: 6 }}>The Rental Fee includes the <strong>Reduced Liability premium of {weekly ? `$${fmtMoney(d.reducedExcessWeekly)} AUD per week` : `$${fmtMoney(d.reducedExcessFixed)} AUD (one-off)`}</strong> (see clause on Renter's Liability).</p>
+      )}
+    </>
+  );
+  const liabilityTitle = reduced ? 'Reduced Liability (selected)' : 'Standard Liability (selected)';
+  const liabilityClause = (
+    <>
+      <p>The security bond of <strong>${fmtMoney(d.bondAmount)} AUD</strong> is applied first towards the insurance excess and any damage to the {noun}.</p>
+      {reduced ? (
+        <p style={{ marginTop: 6 }}>The Renter has selected the <strong>Reduced Liability</strong> option for <strong>{weekly ? `$${fmtMoney(d.reducedExcessWeekly)} AUD per week` : `$${fmtMoney(d.reducedExcessFixed)} AUD as a one-off charge`}</strong>. Under this option the Renter's total liability per incident, covering both the insurance excess and damage to the {noun} itself, is capped at <strong>${fmtMoney(d.reducedExcess)} AUD</strong>. Nothing further is charged on top of the bond.</p>
+      ) : (
+        <p style={{ marginTop: 6 }}>The Renter has selected the <strong>Standard Liability</strong> option. In the event of an accident the Renter will pay <strong>${fmtMoney(totalLiability(d))} AUD in total</strong>: the <strong>${fmtMoney(d.bondAmount)} AUD</strong> bond is retained and the balance is charged to the card on file. The Renter is also liable for the full cost of repairing or replacing the {noun} where this exceeds that amount.</p>
+      )}
+      <p style={{ marginTop: 6 }}>The liability cap and the bond limit do not apply, and the Renter is liable for the full cost, in the case of {COVER_EXCLUSIONS.join('; ')}.</p>
+    </>
+  );
 
   // Rental fee — highlighted at the top of the Payment section
   const RateBlock = () => (
@@ -142,13 +168,15 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
     { num: '3', title: 'Payment, Security Bond & Card Authorisation', content: (
       <div style={bodyText}>
         <RateBlock />
-        <div><strong>3.1 Rental Fee</strong><p>The Rental Fee of <strong>{d.price ? `$${fmtMoney(d.price)} AUD ${perUnit}` : `$_______________ AUD ${perUnit}`}</strong> must be paid in full via bank transfer or an approved payment method prior to scooter key handover.</p></div>
+        <div><strong>3.1 Rental Fee</strong><p>The Rental Fee of <strong>{d.price ? `$${fmtMoney(d.price)} AUD ${perUnit}` : `$_______________ AUD ${perUnit}`}</strong> must be paid in full via bank transfer or an approved payment method prior to scooter key handover.</p>{feeNotes}</div>
         <div style={{ marginTop: 10 }}><strong>3.2 Security Bond &amp; Card on File</strong><p>The Renter must provide a security deposit of <strong>${d.bondAmount} AUD</strong> via bank transfer or credit/debit card. Additionally, the Renter agrees to provide a valid credit or debit card to be securely stored on file via the Owner's digital payment gateway (e.g. Stripe) for the duration of the rental period.</p></div>
         <div style={{ marginTop: 10 }}><strong>3.3 Authority to Charge Saved Card</strong><p style={{ marginBottom: 4 }}>The Renter explicitly authorises the Owner to automatically charge the saved credit/debit card on file to recover any outstanding balances, costs, or liabilities incurred under this Agreement. The card on file may be charged for:</p>
           <ul style={{ marginLeft: 20, marginBottom: 8 }}>
             {[
-              `The standard insurance excess of $${fmtMoney(d.insuranceExcess)} AUD per claim in the event of an accident, third-party property damage, or insurance claim.`,
-              'The full cost of repairs, replacement, or loss resulting from damage, neglect, or theft of the moped (as no comprehensive insurance is included).',
+              reduced
+                ? `The Renter's liability of up to $${fmtMoney(d.reducedExcess)} AUD per incident under the Reduced Liability option, or the full amount where that option does not apply.`
+                : `In the event of an accident, third-party property damage, or insurance claim, the balance of the Renter's total liability of $${fmtMoney(totalLiability(d))} AUD per incident under the Standard Liability option (the $${fmtMoney(d.bondAmount)} AUD bond is retained and the remainder is charged to the card on file).`,
+              reduced ? 'Damage to or loss of the moped up to the Reduced Liability cap, or the full cost where that option does not apply.' : 'The full cost of repairs, replacement, or loss resulting from damage, neglect, or theft of the moped (as no comprehensive insurance is included).',
               'Unpaid traffic infringements, parking fines, tolls, speed camera penalties, and associated administrative processing fees.',
               'Late return fees, professional cleaning fees, or vehicle recovery/towing costs.',
             ].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
@@ -170,6 +198,7 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
         <div style={{ marginTop: 10 }}><strong>5.1 Traffic Fines and Tolls</strong><p>The Renter is responsible for all traffic infringements, parking fines, and toll charges during the rental period.</p></div>
         <div style={{ marginTop: 10 }}><strong>5.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the moped occurring during the rental period. The Renter must immediately notify the Owner and, if applicable, the police of any accident, theft, or incident. Rental fees continue until the moped is repaired or replaced.</p></div>
         <div style={{ marginTop: 10 }}><strong>5.3 Insurance</strong><p>The moped is covered by <strong>Compulsory Third Party (CTP)</strong> insurance, which covers bodily injury to other people, and <strong>Third Party Property Damage</strong> insurance, which covers damage to other people's property caused by the Renter. Neither policy covers damage to or theft of the moped itself. The Renter remains fully liable for any loss or damage to the moped.</p></div>
+        <div style={{ marginTop: 10 }}><strong>5.4 Renter's Liability — {liabilityTitle}</strong>{liabilityClause}</div>
       </div>
     )},
     { num: '6', title: 'Condition & Pre-Ride Inspection', content: (
@@ -191,6 +220,7 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
         </div>
         <div style={{ marginTop: 10 }}><strong>6.3 Acceptance of Risk &amp; Mechanical Soundness</strong><p>By signing this Agreement and taking possession of the vehicle on the street, the Renter acknowledges they have inspected the vehicle on-site, find it structurally and mechanically safe to operate, and accept the moped in its current physical condition.</p></div>
         <div style={{ marginTop: 10 }}><strong>6.4 Return Condition</strong><p>At the end of the rental period, the Renter must return the moped to the designated street location in the exact same condition, allowing only for reasonable fair wear and tear, and with the same level of fuel as provided at handover.</p></div>
+        <div style={{ marginTop: 10 }}><strong>6.5 Engine Oil</strong><p>The moped requires 2-stroke engine oil top-ups. The first top-up is free of charge; each subsequent top-up is <strong>${fmtMoney(d.oilRefillFee)} AUD</strong>. The Renter must not ride with the oil light on; engine damage caused by running without oil is charged to the Renter in full.</p></div>
       </div>
     )},
     { num: '8',  title: 'Prohibited Uses', content: (
@@ -310,13 +340,15 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
     { num: '3', title: 'Payment, Security Bond & Card Authorisation', content: (
       <div style={bodyText}>
         <RateBlock />
-        <div><strong>3.1 Rental Fee</strong><p>The Rental Fee of <strong>{d.price ? `$${fmtMoney(d.price)} AUD ${perUnit}` : `$_______________ AUD ${perUnit}`}</strong> must be paid in full via bank transfer or an approved payment method prior to vehicle key handover.</p></div>
+        <div><strong>3.1 Rental Fee</strong><p>The Rental Fee of <strong>{d.price ? `$${fmtMoney(d.price)} AUD ${perUnit}` : `$_______________ AUD ${perUnit}`}</strong> must be paid in full via bank transfer or an approved payment method prior to vehicle key handover.</p>{feeNotes}</div>
         <div style={{ marginTop: 10 }}><strong>3.2 Security Bond &amp; Card on File</strong><p>The Renter must provide a security deposit of <strong>${d.bondAmount} AUD</strong> via bank transfer or credit/debit card. Additionally, the Renter agrees to provide a valid credit or debit card to be securely stored on file via the Owner's digital payment gateway (e.g. Stripe) for the duration of the rental period.</p></div>
         <div style={{ marginTop: 10 }}><strong>3.3 Authority to Charge Saved Card</strong><p style={{ marginBottom: 4 }}>The Renter explicitly authorises the Owner to automatically charge the saved credit/debit card on file to recover any outstanding balances, costs, or liabilities incurred under this Agreement. The card on file may be charged for:</p>
           <ul style={{ marginLeft: 20, marginBottom: 8 }}>
             {[
-              `The standard insurance excess of $${fmtMoney(d.insuranceExcess)} AUD per claim in the event of an accident, third-party property damage, or insurance claim.`,
-              'The full cost of repairs, replacement, or loss resulting from damage, neglect, or theft of the vehicle (as no comprehensive insurance is included).',
+              reduced
+                ? `The Renter's liability of up to $${fmtMoney(d.reducedExcess)} AUD per incident under the Reduced Liability option, or the full amount where that option does not apply.`
+                : `In the event of an accident, third-party property damage, or insurance claim, the balance of the Renter's total liability of $${fmtMoney(totalLiability(d))} AUD per incident under the Standard Liability option (the $${fmtMoney(d.bondAmount)} AUD bond is retained and the remainder is charged to the card on file).`,
+              reduced ? 'Damage to or loss of the vehicle up to the Reduced Liability cap, or the full cost where that option does not apply.' : 'The full cost of repairs, replacement, or loss resulting from damage, neglect, or theft of the vehicle (as no comprehensive insurance is included).',
               'Unpaid traffic infringements, parking fines, tolls, speed camera penalties, and associated administrative processing fees.',
               'Late return fees, professional cleaning fees, refuelling costs, or vehicle recovery/towing costs.',
             ].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
@@ -344,7 +376,7 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
         <div style={{ marginTop: 10 }}><strong>6.1 Traffic Fines and Tolls</strong><p>The Renter is solely responsible for all traffic infringements, parking fines, and toll charges incurred during the rental period.</p></div>
         <div style={{ marginTop: 10 }}><strong>6.2 Accidents and Damage</strong><p>The Renter is responsible for any loss, damage, or theft of the vehicle occurring during the rental period. The Renter must immediately notify the Owner and, if applicable, Queensland Police. Rental fees continue until the vehicle is repaired or replaced.</p></div>
         <div style={{ marginTop: 10 }}><strong>6.3 Insurance Cover Provided</strong><p>The following insurance is included with this rental: <strong>Compulsory Third Party (CTP)</strong> — covers bodily injury to other people as required by Queensland law; and <strong>Third Party Property Damage</strong> — covers damage caused to other people's property (e.g. another vehicle) in an accident. <strong>No comprehensive insurance is included.</strong> The Renter is fully liable for any damage to or theft of the rental vehicle itself.</p></div>
-        <div style={{ marginTop: 10 }}><strong>6.4 Renter's Liability</strong><p>The Renter is fully liable for the cost of repairing or replacing the vehicle in the event of damage or theft not covered by the included insurance. The Owner strongly recommends the Renter arrange their own comprehensive vehicle or travel insurance before taking possession of the vehicle.</p></div>
+        <div style={{ marginTop: 10 }}><strong>6.4 Renter's Liability — {liabilityTitle}</strong>{liabilityClause}<p style={{ marginTop: 6 }}>The Owner strongly recommends the Renter arrange their own comprehensive or travel insurance for the duration of the rental.</p></div>
       </div>
     )},
     { num: '8', title: 'Condition of the Vehicle', content: (

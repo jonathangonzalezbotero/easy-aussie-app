@@ -52,6 +52,34 @@ export default function Settings() {
               <input className="input" type="number" min="0" value={form.insuranceExcess || ''} onChange={e => sf('insuranceExcess', e.target.value)} />
               <span className="field-hint">Shown in the contract as the amount charged to the card on file per insurance claim (scooters and cars)</span>
             </div>
+            <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 6 }}>Rental conditions shown on the public intake page and printed in the contract.</p>
+            <div className="grid-2">
+              <div className="field">
+                <label className="label">E-bike Bond Amount ($)</label>
+                <input className="input" type="number" min="0" value={form.ebikeBond || ''} onChange={e => sf('ebikeBond', e.target.value)} />
+                <span className="field-hint">Default bond for e-bike rentals (scooters use the amount above)</span>
+              </div>
+              <div className="field">
+                <label className="label">Oil Top-up Fee ($)</label>
+                <input className="input" type="number" min="0" value={form.oilRefillFee || ''} onChange={e => sf('oilRefillFee', e.target.value)} />
+                <span className="field-hint">Scooters only. First top-up is free</span>
+              </div>
+              <div className="field">
+                <label className="label">Reduced Liability Cap ($)</label>
+                <input className="input" type="number" min="0" value={form.reducedExcess || ''} onChange={e => sf('reducedExcess', e.target.value)} />
+                <span className="field-hint">Maximum out-of-pocket per incident with the reduced option</span>
+              </div>
+              <div className="field">
+                <label className="label">Reduced Liability Premium ($/week)</label>
+                <input className="input" type="number" min="0" value={form.reducedExcessWeekly || ''} onChange={e => sf('reducedExcessWeekly', e.target.value)} />
+                <span className="field-hint">For ongoing weekly rentals</span>
+              </div>
+              <div className="field">
+                <label className="label">Reduced Liability One-off ($)</label>
+                <input className="input" type="number" min="0" value={form.reducedExcessFixed || ''} onChange={e => sf('reducedExcessFixed', e.target.value)} />
+                <span className="field-hint">Single charge for fixed-term rentals of a week or less</span>
+              </div>
+            </div>
             <div>
               <button className="btn btn-primary" onClick={save} disabled={saving}>
                 {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Settings'}

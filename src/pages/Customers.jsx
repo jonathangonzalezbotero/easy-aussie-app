@@ -252,6 +252,13 @@ export default function Customers() {
                 </div>
               )}
             </div>
+            {selected.termsAcceptedAt && (
+              <div style={{ background: 'var(--accent-light)', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 13 }}>
+                <div className="label" style={{ marginBottom: 4 }}>Rental Conditions</div>
+                Accepted {formatTimestamp(selected.termsAcceptedAt)}{selected.termsVersion ? ` (v${selected.termsVersion})` : ''}
+                {selected.insuranceOption && <span> · {selected.insuranceOption === 'reduced' ? 'Reduced liability' : 'Standard liability'}</span>}
+              </div>
+            )}
             {(selected.licenseRef || detailPhoto) && (
               <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
                 <div className="label" style={{ marginBottom: 8 }}>Driver's Licence</div>

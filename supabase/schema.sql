@@ -41,12 +41,16 @@ create table if not exists customers (
   license_ref       text,
   licence_photo     text,
   vehicle_type      text check (vehicle_type in ('scooter','ebike','car')),
+  terms_accepted_at timestamptz,
+  terms_version     text,
+  insurance_option  text check (insurance_option in ('standard','reduced')),
   notes             text,
   created_at        timestamptz default now()
 );
 
 -- Run this if the customers table already exists:
 -- alter table customers add column if not exists vehicle_type text check (vehicle_type in ('scooter','ebike','car'));
+-- For terms_accepted_at / terms_version / insurance_option see migration_intake_terms.sql
 
 create table if not exists rentals (
   id            uuid primary key default gen_random_uuid(),
@@ -64,6 +68,7 @@ create table if not exists rentals (
   bond_refund_method   text,
   bond_refund_date     date,
   rent_paid_by         text default 'stripe',
+  insurance_option     text default 'standard' check (insurance_option in ('standard','reduced')),
   stripe_subscription_id text,
   shopify_ref      text,
   contract_ref     text,
@@ -97,7 +102,12 @@ create table if not exists settings (
   owner_abn          text default '20 680 626 251',
   owner_responsible  text default 'Jonathan Alexander Gonzalez Botero',
   default_bond       text default '300',
-  insurance_excess   text default '700'
+  insurance_excess   text default '700',
+  ebike_bond            text default '150',
+  oil_refill_fee        text default '5',
+  reduced_excess        text default '300',
+  reduced_excess_weekly text default '10',
+  reduced_excess_fixed  text default '30'
 );
 
 -- Insert the single settings row
@@ -121,3 +131,4 @@ create policy "Auth full access" on settings    for all to authenticated using (
 create policy "Auth full access"       on customers for all    to authenticated using (true) with check (true);
 -- Anonymous users can only INSERT (for the public intake form)
 create policy "Public intake form insert" on customers for insert to anon          with check (true);
+create policy "Public read settings"      on settings  for select to anon          using (true);

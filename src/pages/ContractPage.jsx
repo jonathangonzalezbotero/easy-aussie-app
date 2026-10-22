@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import ContractDocument from '../components/ContractDocument';
+import { termsAmountsFromSettings } from '../utils/terms';
 
 export default function ContractPage() {
   const { state } = useLocation();
@@ -53,8 +54,10 @@ export default function ContractPage() {
     vehicleCondition: vehicle?.conditionNotes || '',
     startDate:        rental.startDate || '',
     endDate:          rental.endDate || '',
-    bondAmount:       rental.bond?.amount || settings.defaultBond || '300',
+    bondAmount:       rental.bond?.amount || (isEbike ? settings.ebikeBond || '150' : settings.defaultBond || '300'),
     insuranceExcess:  settings.insuranceExcess || '700',
+    ...termsAmountsFromSettings(settings),
+    insuranceOption:  rental.insuranceOption || 'standard',
     price:            rental.price || '',
     billingPeriod:    rental.billingPeriod || 'weekly',
     contractNumber:   rental.contractNumber || '',

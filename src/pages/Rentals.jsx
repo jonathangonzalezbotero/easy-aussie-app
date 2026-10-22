@@ -9,9 +9,10 @@ import Tabs from '../components/shared/Tabs';
 import { formatDate, daysBetween, todayStr, ageOn, isYoungRenter } from '../utils/dates';
 import { BOND_STATUSES, BOND_RETAIN_REASONS, bondLabel, bondVariant, closedBondStatus } from '../utils/bond';
 import { confirmOdometer, latestReading, describeReading } from '../utils/odometer';
+import { insuranceOptions, termsAmountsFromSettings, reducedPremiumText } from '../utils/terms';
 
 const EF = {
-  customerId: '', vehicleId: '', startDate: todayStr(), endDate: '', contractNumber: '', notes: '', odometer: '', price: '', billingPeriod: 'weekly',
+  customerId: '', vehicleId: '', startDate: todayStr(), endDate: '', contractNumber: '', notes: '', odometer: '', price: '', billingPeriod: 'weekly', insuranceOption: 'standard',
   bond: { amount: '', method: 'cash', status: 'held', refundedAmount: '', retainedAmount: '', retainReason: '', refundMethod: '', refundDate: '' },
 };
 const EMPTY_BOND = EF.bond;
@@ -170,6 +171,7 @@ export default function Rentals() {
       odometer: r.odometer || '',
       price: r.price || '',
       billingPeriod: r.billingPeriod || 'weekly',
+      insuranceOption: r.insuranceOption || 'standard',
       bond: { ...EMPTY_BOND, ...(r.bond || {}) },
     });
   };
@@ -185,7 +187,7 @@ export default function Rentals() {
     if (!form.customerId) { alert('Please select a customer'); return; }
     if (!form.vehicleId) { alert('Please select a vehicle'); return; }
     if (!form.startDate) { alert('Start date is required'); return; }
-    const bondAmount = form.bond.amount || data.settings?.defaultBond || '300';
+    const bondAmount = form.bond.amount || (data.vehicles.find(v => v.id === form.vehicleId)?.type === 'ebike' ? data.settings?.ebikeBond || '150' : data.settings?.defaultBond || '300');
     if (form.odometer && !confirmOdometer(data.odometerReadings, form.vehicleId, form.odometer, form.startDate)) return;
     setSaving(true);
     try {
@@ -294,7 +296,7 @@ export default function Rentals() {
       <div className="grid-2">
         <div className="field">
           <label className="label">Customer *</label>
-          <CustomerPicker customers={customerOpts} value={form.customerId} onChange={id => sf('customerId', id)} startDate={form.startDate} />
+          <CustomerPicker customers={customerOpts} value={form.customerId} onChange={id => { const c = data.customers.find(x => x.id === id); setForm(f => ({ ...f, customerId: id, insuranceOption: c?.insuranceOption || f.insuranceOption })); }} startDate={form.startDate} />
           {data.customers.length === 0 && <span className="field-hint">No customers yet — add one first</span>}
           {(() => {
             const c = data.customers.find(x => x.id === form.customerId);
@@ -342,11 +344,31 @@ export default function Rentals() {
           <input className="input" type="number" min="0" step="0.01" value={form.price} onChange={e => sf('price', e.target.value)} placeholder={form.billingPeriod === 'fixed' ? 'e.g. 105' : 'e.g. 150'} />
         </div>
       </div>
+      {(() => {
+        const v = data.vehicles.find(x => x.id === form.vehicleId);
+        if (v?.type === 'ebike') return null;
+        const a = termsAmountsFromSettings(data.settings);
+        const c = data.customers.find(x => x.id === form.customerId);
+        return (
+          <div className="field">
+            <label className="label">Liability Option</label>
+            <select className="select" value={form.insuranceOption} onChange={e => sf('insuranceOption', e.target.value)}>
+              {insuranceOptions(a).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <span className="field-hint">
+              {form.insuranceOption === 'reduced'
+                ? `Out-of-pocket capped at $${a.reducedExcess} per incident — include the ${reducedPremiumText(a, form.billingPeriod)} in the price.`
+                : `An accident costs the renter $${Number(a.defaultBond) + Number(a.insuranceExcess)} in total (bond kept, balance charged to card).`}
+              {c?.insuranceOption && c.insuranceOption !== form.insuranceOption ? ` Customer chose "${insuranceOptions(a).find(o => o.value === c.insuranceOption)?.label}" on the intake form.` : ''}
+            </span>
+          </div>
+        );
+      })()}
       <div className="form-divider"><span>Bond / Deposit</span></div>
       <div className="grid-2">
         <div className="field">
           <label className="label">Amount ($)</label>
-          <input className="input" type="number" min="0" value={form.bond.amount} onChange={e => sb('amount', e.target.value)} placeholder={data.settings?.defaultBond || '300'} />
+          <input className="input" type="number" min="0" value={form.bond.amount} onChange={e => sb('amount', e.target.value)} placeholder={data.vehicles.find(v => v.id === form.vehicleId)?.type === 'ebike' ? (data.settings?.ebikeBond || '150') : (data.settings?.defaultBond || '300')} />
         </div>
         <div className="field">
           <label className="label">Payment Method</label>
@@ -685,6 +707,7 @@ export default function Rentals() {
                 {selected.contractNumber && <div><div className="label">Contract No.</div><div style={{ marginTop: 3, fontWeight: 600 }}>{selected.contractNumber}</div></div>}
                 {selected.odometer && <div><div className="label">Odometer at Start</div><div style={{ marginTop: 3 }}>{Number(selected.odometer).toLocaleString()} km</div></div>}
                 {selected.odometerReturn && <div><div className="label">Odometer at Return</div><div style={{ marginTop: 3, fontWeight: 600 }}>{Number(selected.odometerReturn).toLocaleString()} km{selected.odometer ? ` (+${(Number(selected.odometerReturn) - Number(selected.odometer)).toLocaleString()} km)` : ''}</div></div>}
+                {selected.insuranceOption && data.vehicles.find(x => x.id === selected.vehicleId)?.type !== 'ebike' && <div><div className="label">Liability Option</div><div style={{ marginTop: 3 }}>{insuranceOptions(termsAmountsFromSettings(data.settings)).find(o => o.value === selected.insuranceOption)?.label || selected.insuranceOption}</div></div>}
                 {selected.price && <div><div className="label">{selected.billingPeriod === 'fixed' ? 'Total Price (Rental Period)' : 'Weekly Price'}</div><div style={{ marginTop: 3, fontWeight: 600 }}>${Number(selected.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}{selected.billingPeriod === 'fixed' ? ' total' : ' / week'}</div></div>}
               </div>
               <div style={{ background: selected.bond?.amount ? (selected.bond.status === 'held' ? 'var(--amber-bg)' : selected.bond.status === 'awaiting' ? 'var(--blue-bg)' : 'var(--accent-light)') : 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>

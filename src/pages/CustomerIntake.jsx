@@ -1,14 +1,14 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { TERMS_VERSION, DEFAULT_TERMS_AMOUNTS, termsAmountsFromRow, termsFor, insuranceOptions } from '../utils/terms';
 
 const VEHICLE_TYPES = [
   { value: 'scooter', label: 'Scooter', needsLicence: true },
   { value: 'ebike',   label: 'E-bike',  needsLicence: false },
-  { value: 'car',     label: 'Car',     needsLicence: true },
 ];
 
 const EF = {
-  vehicleType: '',
+  vehicleType: '', insuranceOption: 'standard', termsAccepted: false,
   name: '', dateOfBirth: '', phone: '', email: '',
   addressStreet: '', addressSuburb: '', addressState: '', addressPostCode: '',
   occupation: '', emergencyContact: '', emergencyPhone: '', hotelAddress: '',
@@ -20,9 +20,29 @@ export default function CustomerIntake() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted]   = useState(false);
   const [error, setError]           = useState('');
+  const [step, setStep]             = useState('terms');   // 'terms' | 'form'
+  const [amounts, setAmounts]       = useState(DEFAULT_TERMS_AMOUNTS);
   const fileInputRef = useRef(null);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const needsLicence = VEHICLE_TYPES.find(t => t.value === form.vehicleType)?.needsLicence ?? true;
+  const hasInsuranceOption = form.vehicleType === 'scooter';
+  const vehicleLabel = VEHICLE_TYPES.find(t => t.value === form.vehicleType)?.label || '';
+
+  // Bond / excess / surcharge amounts come from the settings row (anon read policy).
+  // Falls back to the defaults if the read fails so the page still works.
+  useEffect(() => {
+    supabase.from('settings').select('*').eq('id', 1).single()
+      .then(({ data }) => { if (data) setAmounts(termsAmountsFromRow(data)); })
+      .catch(() => {});
+  }, []);
+
+  const continueToForm = () => {
+    if (!form.vehicleType)   { setError('Please select what you would like to rent'); return; }
+    if (!form.termsAccepted) { setError('Please tick the box to confirm you have read and accept the conditions'); return; }
+    setError('');
+    setStep('form');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleFile = (e) => {
     const file = e.target.files[0];
@@ -38,6 +58,7 @@ export default function CustomerIntake() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.vehicleType)       { setError('Please select what you would like to rent'); return; }
+    if (!form.termsAccepted)     { setError('Please accept the rental conditions first'); setStep('terms'); return; }
     if (!form.name.trim())       { setError('Full name is required'); return; }
     if (!form.dateOfBirth)       { setError('Date of birth is required'); return; }
     if (!form.phone.trim())      { setError('Phone number is required'); return; }
@@ -64,6 +85,9 @@ export default function CustomerIntake() {
         license_ref:       needsLicence ? (form.licenseRef || null) : null,
         licence_photo:     form.licencePhoto || null,
         vehicle_type:      form.vehicleType,
+        terms_accepted_at: new Date().toISOString(),
+        terms_version:     TERMS_VERSION,
+        insurance_option:  hasInsuranceOption ? form.insuranceOption : null,
         notes:             'Submitted via intake form',
       });
       if (err) throw err;
@@ -118,17 +142,15 @@ export default function CustomerIntake() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ background: 'white', borderRadius: 16, padding: '28px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-            {/* What are you renting? */}
+        {step === 'terms' && (
+          <div style={{ background: 'white', borderRadius: 16, padding: '28px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div style={fieldStyle}>
               <label style={labelStyle}>What would you like to rent? *</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                 {VEHICLE_TYPES.map(t => {
                   const active = form.vehicleType === t.value;
                   return (
-                    <button key={t.value} type="button" onClick={() => sf('vehicleType', t.value)}
+                    <button key={t.value} type="button" onClick={() => { setForm(f => ({ ...f, vehicleType: t.value, termsAccepted: false })); setError(''); }}
                       style={{ fontFamily: 'inherit', fontSize: 14, fontWeight: 600, padding: '12px 8px', borderRadius: 9, cursor: 'pointer',
                         background: active ? 'oklch(0.50 0.14 150)' : '#f7f6f2', color: active ? 'white' : '#333',
                         border: active ? '1.5px solid oklch(0.50 0.14 150)' : '1.5px solid #e0dfd8' }}>
@@ -137,9 +159,82 @@ export default function CustomerIntake() {
                   );
                 })}
               </div>
-              {form.vehicleType && !needsLicence && (
-                <p style={{ fontSize: 13, color: '#888', marginTop: 4, lineHeight: 1.5 }}>No driver&apos;s licence is needed for an e-bike.</p>
-              )}
+            </div>
+
+            {form.vehicleType ? (
+              <>
+                <div style={dividerStyle}>
+                  <div style={{ flex: 1, height: 1, background: '#e0dfd8' }} />
+                  <span>Rental conditions</span>
+                  <div style={{ flex: 1, height: 1, background: '#e0dfd8' }} />
+                </div>
+                <p style={{ fontSize: 14, color: '#555', lineHeight: 1.6, margin: 0 }}>
+                  Please read these before filling in your details. They are a summary of the rental agreement you will sign at pick-up.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {termsFor(form.vehicleType, amounts).map(t => (
+                    <div key={t.title} style={{ background: '#f7f6f2', border: '1.5px solid #e0dfd8', borderRadius: 10, padding: '12px 14px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginBottom: 4 }}>{t.title}</div>
+                      <div style={{ fontSize: 13.5, color: '#444', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{t.body}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {hasInsuranceOption && (
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>Choose your liability option *</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {insuranceOptions(amounts).map(o => {
+                        const active = form.insuranceOption === o.value;
+                        return (
+                          <label key={o.value} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: 'pointer', borderRadius: 10, padding: '12px 14px',
+                            background: active ? '#f0fdf4' : '#f7f6f2', border: active ? '1.5px solid oklch(0.50 0.14 150)' : '1.5px solid #e0dfd8' }}>
+                            <input type="radio" name="insuranceOption" value={o.value} checked={active} onChange={() => sf('insuranceOption', o.value)} style={{ marginTop: 3, accentColor: 'oklch(0.50 0.14 150)' }} />
+                            <div>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a' }}>{o.label}</div>
+                              <div style={{ fontSize: 13, color: '#555', lineHeight: 1.5, marginTop: 2 }}>{o.text}</div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <label style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: 'pointer', fontSize: 14, color: '#1a1a1a', lineHeight: 1.5 }}>
+                  <input type="checkbox" checked={form.termsAccepted} onChange={e => sf('termsAccepted', e.target.checked)} style={{ marginTop: 3, width: 18, height: 18, accentColor: 'oklch(0.50 0.14 150)' }} />
+                  <span>I have read and accept the rental conditions above{hasInsuranceOption ? ' and my chosen liability option' : ''}.</span>
+                </label>
+              </>
+            ) : (
+              <p style={{ fontSize: 14, color: '#888', margin: 0 }}>Select a vehicle to see the rental conditions.</p>
+            )}
+
+            {error && (
+              <div style={{ background: '#fee8e8', border: '1px solid #fcc', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#c00' }}>
+                {error}
+              </div>
+            )}
+
+            <button type="button" onClick={continueToForm} disabled={!form.vehicleType}
+              style={{ background: form.vehicleType ? 'oklch(0.50 0.14 150)' : '#ccc', color: 'white', border: 'none', borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 700, cursor: form.vehicleType ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
+              Accept &amp; Continue
+            </button>
+          </div>
+        )}
+
+        {step === 'form' && (
+        <form onSubmit={handleSubmit}>
+          <div style={{ background: 'white', borderRadius: 16, padding: '28px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* Renting summary + change */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px' }}>
+              <div style={{ fontSize: 14, color: '#14532d' }}>
+                <strong>Renting: {vehicleLabel}</strong>
+                {hasInsuranceOption && <span style={{ color: '#166534' }}> · {insuranceOptions(amounts).find(o => o.value === form.insuranceOption)?.label}</span>}
+                {!needsLicence && <span style={{ color: '#166534' }}> · no licence needed</span>}
+              </div>
+              <button type="button" onClick={() => setStep('terms')} style={{ background: 'none', border: 'none', color: '#166534', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline', whiteSpace: 'nowrap' }}>Change</button>
             </div>
 
             {/* Personal Details */}
@@ -295,6 +390,7 @@ export default function CustomerIntake() {
             </p>
           </div>
         </form>
+        )}
       </div>
     </div>
   );
