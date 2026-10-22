@@ -110,7 +110,7 @@ export default function Overview({ go }) {
         <div className="label" style={{ marginBottom: 0 }}>Where the money is · today</div>
         <button className="btn btn-secondary btn-sm" onClick={() => setBalances(true)}>{cash.missing.length ? 'Enter account balances' : `Balances as at ${cash.oldest ? formatDate(cash.oldest) : 'today'} · update`}</button>
       </div>
-      {cash.missing.length > 0 && <div className="fin-alert mb-16" style={{ background: 'var(--amber-bg)' }}><span style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--amber)', marginTop: 6 }} /><div style={{ fontSize: 14 }}>No balance yet for {cash.missing.map(r => r.account.name).join(', ')}. {cash.missing.some(r => r.account.feed === 'csv') ? 'Import a NAB CSV and it is read from the file automatically. ' : ''}{cash.missing.some(r => r.account.feed === 'stripe') ? 'Press Sync now in Settings for Stripe. ' : ''}Or type it in for now.</div></div>}
+      {cash.missing.length > 0 && <div className="fin-alert mb-16" style={{ background: 'var(--amber-bg)' }}><span style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--amber)', marginTop: 6 }} /><div style={{ fontSize: 14 }}>Type in today's balance for {cash.missing.map(r => r.account.name).join(', ')} so this row is complete. Bank CSV imports and the Stripe sync update them afterwards.</div></div>}
       <div className="grid-4 mb-20">
         <StatCard color="var(--text)" value={money0(cash.total)} label="In bank and Stripe" sub={cash.rows.filter(r => r.balance != null && r.balance !== 0).map(r => `${r.account.name} ${money0(r.balance)}`).join(' · ') || 'Enter balances'} onClick={() => setBalances(true)} />
         <StatCard color="var(--amber)" value={money0(cash.bonds)} label="Belongs to customers (bonds)" sub={`${held.count} bond${held.count !== 1 ? 's' : ''} to give back one day`} onClick={() => navigate('/bonds')} />
@@ -123,7 +123,7 @@ export default function Overview({ go }) {
           <div className="modal" style={{ maxWidth: 460 }}>
             <div className="modal-header"><h2 style={{ fontSize: 16, fontWeight: 700 }}>Account balances today</h2><button className="btn btn-ghost btn-sm" onClick={() => setBalances(false)}>×</button></div>
             <div className="modal-body">
-              <div className="text-sm text-muted">Only needed before the first CSV for an account. Each NAB import sets the balance from the file's closing balance; Stripe sets its own at each sync.</div>
+              <div className="text-sm text-muted">Open your banking app and copy the balances. Stripe fills in on its own at each sync.</div>
               {cash.rows.filter(r => r.account.feed !== 'stripe').map(r => (
                 <div key={r.account.id} className="grid-2" style={{ gap: 10 }}>
                   <div className="field"><label className="label">{r.account.name}</label><input className="input" type="number" step="0.01" defaultValue={r.account.balance ?? ''} onChange={e => setBalDraft(d => ({ ...d, [r.account.id]: e.target.value }))} placeholder="0.00" /></div>
