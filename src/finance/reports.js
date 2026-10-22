@@ -73,6 +73,33 @@ export const directorPosition = (fin) => {
   return { loanBalance: loan / 100, unreimbursed: unpaid, unreimbursedTotal: unpaidTotal / 100, drawings, drawingsTotal: drawingsTotal / 100, total: (loan + unpaidTotal - drawingsTotal) / 100 };
 };
 
+// Cash position from history: what each business account should hold according to the ledger
+// (opening balance + every line since), what the bank says it holds (last CSV closing balance,
+// Stripe's live balance), and how much of that is customers' bonds rather than your money.
+export const cashPosition = (fin, rentals) => {
+  const accounts = fin.accounts.filter(a => a.kind !== 'personal');
+  const rows = accounts.map(a => {
+    const from = a.openingDate || '';
+    const lines = fin.transactions.filter(t => t.accountId === a.id && t.matchStatus !== 'ignored' && (!from || t.date >= from));
+    const ledger = toCents(a.openingBalance) + lines.reduce((s, t) => s + toCents(t.amount), 0);
+    const lastImport = fin.imports.filter(i => i.accountId === a.id && i.closingBalance != null).sort((x, y) => (y.toDate || '').localeCompare(x.toDate || ''))[0];
+    let actual = null, actualAt = null, actualNote = '';
+    if (a.feed === 'csv' && lastImport) { actual = toCents(lastImport.closingBalance); actualAt = lastImport.toDate; actualNote = 'closing balance of the last CSV'; }
+    else if (a.feed === 'stripe' && fin.settings.stripeBalance != null) { actual = toCents(fin.settings.stripeBalance); actualAt = (fin.settings.stripeBalanceAt || '').slice(0, 10); actualNote = 'Stripe balance at last sync (available + pending)'; }
+    else if (a.kind === 'cash') { actual = ledger; actualAt = null; actualNote = 'cash is only what you record'; }
+    // Ledger up to the date the bank balance refers to, so timing differences do not look like gaps.
+    const ledgerAt = actualAt ? toCents(a.openingBalance) + lines.filter(t => t.date <= actualAt).reduce((s, t) => s + toCents(t.amount), 0) : ledger;
+    const gap = actual == null ? null : actual - ledgerAt;
+    return { account: a, ledger: ledger / 100, actual: actual == null ? null : actual / 100, actualAt, actualNote, gap: gap == null ? null : gap / 100, hasOpening: !!a.openingDate };
+  });
+  const known = rows.filter(r => r.actual != null);
+  const business = known.reduce((s, r) => s + toCents(r.actual), 0) / 100;
+  const ledgerTotal = rows.reduce((s, r) => s + toCents(r.ledger), 0) / 100;
+  const bonds = bondsHeld(rentals).total;
+  const director = directorPosition(fin);
+  return { rows, business, ledgerTotal, bonds, free: business - bonds, afterDirector: business - bonds - director.total, director, unknown: rows.filter(r => r.actual == null && r.account.kind !== 'cash') };
+};
+
 export const bondsHeld = (rentals) => {
   const held = rentals.filter(r => r.bond?.amount && r.bond.status === 'held');
   return { count: held.length, total: held.reduce((s, r) => s + (Number(r.bond.amount) || 0), 0), rentals: held };
