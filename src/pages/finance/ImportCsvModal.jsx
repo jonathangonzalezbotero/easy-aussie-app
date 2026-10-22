@@ -5,7 +5,6 @@ import { useFinance } from '../../finance/FinanceContext';
 import { useStore } from '../../context/StoreContext';
 import { parseCsv, guessMapping, looksLikeHeader, mapRows, dedupeKey, last4, COLUMN_ROLES } from '../../finance/csv';
 import { suggestFor } from '../../finance/matching';
-import { mirrorMatching } from '../../finance/transfers';
 import { money } from '../../finance/categories';
 import { formatDate } from '../../utils/dates';
 import { AmountCell } from './bits';
@@ -98,15 +97,7 @@ export default function ImportCsvModal({ open, onClose, onDone, accountId: initi
     try {
       localStorage.setItem(`finance.csvMapping.${accountId}`, JSON.stringify(mapping));
       const items = prepared.map(p => ({ accountId, date: p.date, amount: p.amount, description: p.description, balance: p.balance, source: 'bank_csv', raw: p.raw, category: p.category, matchStatus: p.matchStatus, suggestion: p.suggestion ? { category: p.suggestion.category, reason: p.suggestion.reason, kind: p.suggestion.kind } : null, customerId: p.customerId, rentalId: p.rentalId, vehicleId: p.vehicleId, payeeId: p.payeeId, linkedTransactionId: p.linkedTransactionId }));
-      // Lines that are the real side of a transfer already mirrored on this account inherit the
-      // mirror's category and pairing, and the mirror is removed.
-      const mirrors = [];
-      for (const it of items) {
-        const m = mirrorMatching(it, accountId, fin.transactions);
-        if (m && !mirrors.some(x => x.mirror.id === m.id)) { it.category = 'internal_transfer'; it.matchStatus = 'confirmed'; it.linkedTransactionId = m.linkedTransactionId; it.label = m.label; mirrors.push({ mirror: m, key: `${it.date}|${it.amount}` }); }
-      }
       const inserted = items.length ? await fin.insertTransactions(items) : [];
-      for (const { mirror } of mirrors) await fin.removeTransaction(mirror.id);
       await fin.addImport({ accountId, kind: 'bank_csv', fileName: file.name, lineCount: mapped.lines.length, newCount: inserted.length, skippedCount: mapped.lines.length - inserted.length, fromDate: dateRange?.[0], toDate: dateRange?.[1], closingBalance: closing });
       if (accountCheck.state === 'new' && accountCheck.fileLast4) await fin.updateAccount(accountId, { accountHint: accountCheck.fileLast4 });
       onDone?.(inserted.length);

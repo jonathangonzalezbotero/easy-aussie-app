@@ -195,7 +195,7 @@ export default function Transactions({ go }) {
                     <td className="text-muted" style={{ whiteSpace: 'nowrap' }}>{formatDate(t.date).replace(/ \d{4}$/, '')}</td>
                     <td>
                       <div className={`fin-desc ${t.label || t.source !== 'bank_csv' ? 'fw-500' : 'fin-mono'}`}>{t.label || t.description || '—'}</div>
-                      <div className="text-sm text-muted fin-desc">{t.label ? `${t.description.slice(0, 40)} · ` : ''}{t.raw?.mirror_of ? 'Other side of a transfer, until the CSV arrives' : SOURCE_LABEL[t.source]}{t.notes && !t.raw?.mirror_of ? ` · ${t.notes.slice(0, 40)}` : ''}</div>
+                      <div className="text-sm text-muted fin-desc">{t.label ? `${t.description.slice(0, 40)} · ` : ''}{SOURCE_LABEL[t.source]}{t.notes ? ` · ${t.notes.slice(0, 40)}` : ''}</div>
                     </td>
                     <td style={{ textAlign: 'right' }}><AmountCell value={t.amount} /></td>
                     <td className="col-hide-mobile"><AccountBadge account={account} /></td>

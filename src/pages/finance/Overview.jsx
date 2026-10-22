@@ -33,17 +33,6 @@ export default function Overview({ go }) {
   const capitalLabel = sum.capitalOut ? `After ${money0(sum.capitalOut)} director loan / capital` : 'No capital movements';
   const held = bondsHeld(data.rentals);
   const cash = useMemo(() => cashPosition(fin, data.rentals), [fin, data.rentals]);
-  const [balances, setBalances] = useState(false);
-  const [balDraft, setBalDraft] = useState({});
-  const saveBalances = async () => {
-    for (const r of cash.rows) {
-      if (r.account.feed === 'stripe') continue;
-      const v = balDraft[r.account.id]; const at = balDraft[`${r.account.id}_at`];
-      if (v === undefined && at === undefined) continue;
-      await fin.updateAccount(r.account.id, { balance: v === undefined ? r.account.balance : v, balanceAt: at || r.account.balanceAt || today });
-    }
-    setBalDraft({}); setBalances(false);
-  };
   const pendingRefunds = data.rentals.filter(r => r.bond?.status === 'held' && r.bond.refundedAmount !== '' && Number(r.bond.refundedAmount) > 0).length;
 
   // Alerts
@@ -106,35 +95,27 @@ export default function Overview({ go }) {
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-        <div className="label" style={{ marginBottom: 0 }}>Where the money is · today</div>
-        <button className="btn btn-secondary btn-sm" onClick={() => setBalances(true)}>{cash.missing.length ? 'Enter account balances' : `Balances as at ${cash.oldest ? formatDate(cash.oldest) : 'today'} · update`}</button>
-      </div>
-      {cash.missing.length > 0 && <div className="fin-alert mb-16" style={{ background: 'var(--amber-bg)' }}><span style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--amber)', marginTop: 6 }} /><div style={{ fontSize: 14 }}>Type in today's balance for {cash.missing.map(r => r.account.name).join(', ')} so this row is complete. Bank CSV imports and the Stripe sync update them afterwards.</div></div>}
+      <div className="label" style={{ marginBottom: 8 }}>Cash position · today, from the whole history</div>
       <div className="grid-4 mb-20">
-        <StatCard color="var(--text)" value={money0(cash.total)} label="In bank and Stripe" sub={cash.rows.filter(r => r.balance != null && r.balance !== 0).map(r => `${r.account.name} ${money0(r.balance)}`).join(' · ') || 'Enter balances'} onClick={() => setBalances(true)} />
-        <StatCard color="var(--amber)" value={money0(cash.bonds)} label="Belongs to customers (bonds)" sub={`${held.count} bond${held.count !== 1 ? 's' : ''} to give back one day`} onClick={() => navigate('/bonds')} />
-        <StatCard color={cash.free < 0 ? 'var(--red)' : 'var(--accent)'} value={money0(cash.free)} label="Yours to spend" sub={cash.free < 0 ? `${money0(-cash.free)} short of the bonds` : 'Bank and Stripe minus the bonds'} />
-        <StatCard color={cash.afterDirector < 0 ? 'var(--red)' : 'var(--blue)'} value={money0(cash.afterDirector)} label="After paying yourself back" sub={`Business owes you ${money0(cash.director.total)}`} onClick={() => go('fy')} />
+        <StatCard color="var(--text)" value={money0(cash.business)} label="In the business accounts" sub={cash.rows.filter(r => r.actual != null).map(r => `${r.account.name} ${money0(r.actual)}`).join(' · ') || 'No balances known yet'} />
+        <StatCard color="var(--amber)" value={money0(cash.bonds)} label="Of which customers' bonds" sub={`${held.count} bond${held.count !== 1 ? 's' : ''} you must be able to give back`} onClick={() => navigate('/bonds')} />
+        <StatCard color={cash.free < 0 ? 'var(--red)' : 'var(--accent)'} value={money0(cash.free)} label="Your money" sub={cash.free < 0 ? `${money0(-cash.free)} short of covering the bonds` : 'After the bonds are set aside'} />
+        <StatCard color={cash.afterDirector < 0 ? 'var(--red)' : 'var(--blue)'} value={money0(cash.afterDirector)} label="After paying yourself" sub={`Business owes you ${money0(cash.director.total)}`} onClick={() => go('fy')} />
       </div>
-
-      {balances && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setBalances(false)}>
-          <div className="modal" style={{ maxWidth: 460 }}>
-            <div className="modal-header"><h2 style={{ fontSize: 16, fontWeight: 700 }}>Account balances today</h2><button className="btn btn-ghost btn-sm" onClick={() => setBalances(false)}>×</button></div>
-            <div className="modal-body">
-              <div className="text-sm text-muted">Open your banking app and copy the balances. Stripe fills in on its own at each sync.</div>
-              {cash.rows.filter(r => r.account.feed !== 'stripe').map(r => (
-                <div key={r.account.id} className="grid-2" style={{ gap: 10 }}>
-                  <div className="field"><label className="label">{r.account.name}</label><input className="input" type="number" step="0.01" defaultValue={r.account.balance ?? ''} onChange={e => setBalDraft(d => ({ ...d, [r.account.id]: e.target.value }))} placeholder="0.00" /></div>
-                  <div className="field"><label className="label">As at</label><input className="input" type="date" defaultValue={r.account.balanceAt || today} onChange={e => setBalDraft(d => ({ ...d, [`${r.account.id}_at`]: e.target.value }))} /></div>
-                </div>))}
-              {cash.rows.filter(r => r.account.feed === 'stripe').map(r => <div key={r.account.id} className="text-sm text-muted">{r.account.name}: {r.balance == null ? 'not synced yet, press Sync now in Settings' : `${money0(r.balance)} from Stripe${r.at ? ` on ${formatDate(r.at)}` : ''}`}</div>)}
-            </div>
-            <div className="modal-footer"><button className="btn btn-secondary" onClick={() => setBalances(false)}>Cancel</button><button className="btn btn-primary" onClick={saveBalances}>Save</button></div>
-          </div>
-        </div>
-      )}
+      <div className="card mb-20">
+        <div className="card-head"><div><span className="card-title">Ledger vs bank, per account</span><div className="text-sm text-muted">A gap means money moved that is not in the ledger: a missed CSV, a line marked ignored, or an opening balance that is wrong.</div></div><button className="btn btn-secondary btn-sm" onClick={() => go('settings')}>Opening balances</button></div>
+        <div className="table-wrap"><table className="table">
+          <thead><tr><th>Account</th><th style={{ textAlign: 'right' }}>Ledger says</th><th style={{ textAlign: 'right' }}>Bank says</th><th className="col-hide-mobile">As at</th><th style={{ textAlign: 'right' }}>Gap</th></tr></thead>
+          <tbody>{cash.rows.map(r => (
+            <tr key={r.account.id} style={{ cursor: 'default' }}>
+              <td className="fw-500">{r.account.name}{!r.hasOpening && r.account.kind !== 'cash' && <div className="text-sm text-muted">No opening balance set</div>}</td>
+              <td style={{ textAlign: 'right' }}>{money0(r.ledger)}</td>
+              <td style={{ textAlign: 'right' }}>{r.actual == null ? <span className="text-muted">—</span> : money0(r.actual)}</td>
+              <td className="col-hide-mobile text-muted">{r.actualAt ? `${formatDate(r.actualAt)} · ${r.actualNote}` : r.actualNote || '—'}</td>
+              <td style={{ textAlign: 'right', fontWeight: 600, color: r.gap == null ? 'var(--muted)' : Math.abs(r.gap) < 1 ? 'var(--accent)' : 'var(--red)' }}>{r.gap == null ? '—' : Math.abs(r.gap) < 1 ? '✓' : money0(r.gap)}</td>
+            </tr>))}</tbody>
+        </table></div>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 1fr)', gap: 14, alignItems: 'start' }} className="fin-overview-grid">
         <div>
