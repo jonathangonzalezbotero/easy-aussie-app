@@ -8,6 +8,8 @@ import Drawer from '../components/shared/Drawer';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
+import SearchBar from '../components/shared/SearchBar';
+import { matchesSearch } from '../utils/search';
 import { formatDate, daysBetween, todayStr, ageOn, isYoungRenter } from '../utils/dates';
 import { BOND_STATUSES, BOND_RETAIN_REASONS, bondLabel, bondVariant, closedBondStatus } from '../utils/bond';
 import { confirmOdometer, latestReading, describeReading } from '../utils/odometer';
@@ -95,6 +97,7 @@ export default function Rentals() {
   };
   const navigate = useNavigate();
   const [tab, setTab] = useState('active');
+  const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [editR, setEditR] = useState(null);
   const [detailR, setDetailR] = useState(null);
@@ -172,8 +175,14 @@ export default function Rentals() {
   }, [form.vehicleId, showCreate]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
-  const active = data.rentals.filter(r => r.status === 'active');
-  const past = data.rentals.filter(r => r.status === 'completed');
+  const rentalMatches = (r) => {
+    if (!search.trim()) return true;
+    const c = data.customers.find(x => x.id === r.customerId);
+    const v = data.vehicles.find(x => x.id === r.vehicleId);
+    return matchesSearch(search, c?.name, c?.phone, c?.email, v?.plate, v?.name, r.contractNumber, r.notes, r.startDate, r.endDate, r.price, r.bond?.amount);
+  };
+  const active = data.rentals.filter(r => r.status === 'active' && rentalMatches(r));
+  const past = data.rentals.filter(r => r.status === 'completed' && rentalMatches(r));
   const available = data.vehicles.filter(v => v.status === 'available');
 
   const activeCustomerIds = new Set(active.map(r => r.customerId));
@@ -539,13 +548,14 @@ export default function Rentals() {
         <button className="btn btn-primary" onClick={() => { setForm(EF); setShowCreate(true); }}>+ Create Rental</button>
       </div>
 
-      <div className="mb-16">
+      <div className="filter-toolbar" style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <Tabs tabs={[{ label: 'Active', value: 'active', count: active.length }, { label: 'Past', value: 'past', count: past.length }]} active={tab} onChange={setTab} />
+        <SearchBar value={search} onChange={setSearch} placeholder="Search customer, plate, contract, phone…" />
       </div>
 
       <div className="card">
         {tab === 'active' && (active.length === 0
-          ? <EmptyState message="No active rentals" action={<button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>Create rental</button>} />
+          ? search ? <EmptyState message={`No active rentals match “${search}”`} /> : <EmptyState message="No active rentals" action={<button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>Create rental</button>} />
           : <div className="table-wrap"><table className="table">
             <thead><tr>
               <SortTh col="customer">Customer</SortTh>
@@ -563,7 +573,7 @@ export default function Rentals() {
           </table></div>
         )}
         {tab === 'past' && (past.length === 0
-          ? <EmptyState message="No completed rentals yet" />
+          ? <EmptyState message={search ? `No past rentals match “${search}”` : 'No completed rentals yet'} />
           : <div className="table-wrap"><table className="table">
             <thead><tr>
               <SortTh col="customer">Customer</SortTh>

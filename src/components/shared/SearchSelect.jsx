@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Badge from './Badge';
 
 // Searchable single-select. options: [{ value, label, sub, group }]. Typing filters by label and sub.
 // onCreate(query) is optional: shows an "Add …" row when nothing matches.
@@ -27,7 +28,7 @@ export default function SearchSelect({ options, value, onChange, placeholder = '
           {results.length === 0 && !onCreate && <div style={{ padding: '10px 12px', fontSize: 13 }} className="text-muted">No matches</div>}
           {results.map(o => (
             <div key={o.value} className={`picker-option${o.value === value ? ' active' : ''}`} onMouseDown={() => { onChange(o.value); setQuery(''); setOpen(false); }}>
-              <div className="fw-500" style={{ fontSize: 14 }}>{o.label}</div>
+              <div className="fw-500" style={{ fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>{o.label}{o.badge && <Badge variant={o.badge.variant}>{o.badge.text}</Badge>}</div>
               {o.sub && <div className="text-sm text-muted">{o.sub}</div>}
             </div>
           ))}

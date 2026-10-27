@@ -4,12 +4,15 @@ import { useStore } from '../context/StoreContext';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
+import SearchBar from '../components/shared/SearchBar';
+import { matchesSearch } from '../utils/search';
 import { formatDate, todayStr } from '../utils/dates';
 import { bondLabel, bondVariant, closedBondStatus, isBondClosed } from '../utils/bond';
 
 export default function Bonds() {
   const { data, update } = useStore();
   const [tab, setTab]   = useState('held');
+  const [search, setSearch] = useState('');
   const [sort, setSort] = useState({ col: 'amount', dir: 'desc' });
 
   const toggleSort = (col) =>
@@ -49,6 +52,7 @@ export default function Bonds() {
   const held       = withBond.filter(r => r.bond.status === 'held');
   const awaiting   = withBond.filter(r => r.bond.status === 'awaiting');
   const closed     = withBond.filter(r => isBondClosed(r.bond));
+  const bondMatches = (r) => { if (!search.trim()) return true; const c = data.customers.find(x => x.id === r.customerId); const v = data.vehicles.find(x => x.id === r.vehicleId); return matchesSearch(search, c?.name, c?.phone, c?.email, v?.plate, v?.name, r.contractNumber, r.bond?.amount, r.bond?.method, r.bond?.retainReason); };
   const totalHeld     = held.reduce((s, r) => s + (Number(r.bond.amount) || 0), 0);
   const totalAwaiting = awaiting.reduce((s, r) => s + (Number(r.bond.amount) || 0), 0);
   const totalRetained = closed.reduce((s, r) => s + (Number(r.bond.retainedAmount) || 0), 0);
@@ -144,18 +148,19 @@ export default function Bonds() {
         </div>
       </div>
 
-      <div className="mb-16">
+      <div className="filter-toolbar" style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <Tabs tabs={[
-          { label: 'Held', value: 'held', count: held.length },
-          { label: 'Awaiting', value: 'awaiting', count: awaiting.length },
-          { label: 'Closed', value: 'closed', count: closed.length },
+          { label: 'Held', value: 'held', count: held.filter(bondMatches).length },
+          { label: 'Awaiting', value: 'awaiting', count: awaiting.filter(bondMatches).length },
+          { label: 'Closed', value: 'closed', count: closed.filter(bondMatches).length },
         ]} active={tab} onChange={setTab} />
+        <SearchBar value={search} onChange={setSearch} placeholder="Search customer, plate, contract…" />
       </div>
 
       <div className="card">
-        {tab === 'held' && table(held, 'No bonds currently held')}
-        {tab === 'awaiting' && table(awaiting, 'No bonds waiting to be paid')}
-        {tab === 'closed' && table(closed, 'No bonds refunded or retained yet')}
+        {tab === 'held' && table(held.filter(bondMatches), search ? `No held bonds match “${search}”` : 'No bonds currently held')}
+        {tab === 'awaiting' && table(awaiting.filter(bondMatches), search ? `No awaiting bonds match “${search}”` : 'No bonds waiting to be paid')}
+        {tab === 'closed' && table(closed.filter(bondMatches), search ? `No closed bonds match “${search}”` : 'No bonds refunded or retained yet')}
       </div>
 
       <Modal open={!!moveR} onClose={() => setMoveR(null)} title="Move bond to another rental"

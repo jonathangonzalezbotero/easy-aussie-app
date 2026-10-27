@@ -66,7 +66,7 @@ Setup: run `supabase/migration_finance.sql` then `supabase/migration_finance_pay
 
 ### Shared components
 
-`src/components/shared/` — `Modal`, `Drawer`, `Badge`, `EmptyState`, `Tabs`, `SectionLabel`, `SearchSelect` (searchable single-select with optional create row). Import individually (no barrel file).
+`src/components/shared/` — `Modal`, `Drawer`, `Badge`, `EmptyState`, `Tabs`, `SectionLabel`, `SearchSelect` (searchable single-select with optional create row and per-option badge), `SearchBar` (list search box; pair with `matchesSearch()` in `src/utils/search.js`). Import individually (no barrel file).
 
 ### PDF generation
 

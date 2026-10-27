@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Drawer from '../../components/shared/Drawer';
 import Badge from '../../components/shared/Badge';
 import SearchSelect from '../../components/shared/SearchSelect';
+import { vehicleSortKey } from '../../utils/search';
 import { useFinance } from '../../finance/FinanceContext';
 import { useStore } from '../../context/StoreContext';
 import { useSuggestions } from '../../finance/useSuggestions';
@@ -89,7 +90,7 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
       const splits = form.splitOn ? activeSplits.map(s => ({ id: s.id || undefined, category: s.category, amount: Number(s.amount), rentalId: s.rentalId || null, customerId: s.customerId || null, vehicleId: s.vehicleId || null, payeeId: s.payeeId || null, notes: s.notes || '' })) : [];
       let saved;
       if (isNew) {
-        saved = await fin.addTransaction({ accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() || categoryLabel(form.category), source: 'manual', category: splits.length ? 'split' : form.category, matchStatus: 'confirmed', customerId: form.customerId || null, rentalId: form.rentalId || null, vehicleId: form.vehicleId || null, payeeId: form.payeeId || null, linkedTransactionId: form.linkedTransactionId || null, label: form.label, notes: form.notes, splits });
+        saved = await fin.addTransaction({ accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim() || (splits.length ? [...new Set(splits.map(s => categoryLabel(s.category)))].join(' + ') : categoryLabel(form.category)), source: 'manual', category: splits.length ? 'split' : form.category, matchStatus: 'confirmed', customerId: form.customerId || null, rentalId: form.rentalId || null, vehicleId: form.vehicleId || null, payeeId: form.payeeId || null, linkedTransactionId: form.linkedTransactionId || null, label: form.label, notes: form.notes, splits });
         if (confirmPayload.rentalId) await fin.confirmTransaction({ ...confirmPayload, id: saved.id, splits });
       } else {
         if (!locked) await fin.updateTransaction(tx.id, { accountId: form.accountId, date: form.date, amount: amountNum, description: form.description.trim(), label: form.label });
@@ -126,7 +127,8 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
   const rentalOptions = (customerId) => data.rentals.filter(r => !customerId || r.customerId === customerId)
     .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''))
     .map(r => { const v = data.vehicles.find(x => x.id === r.vehicleId); const c = data.customers.find(x => x.id === r.customerId); return { value: r.id, label: `${r.contractNumber || formatDate(r.startDate)} · ${v?.plate || ''}`, sub: `${c?.name || ''}${r.bond?.amount ? ` · bond $${r.bond.amount}` : ''} · ${r.status}` }; });
-  const vehicleOptions = data.vehicles.map(v => ({ value: v.id, label: v.plate, sub: v.name || v.type }));
+  const vehicleOptions = [...data.vehicles].sort((a, b) => vehicleSortKey(a) - vehicleSortKey(b) || (a.plate || '').localeCompare(b.plate || ''))
+    .map(v => ({ value: v.id, label: v.plate, sub: v.name || v.type, badge: v.status === 'stolen' ? { text: 'Stolen', variant: 'red' } : v.status === 'sold' ? { text: 'Sold', variant: 'black' } : null }));
   const payeeOptions = fin.payees.filter(p => p.active !== false).map(p => ({ value: p.id, label: p.name, sub: p.kind }));
   const createPayee = async (name, apply) => { try { const p = await fin.addPayee({ name, kind: 'contractor' }); apply(p.id); } catch (e) { setErr(e.message); } };
   const linkFields = (value, onChange) => (

@@ -11,6 +11,7 @@ import TransactionDrawer from './TransactionDrawer';
 import ImportCsvModal from './ImportCsvModal';
 import SpreadsheetImportModal from './SpreadsheetImportModal';
 import { syncStripe } from '../../finance/stripe';
+import { vehicleSortKey } from '../../utils/search';
 
 export default function Transactions({ go }) {
   const fin = useFinance();
@@ -142,7 +143,7 @@ export default function Transactions({ go }) {
           <div className="field"><label className="label">Category type</label>
             <select className="select" value={filters.type} onChange={e => sfl('type', e.target.value)}><option value="">All types</option>{Object.entries(CATEGORY_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
           <div className="field"><label className="label">Vehicle</label>
-            <select className="select" value={filters.vehicle} onChange={e => sfl('vehicle', e.target.value)}><option value="">All vehicles</option>{data.vehicles.map(v => <option key={v.id} value={v.id}>{v.plate}{v.name ? ` · ${v.name}` : ''}</option>)}</select></div>
+            <select className="select" value={filters.vehicle} onChange={e => sfl('vehicle', e.target.value)}><option value="">All vehicles</option>{[...data.vehicles].sort((a, b) => vehicleSortKey(a) - vehicleSortKey(b) || (a.plate || '').localeCompare(b.plate || '')).map(v => <option key={v.id} value={v.id}>{v.plate}{v.name ? ` · ${v.name}` : ''}{v.status === 'stolen' ? ' · STOLEN' : v.status === 'sold' ? ' · SOLD' : ''}</option>)}</select></div>
           <div className="field"><label className="label">Paid to</label>
             <select className="select" value={filters.payee} onChange={e => sfl('payee', e.target.value)}><option value="">All payees</option><option value="none">No payee set</option>{fin.payees.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           <div className="field"><label className="label">Match status</label>

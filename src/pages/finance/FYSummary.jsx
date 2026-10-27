@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useFinance } from '../../finance/FinanceContext';
 import { useStore } from '../../context/StoreContext';
 import { useSuggestions } from '../../finance/useSuggestions';
-import { CATEGORIES, categoriesOfType, categoryLabel, categoryShort, fyLabel, fyMonths, fyOf, fyRange, money, money0, monthLabel, summarise, txName } from '../../finance/categories';
+import { CATEGORIES, categoriesOfType, categoryLabel, categoryShort, fyLabel, fyMonths, fyOf, fyRange, money, money0, monthLabel, summarise, toCents, txName } from '../../finance/categories';
 import { inRange, categoryByMonth, directorPosition } from '../../finance/reports';
 import { payeeSummary, PAYEE_KINDS } from '../../finance/payees';
 import { formatDate, todayStr } from '../../utils/dates';
@@ -33,7 +33,10 @@ export default function FYSummary({ go }) {
   const incomeRows = categoriesOfType('income').filter(c => byMonth[c.id]).map(c => ({ ...c, sign: 1 }));
   const opRows = categoriesOfType('operating').filter(c => byMonth[c.id]).map(c => ({ ...c, sign: -1 }));
   const capitalLines = useMemo(() => live.flatMap(t => (t.splits.length ? t.splits : [t]).filter(l => categoriesOfType('capital').some(c => c.id === l.category)).map(l => ({ date: t.date, description: t.description, label: t.label, category: l.category, amount: Number(l.amount), vehicleId: l.vehicleId || t.vehicleId }))).sort((a, b) => a.date.localeCompare(b.date)), [live]);
-  const capitalTotal = capitalLines.reduce((s, l) => s + Math.abs(l.amount), 0);
+  // Capital money in (vehicle sales, director loans in) and out (purchases, loan repayments, drawings), kept apart: adding them up ignoring the sign double counts.
+  const capitalIn = capitalLines.filter(l => l.amount > 0).reduce((s, l) => s + toCents(l.amount), 0) / 100;
+  const capitalOut = capitalLines.filter(l => l.amount < 0).reduce((s, l) => s - toCents(l.amount), 0) / 100;
+  const capitalNet = capitalIn - capitalOut;
   // Bonds held at the end of the FY: held now, or refunded after the FY end
   const bondsAtClose = data.rentals.filter(r => r.bond?.amount && (r.startDate || '') <= closingDate && (r.bond.status === 'held' || (['refunded', 'partially_refunded', 'retained', 'transferred'].includes(r.bond.status) && r.bond.refundDate && r.bond.refundDate > closingDate)));
   const bondsTotal = bondsAtClose.reduce((s, r) => s + Number(r.bond.amount), 0);
@@ -95,7 +98,7 @@ export default function FYSummary({ go }) {
               <StatCard color="var(--accent)" value={money0(sum.income)} label="Income" sub={incomeRows.map(c => categoryShort(c.id).toLowerCase()).join(', ') || '—'} />
               <StatCard color="var(--red)" value={money0(sum.operating)} label="Operating expenses" sub={`${opRows.length} categories`} />
               <StatCard color="var(--blue)" value={money0(sum.operatingNet)} label="Operating net" sub="Before capital" />
-              <StatCard color="var(--text)" value={money(capitalTotal)} label="Capital items" sub="Vehicles, loan repayments" />
+              <StatCard color="var(--text)" value={money(capitalNet)} label="Capital items · net" sub={capitalLines.length ? `${money0(capitalIn)} in · ${money0(capitalOut)} out` : 'Vehicles, loans, drawings'} />
             </div>
           </div>
           <div>
@@ -130,7 +133,9 @@ export default function FYSummary({ go }) {
               <div className="table-wrap"><table className="table">
                 <thead><tr><th>Date</th><th>Item</th><th className="col-hide-mobile">Category</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
                 <tbody>{capitalLines.map((l, i) => <tr key={i} style={{ cursor: 'default' }}><td className="text-muted" style={{ whiteSpace: 'nowrap' }}>{formatDate(l.date)}</td><td>{l.label || l.description}{l.vehicleId ? <span className="text-muted"> · {data.vehicles.find(v => v.id === l.vehicleId)?.plate}</span> : ''}</td><td className="col-hide-mobile">{categoryLabel(l.category)}</td><td style={{ textAlign: 'right' }}><AmountCell value={l.amount} bold={false} /></td></tr>)}
-                  <tr style={{ cursor: 'default' }}><td colSpan={2} className="fw-600">Total capital</td><td className="col-hide-mobile" /><td className="fw-600" style={{ textAlign: 'right' }}>{money(capitalTotal)}</td></tr></tbody>
+                  <tr style={{ cursor: 'default' }}><td colSpan={2}>Money in</td><td className="col-hide-mobile" /><td style={{ textAlign: 'right' }}>{money(capitalIn)}</td></tr>
+                  <tr style={{ cursor: 'default' }}><td colSpan={2}>Money out</td><td className="col-hide-mobile" /><td style={{ textAlign: 'right' }}>{money(-capitalOut)}</td></tr>
+                  <tr style={{ cursor: 'default' }}><td colSpan={2} className="fw-600">Net capital</td><td className="col-hide-mobile" /><td className="fw-600" style={{ textAlign: 'right' }}><AmountCell value={capitalNet} bold /></td></tr></tbody>
               </table></div>)}
           </div>
           <div className="card">

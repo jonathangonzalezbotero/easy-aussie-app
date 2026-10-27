@@ -4,6 +4,8 @@ import Modal from '../components/shared/Modal';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
 import Tabs from '../components/shared/Tabs';
+import SearchBar from '../components/shared/SearchBar';
+import { matchesSearch } from '../utils/search';
 import { formatDate, daysUntil, todayStr } from '../utils/dates';
 import { useFinance } from '../finance/FinanceContext';
 import { autoMatches, linkedLine } from '../finance/maintenanceLink';
@@ -18,6 +20,7 @@ export default function Maintenance() {
   const { data, add, update, remove, refresh } = useStore();
   const fin = useFinance();
   const [tab, setTab] = useState('log');
+  const [search, setSearch] = useState('');
   const [linkFor, setLinkFor] = useState(null);
   const [matching, setMatching] = useState(false);
   const [notice, setNotice] = useState('');
@@ -85,7 +88,8 @@ export default function Maintenance() {
   const addItem = () => { const t = newItem.trim(); if (!t) return; sf('checklist', [...(form.checklist || []), { item: t, done: false }]); setNewItem(''); };
   const setAll = (done) => sf('checklist', form.checklist.map(it => ({ ...it, done })));
 
-  const records = [...data.maintenance].sort((a, b) => {
+  const recordMatches = (m) => { const v = data.vehicles.find(x => x.id === m.vehicleId); return matchesSearch(search, v?.plate, v?.name, m.type, m.description, m.date, m.cost, m.odometer); };
+  const records = [...data.maintenance].filter(recordMatches).sort((a, b) => {
     const mul = sort.dir === 'asc' ? 1 : -1;
     if (sort.col === 'vehicle') {
       const av = data.vehicles.find(x => x.id === a.vehicleId)?.plate || '';
@@ -102,6 +106,7 @@ export default function Maintenance() {
     .filter(v => v.nextServiceDate && v.status !== 'stolen' && v.status !== 'sold')
     .map(v => ({ ...v, days: daysUntil(v.nextServiceDate) }))
     .filter(v => v.days !== null && v.days <= 30)
+    .filter(v => matchesSearch(search, v.plate, v.name, v.type, v.nextServiceDate))
     .sort((a, b) => a.days - b.days);
 
   const save = async () => {
@@ -226,17 +231,18 @@ export default function Maintenance() {
       </div>
       {notice && <div style={{ background: 'var(--blue-bg)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, display: 'flex', justifyContent: 'space-between' }}><span>{notice}</span><button className="btn btn-ghost btn-sm" onClick={() => setNotice('')}>×</button></div>}
 
-      <div className="mb-16">
+      <div className="filter-toolbar" style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <Tabs tabs={[
           { label: 'Service Log', value: 'log', count: records.length },
           { label: 'Upcoming', value: 'upcoming', count: upcoming.length },
         ]} active={tab} onChange={setTab} />
+        <SearchBar value={search} onChange={setSearch} placeholder="Search plate, type, description…" />
       </div>
 
       {tab === 'log' && (
         <div className="card">
           {records.length === 0
-            ? <EmptyState message="No maintenance records yet" action={<button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>Log service</button>} />
+            ? search ? <EmptyState message={`No service records match “${search}”`} /> : <EmptyState message="No maintenance records yet" action={<button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>Log service</button>} />
             : <div className="table-wrap"><table className="table">
               <thead><tr>
                 <SortTh col="vehicle">Vehicle</SortTh>
@@ -288,7 +294,7 @@ export default function Maintenance() {
       {tab === 'upcoming' && (
         <div className="card">
           {upcoming.length === 0
-            ? <EmptyState message="No upcoming services — all vehicles are up to date" />
+            ? <EmptyState message={search ? `No upcoming services match “${search}”` : 'No upcoming services — all vehicles are up to date'} />
             : <div className="table-wrap"><table className="table">
               <thead><tr><th>Vehicle</th><th>Type</th><th>Next Service</th><th>Status</th></tr></thead>
               <tbody>

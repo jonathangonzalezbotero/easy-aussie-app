@@ -3,6 +3,8 @@ import { useStore } from '../context/StoreContext';
 import { supabase } from '../lib/supabase';
 import Modal from '../components/shared/Modal';
 import Drawer from '../components/shared/Drawer';
+import SearchBar from '../components/shared/SearchBar';
+import { matchesSearch } from '../utils/search';
 import VehicleFinanceCard from '../components/VehicleFinanceCard';
 import Badge from '../components/shared/Badge';
 import EmptyState from '../components/shared/EmptyState';
@@ -117,8 +119,7 @@ export default function Vehicles() {
   };
 
   const vehicles = [...data.vehicles.filter(v => {
-    const q = search.toLowerCase();
-    const matchQ = !q || v.plate.toLowerCase().includes(q) || (v.name || '').toLowerCase().includes(q) || (v.make || '').toLowerCase().includes(q) || (v.model || '').toLowerCase().includes(q);
+    const matchQ = matchesSearch(search, v.plate, v.name, v.make, v.model, v.colour, v.type, v.status, v.engineCapacity, v.notes);
     const matchF = filter === 'all' || v.status === filter;
     return matchQ && matchF;
   })].sort((a, b) => {
@@ -294,7 +295,7 @@ export default function Vehicles() {
           { label: 'Stolen', value: 'stolen', count: counts.stolen },
           { label: 'Sold', value: 'sold', count: counts.sold },
         ]} active={filter} onChange={setFilter} />
-        <input className="input" style={{ width: '100%', maxWidth: 220 }} placeholder="Search plate, name, make…" value={search} onChange={e => setSearch(e.target.value)} />
+        <SearchBar value={search} onChange={setSearch} placeholder="Search plate, name, make, colour…" maxWidth={280} />
       </div>
 
       <div className="card">
