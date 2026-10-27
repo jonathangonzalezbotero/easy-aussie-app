@@ -109,7 +109,8 @@ create table if not exists settings (
   reduced_excess_weekly text default '10',
   reduced_excess_fixed  text default '30',
   ebike_total_liability text default '600',
-  ebike_reduced_weekly  text default '10'
+  ebike_reduced_weekly  text default '10',
+  ebike_reduced_fixed   text default '30'
 );
 
 -- Insert the single settings row

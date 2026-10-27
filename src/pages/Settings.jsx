@@ -89,6 +89,11 @@ export default function Settings() {
                 <input className="input" type="number" min="0" value={form.ebikeReducedWeekly || ''} onChange={e => sf('ebikeReducedWeekly', e.target.value)} />
                 <span className="field-hint">Caps the e-bike renter's liability at the e-bike bond</span>
               </div>
+              <div className="field">
+                <label className="label">E-bike Reduced Liability One-off ($)</label>
+                <input className="input" type="number" min="0" value={form.ebikeReducedFixed || ''} onChange={e => sf('ebikeReducedFixed', e.target.value)} />
+                <span className="field-hint">Single charge for fixed-term e-bike rentals of a week or less</span>
+              </div>
             </div>
             <div>
               <button className="btn btn-primary" onClick={save} disabled={saving}>

@@ -15,6 +15,7 @@ export const DEFAULT_TERMS_AMOUNTS = {
   reducedExcessFixed: '30',
   ebikeTotalLiability: '600',
   ebikeReducedWeekly: '10',
+  ebikeReducedFixed: '30',
 };
 
 // Map a raw snake_case settings row (public intake / signing page) to the camelCase
@@ -31,6 +32,7 @@ export function termsAmountsFromRow(row) {
     reducedExcessFixed:  r.reduced_excess_fixed  || DEFAULT_TERMS_AMOUNTS.reducedExcessFixed,
     ebikeTotalLiability: r.ebike_total_liability || DEFAULT_TERMS_AMOUNTS.ebikeTotalLiability,
     ebikeReducedWeekly:  r.ebike_reduced_weekly  || DEFAULT_TERMS_AMOUNTS.ebikeReducedWeekly,
+    ebikeReducedFixed:   r.ebike_reduced_fixed   || DEFAULT_TERMS_AMOUNTS.ebikeReducedFixed,
   };
 }
 
@@ -47,6 +49,7 @@ export function termsAmountsFromSettings(s) {
     reducedExcessFixed:  x.reducedExcessFixed  || DEFAULT_TERMS_AMOUNTS.reducedExcessFixed,
     ebikeTotalLiability: x.ebikeTotalLiability || DEFAULT_TERMS_AMOUNTS.ebikeTotalLiability,
     ebikeReducedWeekly:  x.ebikeReducedWeekly  || DEFAULT_TERMS_AMOUNTS.ebikeReducedWeekly,
+    ebikeReducedFixed:   x.ebikeReducedFixed   || DEFAULT_TERMS_AMOUNTS.ebikeReducedFixed,
   };
 }
 
@@ -66,7 +69,7 @@ export const COVER_EXCLUSIONS = [
 //   weekly — Reduced liability premium per week; fixed — one-off premium for short rentals (null = not offered)
 export function liabilityFor(a, vehicleType) {
   if (vehicleType === 'ebike') {
-    return { bond: a.ebikeBond, total: Number(a.ebikeTotalLiability || 0), cap: Number(a.ebikeBond || 0), weekly: a.ebikeReducedWeekly, fixed: null, noun: 'e-bike', hasExcess: false };
+    return { bond: a.ebikeBond, total: Number(a.ebikeTotalLiability || 0), cap: Number(a.ebikeBond || 0), weekly: a.ebikeReducedWeekly, fixed: a.ebikeReducedFixed, noun: 'e-bike', hasExcess: false };
   }
   return { bond: a.defaultBond, total: Number(a.defaultBond || 0) + Number(a.insuranceExcess || 0), cap: Number(a.reducedExcess || 0), weekly: a.reducedExcessWeekly, fixed: a.reducedExcessFixed, noun: 'scooter', hasExcess: true };
 }
@@ -126,7 +129,7 @@ export function termsFor(vehicleType, a) {
     });
     items.push({
       title: 'Accidents and damage',
-      body: `The e-bike is not a registered motor vehicle and has no insurance. You are responsible for any loss, damage or theft of the e-bike and its accessories while it is in your care, and for any damage you cause to other people or their property.\n\nYou can choose below how this is handled:\n• Standard liability: an accident, damage or theft will cost you $${L.total} in total. Your $${L.bond} bond is kept and the balance is charged to your card on file.\n• Reduced liability: $${L.weekly} extra per week. Your maximum out-of-pocket per incident is capped at $${L.cap}. Nothing is charged on top of your bond.\n\nNeither option applies to ${COVER_EXCLUSIONS.join(', ')}. In those cases you are liable for the full cost.`,
+      body: `The e-bike is not a registered motor vehicle and has no insurance. You are responsible for any loss, damage or theft of the e-bike and its accessories while it is in your care, and for any damage you cause to other people or their property.\n\nYou can choose below how this is handled:\n• Standard liability: an accident, damage or theft will cost you $${L.total} in total. Your $${L.bond} bond is kept and the balance is charged to your card on file.\n• Reduced liability: $${L.weekly} extra per week for ongoing rentals, or a one-off $${L.fixed} for rentals of a week or less. Your maximum out-of-pocket per incident is capped at $${L.cap}. Nothing is charged on top of your bond.\n\nNeither option applies to ${COVER_EXCLUSIONS.join(', ')}. In those cases you are liable for the full cost.`,
     });
     items.push({
       title: 'Battery and charging',
