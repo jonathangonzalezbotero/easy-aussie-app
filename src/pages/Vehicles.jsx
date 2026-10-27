@@ -13,7 +13,7 @@ import { readingsFor, formatKm, ODOMETER_SOURCES, confirmOdometer } from '../uti
 const EF = {
   plate: '', name: '', make: '', model: '', year: '', colour: '', engineCapacity: '',
   type: 'scooter', fleetGroup: 'business', purchaseDate: '', purchasePrice: '', status: 'available',
-  nextServiceDate: '', conditionNotes: '', notes: '', odometer: '',
+  nextServiceDate: '', conditionNotes: '', notes: '', odometer: '', leftFleetOn: '',
 };
 
 export default function Vehicles() {
@@ -242,7 +242,7 @@ export default function Vehicles() {
           </select>
         </div>
         <div className="field"><label className="label">Status</label>
-          <select className="select" value={form.status} onChange={e => sf('status', e.target.value)}>
+          <select className="select" value={form.status} onChange={e => { const st = e.target.value; setForm(f => ({ ...f, status: st, leftFleetOn: ['stolen', 'sold'].includes(st) ? (f.leftFleetOn || todayStr()) : f.leftFleetOn })); }}>
             <option value="available">Available</option>
             <option value="rented">Rented</option>
             <option value="maintenance">Maintenance</option>
@@ -251,6 +251,13 @@ export default function Vehicles() {
           </select>
         </div>
       </div>
+      {(form.status === 'stolen' || form.status === 'sold') && (
+        <div className="grid-2">
+          <div className="field"><label className="label">{form.status === 'stolen' ? 'Date stolen' : 'Date sold'}</label>
+            <input className="input" type="date" value={form.leftFleetOn || ''} onChange={e => sf('leftFleetOn', e.target.value)} />
+            <span className="field-hint">Listed in Finance › FY summary for your accountant. Put the police event number or sale details in Notes.</span></div>
+        </div>
+      )}
       <div className="grid-2">
         <div className="field"><label className="label">Purchase Date</label><input className="input" type="date" value={form.purchaseDate} onChange={e => sf('purchaseDate', e.target.value)} /></div>
         <div className="field"><label className="label">Purchase Price ($)</label><input className="input" type="number" min="0" value={form.purchasePrice} onChange={e => sf('purchasePrice', e.target.value)} placeholder="e.g. 3500" /></div>
@@ -322,7 +329,7 @@ export default function Vehicles() {
                     </td>
                     <td className="text-muted col-hide-mobile">{v.colour || '—'}</td>
                     <td className="text-muted col-hide-mobile">{v.odometer ? <>{Number(v.odometer).toLocaleString()} km{v.odometerAt && <div className="text-sm">{formatDate(v.odometerAt)}</div>}</> : '—'}</td>
-                    <td>{statusBadge(v.status)}</td>
+                    <td>{statusBadge(v.status)}{v.leftFleetOn && (v.status === 'stolen' || v.status === 'sold') && <div className="text-sm text-muted">{formatDate(v.leftFleetOn)}</div>}</td>
                     <td className="col-hide-mobile">{v.purchaseDate ? formatDate(v.purchaseDate) : '—'}</td>
                     <td style={{ color: regoWarn ? (rd < 0 ? 'var(--red)' : 'var(--amber)') : 'inherit' }}>
                       {(v.status === 'stolen' || v.status === 'sold')
@@ -392,6 +399,7 @@ export default function Vehicles() {
               {selected.colour && <div><div className="label">Colour</div><div style={{ marginTop: 3 }}>{selected.colour}</div></div>}
               {selected.engineCapacity && <div><div className="label">Engine</div><div style={{ marginTop: 3 }}>{selected.engineCapacity}</div></div>}
               {selected.odometer && <div><div className="label">Current Odometer</div><div style={{ marginTop: 3, fontWeight: 600 }}>{Number(selected.odometer).toLocaleString()} km</div>{selected.odometerAt && <div className="text-sm text-muted">{formatDate(selected.odometerAt)} · {ODOMETER_SOURCES[selected.odometerSource] || selected.odometerSource}</div>}</div>}
+              {(selected.status === 'stolen' || selected.status === 'sold') && <div><div className="label">{selected.status === 'stolen' ? 'Stolen on' : 'Sold on'}</div><div style={{ marginTop: 3, color: selected.leftFleetOn ? 'inherit' : 'var(--amber)' }}>{selected.leftFleetOn ? formatDate(selected.leftFleetOn) : 'Date not set · edit vehicle'}</div></div>}
               {selected.purchaseDate && <div><div className="label">Purchase Date</div><div style={{ marginTop: 3 }}>{formatDate(selected.purchaseDate)}</div></div>}
               {selected.purchasePrice && <div><div className="label">Purchase Price</div><div style={{ marginTop: 3 }}>${Number(selected.purchasePrice).toLocaleString()}</div></div>}
               {selected.nextServiceDate && (

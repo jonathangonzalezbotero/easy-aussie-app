@@ -15,6 +15,7 @@ const vehicleFromDb = (v) => ({
   regoDocPath: v.rego_doc_path || null,
   odometer: v.odometer ? String(v.odometer) : '',
   odometerAt: v.odometer_at || null, odometerSource: v.odometer_source || null,
+  leftFleetOn: v.left_fleet_on || '',
 });
 
 const vehicleToDb = (v) => ({
@@ -27,6 +28,8 @@ const vehicleToDb = (v) => ({
   condition_notes: v.conditionNotes || null, notes: v.notes || null,
   rego_doc_path: v.regoDocPath || null,
   // odometer, odometer_at and odometer_source are derived by a trigger from odometer_readings
+  // left_fleet_on only for stolen/sold vehicles, or to clear it when one comes back into the fleet
+  ...((['stolen', 'sold'].includes(v.status) || v.leftFleetOn) ? { left_fleet_on: ['stolen', 'sold'].includes(v.status) ? (v.leftFleetOn || null) : null } : {}),
 });
 
 // licence_photo is a base64 data URL and can be several MB per row — never fetched in bulk,

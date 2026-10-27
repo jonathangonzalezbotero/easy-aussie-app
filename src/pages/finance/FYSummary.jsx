@@ -37,6 +37,8 @@ export default function FYSummary({ go }) {
   // Bonds held at the end of the FY: held now, or refunded after the FY end
   const bondsAtClose = data.rentals.filter(r => r.bond?.amount && (r.startDate || '') <= closingDate && (r.bond.status === 'held' || (['refunded', 'partially_refunded', 'retained', 'transferred'].includes(r.bond.status) && r.bond.refundDate && r.bond.refundDate > closingDate)));
   const bondsTotal = bondsAtClose.reduce((s, r) => s + Number(r.bond.amount), 0);
+  // Vehicles that left the fleet in this FY. Ones with no date yet are shown in the current FY so they are not missed.
+  const leftFleet = data.vehicles.filter(v => (v.status === 'stolen' || v.status === 'sold') && (v.leftFleetOn ? v.leftFleetOn >= from && v.leftFleetOn <= to : inProgress)).sort((a, b) => (a.leftFleetOn || '9').localeCompare(b.leftFleetOn || '9'));
   const director = useMemo(() => directorPosition(fin), [fin]);
   const payeeRows = useMemo(() => payeeSummary(live, fin.payees, to).filter(r => r.total > 0).sort((a, b) => b.total - a.total), [live, fin.payees, to]);
   const rowTotal = (cat) => months.reduce((s, m) => s + (byMonth[cat]?.[m] || 0), 0);
@@ -141,6 +143,23 @@ export default function FYSummary({ go }) {
               </table></div>)}
           </div>
         </div>
+
+        {leftFleet.length > 0 && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div className="card-head"><span className="card-title">Vehicles stolen or sold · {fyLabel(fy)}</span><span className="text-sm text-muted">For the write-off or sale; your accountant works out the figures</span></div>
+            <div className="table-wrap"><table className="table">
+              <thead><tr><th>Vehicle</th><th>What happened</th><th>Date</th><th className="col-hide-mobile">Purchased</th><th style={{ textAlign: 'right' }}>Purchase price</th></tr></thead>
+              <tbody>{leftFleet.map(v => (
+                <tr key={v.id} style={{ cursor: 'default' }}>
+                  <td className="fw-500">{v.plate}{v.name ? <span className="text-muted"> · {v.name}</span> : ''}</td>
+                  <td>{v.status === 'stolen' ? 'Stolen' : 'Sold'}{v.notes ? <div className="text-sm text-muted">{v.notes.slice(0, 80)}</div> : ''}</td>
+                  <td style={{ whiteSpace: 'nowrap', color: v.leftFleetOn ? 'inherit' : 'var(--amber)' }}>{v.leftFleetOn ? formatDate(v.leftFleetOn) : 'Date not set'}</td>
+                  <td className="col-hide-mobile text-muted">{v.purchaseDate ? formatDate(v.purchaseDate) : '—'}</td>
+                  <td style={{ textAlign: 'right' }}>{v.purchasePrice ? money(Number(v.purchasePrice)) : <span style={{ color: 'var(--amber)' }}>not set</span>}</td>
+                </tr>))}</tbody>
+            </table></div>
+          </div>
+        )}
 
         {payeeRows.length > 0 && (
           <div className="card" style={{ marginTop: 20 }}>

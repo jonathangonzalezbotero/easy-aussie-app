@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
+import { useFinance } from '../finance/FinanceContext';
+import { bondInFinance, retentionEntry } from '../finance/bondFinance';
 import Modal from '../components/shared/Modal';
 import Drawer from '../components/shared/Drawer';
 import Badge from '../components/shared/Badge';
@@ -71,6 +73,26 @@ function CustomerPicker({ customers, value, onChange, startDate }) {
 
 export default function Rentals() {
   const { data, add, update, remove, refresh } = useStore();
+  const fin = useFinance();
+  const financeReady = !!fin && !fin.error && !fin.loading;
+  // Offer shown after a bond is kept in full: { rental, amount, reason, deposits }
+  const [retainOffer, setRetainOffer] = useState(null);
+  const [retainSaving, setRetainSaving] = useState(false);
+  const [retainErr, setRetainErr] = useState('');
+  const offerRetention = (rental, amount, reason) => {
+    if (!financeReady) return;
+    const info = bondInFinance({ ...rental, bond: { ...rental.bond, status: 'retained' } }, fin.transactions);
+    if (info.needsRetention) { setRetainErr(''); setRetainOffer({ rental, amount, reason, deposits: info.deposits, depositTotal: info.depositTotal }); }
+  };
+  const recordRetention = async () => {
+    const o = retainOffer; if (!o) return;
+    setRetainSaving(true); setRetainErr('');
+    try {
+      const v = data.vehicles.find(x => x.id === o.rental.vehicleId);
+      await fin.addTransaction(retentionEntry(o.rental, { amount: o.amount, accountId: o.deposits[0].tx.accountId, date: o.rental.endDate || todayStr(), reason: o.reason, contract: o.rental.contractNumber || v?.plate }));
+      setRetainOffer(null);
+    } catch (e) { setRetainErr(e.message || String(e)); } finally { setRetainSaving(false); }
+  };
   const navigate = useNavigate();
   const [tab, setTab] = useState('active');
   const [showCreate, setShowCreate] = useState(false);
@@ -252,14 +274,18 @@ export default function Rentals() {
     }
     const returnKm = odometerReturn.trim();
     await update('rentals', r.id, { status: 'completed', endDate: todayStr(), bond: bondUpdate, notes: noteAppend, odometerReturn: returnKm || null });
-    await update('vehicles', r.vehicleId, { status: 'available' });
+    // A vehicle already marked stolen or sold stays that way; otherwise it is free again.
+    const endedVehicle = data.vehicles.find(v => v.id === r.vehicleId);
+    if (endedVehicle && !['stolen', 'sold'].includes(endedVehicle.status)) await update('vehicles', r.vehicleId, { status: 'available' });
     if (returnKm) await refresh(); // the return reading goes into the odometer log via a trigger
     const endedCustomer = data.customers.find(c => c.id === r.customerId);
     if (endedCustomer?.email) {
       callEdgeFunction('send-review-email', { rental_id: r.id, customer_email: endedCustomer.email, customer_name: endedCustomer.name });
     }
+    const keptAll = r.bond?.amount && r.bond.status === 'held' && endMode === 'keep';
     resetEnd();
     if (detailR?.id === r.id) setDetailR(null);
+    if (keptAll) offerRetention({ ...r, endDate: todayStr() }, Number(r.bond.amount) || 0, bondUpdate.retainReason);
   };
 
   // Hard-delete a rental (e.g. customer never showed up). No review email, no completed record.
@@ -591,6 +617,29 @@ export default function Rentals() {
         })()}
       </Modal>
 
+      {/* Record a kept-in-full bond in Finance */}
+      <Modal open={!!retainOffer} onClose={() => setRetainOffer(null)} title="Record the kept bond in Finance?"
+        footer={<><button className="btn btn-secondary" onClick={() => setRetainOffer(null)}>Not now</button><button className="btn btn-primary" onClick={recordRetention} disabled={retainSaving}>{retainSaving ? 'Saving…' : 'Record it'}</button></>}>
+        {retainOffer && (() => {
+          const o = retainOffer; const d = o.deposits[0];
+          const acc = fin.accounts.find(a => a.id === d.tx.accountId);
+          const c = data.customers.find(x => x.id === o.rental.customerId);
+          return (
+            <>
+              <p style={{ fontSize: 14 }}>You kept <strong>${o.amount}</strong> of {c?.name || 'the customer'}'s bond. The money arrived on {formatDate(d.tx.date)} and is in Finance as a bond deposit{o.deposits.length > 1 ? ` (${o.deposits.length} lines, $${o.depositTotal} in total)` : ''}, so it is not counted as income yet.</p>
+              <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '10px 12px', fontSize: 13 }}>
+                <div className="fw-600" style={{ marginBottom: 4 }}>This adds one entry on {acc?.name || 'the same account'}, dated {formatDate(o.rental.endDate || todayStr())}, amount $0:</div>
+                <div>Bond refund −${o.amount} · closes the bond</div>
+                <div>Bond retained +${o.amount} · counted as income</div>
+                <div className="text-muted" style={{ marginTop: 4 }}>No money moves, so the account balance does not change.</div>
+              </div>
+              {o.depositTotal && Math.abs(o.depositTotal - o.amount) >= 0.01 && <div className="text-sm" style={{ color: 'var(--amber)' }}>The deposit in Finance (${o.depositTotal}) is different from the bond on the rental (${o.amount}). The entry uses the rental's amount; check the deposit line if that is wrong.</div>}
+              {retainErr && <div style={{ color: 'var(--red)', fontSize: 13 }}>{retainErr}</div>}
+            </>
+          );
+        })()}
+      </Modal>
+
       {/* End rental */}
       <Modal open={!!endR} onClose={resetEnd} title="End Rental"
         footer={endR && (
@@ -724,6 +773,12 @@ export default function Rentals() {
                     </div>
                     {selected.bond.status === 'held' && selected.bond.refundedAmount !== '' && Number(selected.bond.refundedAmount) > 0 && (
                       <div className="text-sm" style={{ marginTop: 10 }}>Refund of ${selected.bond.refundedAmount} by {selected.bond.refundMethod || 'bank'} recorded, waiting for the bank line in Finance.</div>
+                    )}
+                    {financeReady && bondInFinance(selected, fin.transactions).needsRetention && (
+                      <div style={{ marginTop: 12, background: 'white', borderRadius: 8, padding: '10px 12px', fontSize: 13 }}>
+                        <div>The bond is in Finance as a deposit, but keeping it is not recorded there yet, so it is not counted as income.</div>
+                        <button className="btn btn-primary btn-sm" style={{ marginTop: 8 }} onClick={() => offerRetention(selected, Number(selected.bond.retainedAmount || selected.bond.amount) || 0, selected.bond.retainReason)}>Record in Finance</button>
+                      </div>
                     )}
                     {selected.bond.status === 'held' && (
                       <button className="btn btn-secondary btn-sm" style={{ marginTop: 12 }} onClick={() => markBondReturned(selected)}>
