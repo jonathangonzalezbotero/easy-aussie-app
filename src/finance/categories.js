@@ -32,6 +32,7 @@ export const CATEGORIES = [
   { id: 'director_loan_repayment', label: 'Director loan repayment', type: 'capital' },
   { id: 'director_loan_in',        label: 'Director loan (money in)', type: 'capital' },
   { id: 'vehicle_purchase',        label: 'Vehicle purchase',         type: 'capital' },
+  { id: 'vehicle_sale',            label: 'Vehicle sale (money in)',  type: 'capital' },
   { id: 'drawings',                label: 'Personal / drawings (business paid something personal)', type: 'capital' },
 
   { id: 'bond_deposit',    label: 'Bond deposit',           type: 'bond' },
