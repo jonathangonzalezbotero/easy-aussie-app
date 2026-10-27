@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import ContractDocument, { fmtMoney } from '../components/ContractDocument';
-import { termsAmountsFromRow } from '../utils/terms';
+import { termsAmountsFromRow, liabilityFor } from '../utils/terms';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const ANON_KEY     = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -51,6 +51,7 @@ function buildD(rental, settings, signedName = null, signedAt = null) {
     bondAmount:       rental.bond_amount  ? String(rental.bond_amount) : (vehicle.type === 'ebike' ? (s.ebike_bond || '150') : (s.default_bond || '300')),
     insuranceExcess:  s.insurance_excess || '700',
     ...termsAmountsFromRow(s),
+    liability:        liabilityFor(termsAmountsFromRow(s), vehicle.type),
     insuranceOption:  rental.insurance_option || 'standard',
     price:            rental.price        || '',
     billingPeriod:    rental.billing_period || 'weekly',

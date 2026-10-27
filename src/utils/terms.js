@@ -13,6 +13,8 @@ export const DEFAULT_TERMS_AMOUNTS = {
   reducedExcess: '300',
   reducedExcessWeekly: '10',
   reducedExcessFixed: '30',
+  ebikeTotalLiability: '600',
+  ebikeReducedWeekly: '10',
 };
 
 // Map a raw snake_case settings row (public intake / signing page) to the camelCase
@@ -27,6 +29,8 @@ export function termsAmountsFromRow(row) {
     reducedExcess:       r.reduced_excess        || DEFAULT_TERMS_AMOUNTS.reducedExcess,
     reducedExcessWeekly: r.reduced_excess_weekly || DEFAULT_TERMS_AMOUNTS.reducedExcessWeekly,
     reducedExcessFixed:  r.reduced_excess_fixed  || DEFAULT_TERMS_AMOUNTS.reducedExcessFixed,
+    ebikeTotalLiability: r.ebike_total_liability || DEFAULT_TERMS_AMOUNTS.ebikeTotalLiability,
+    ebikeReducedWeekly:  r.ebike_reduced_weekly  || DEFAULT_TERMS_AMOUNTS.ebikeReducedWeekly,
   };
 }
 
@@ -41,6 +45,8 @@ export function termsAmountsFromSettings(s) {
     reducedExcess:       x.reducedExcess       || DEFAULT_TERMS_AMOUNTS.reducedExcess,
     reducedExcessWeekly: x.reducedExcessWeekly || DEFAULT_TERMS_AMOUNTS.reducedExcessWeekly,
     reducedExcessFixed:  x.reducedExcessFixed  || DEFAULT_TERMS_AMOUNTS.reducedExcessFixed,
+    ebikeTotalLiability: x.ebikeTotalLiability || DEFAULT_TERMS_AMOUNTS.ebikeTotalLiability,
+    ebikeReducedWeekly:  x.ebikeReducedWeekly  || DEFAULT_TERMS_AMOUNTS.ebikeReducedWeekly,
   };
 }
 
@@ -54,26 +60,41 @@ export const COVER_EXCLUSIONS = [
   'theft where the vehicle was left unlocked or with the keys in it',
 ];
 
-// Premium wording for a rental: weekly rentals pay per week, fixed-term (1 day to 1 week) pay once.
-export const reducedPremiumText = (a, billingPeriod) =>
-  billingPeriod === 'fixed' ? `$${a.reducedExcessFixed} one-off` : `$${a.reducedExcessWeekly} per week`;
+// Liability figures for a vehicle type.
+//   total  — what an incident costs the renter under Standard liability (bond kept + balance charged)
+//   cap    — maximum out-of-pocket under Reduced liability (the bond)
+//   weekly — Reduced liability premium per week; fixed — one-off premium for short rentals (null = not offered)
+export function liabilityFor(a, vehicleType) {
+  if (vehicleType === 'ebike') {
+    return { bond: a.ebikeBond, total: Number(a.ebikeTotalLiability || 0), cap: Number(a.ebikeBond || 0), weekly: a.ebikeReducedWeekly, fixed: null, noun: 'e-bike', hasExcess: false };
+  }
+  return { bond: a.defaultBond, total: Number(a.defaultBond || 0) + Number(a.insuranceExcess || 0), cap: Number(a.reducedExcess || 0), weekly: a.reducedExcessWeekly, fixed: a.reducedExcessFixed, noun: 'scooter', hasExcess: true };
+}
 
-export const totalLiability = (a) => Number(a.defaultBond || 0) + Number(a.insuranceExcess || 0);
+// Premium wording for a rental: weekly rentals pay per week, fixed-term (1 day to 1 week) pay once where offered.
+export const reducedPremiumText = (a, billingPeriod, vehicleType) => {
+  const L = liabilityFor(a, vehicleType);
+  return billingPeriod === 'fixed' && L.fixed ? `$${L.fixed} one-off` : `$${L.weekly} per week`;
+};
+
+export const totalLiability = (a, vehicleType) => liabilityFor(a, vehicleType).total;
 
 // Insurance option labels + one-line descriptions, for intake and the rentals page.
-export function insuranceOptions(a) {
+export function insuranceOptions(a, vehicleType) {
+  const L = liabilityFor(a, vehicleType);
+  const premium = L.fixed ? `+$${L.weekly}/week, or $${L.fixed} one-off for a week or less` : `+$${L.weekly}/week`;
   return [
     {
       value: 'standard',
-      label: `Standard liability ($${totalLiability(a)} per incident)`,
+      label: `Standard liability ($${L.total} per incident)`,
       short: 'No extra charge',
-      text: `If there is an accident it will cost you $${totalLiability(a)} in total. Your $${a.defaultBond} bond is kept and the balance is charged to your card on file.`,
+      text: `If there is an accident${L.hasExcess ? '' : ', damage or theft'} it will cost you $${L.total} in total. Your $${L.bond} bond is kept and the balance is charged to your card on file.`,
     },
     {
       value: 'reduced',
-      label: `Reduced liability (+$${a.reducedExcessWeekly}/week, or $${a.reducedExcessFixed} one-off for a week or less)`,
-      short: `+$${a.reducedExcessWeekly} per week or $${a.reducedExcessFixed} one-off`,
-      text: `Your maximum out-of-pocket per incident is capped at $${a.reducedExcess}. Nothing is charged on top of your bond, for both damage to the scooter and the insurance excess.`,
+      label: `Reduced liability (${premium})`,
+      short: premium,
+      text: `Your maximum out-of-pocket per incident is capped at $${L.cap}. Nothing is charged on top of your bond${L.hasExcess ? ', for both damage to the scooter and the insurance excess' : ''}.`,
     },
   ];
 }
@@ -82,6 +103,7 @@ export function insuranceOptions(a) {
 // Each item is { title, body } where body is plain text (may contain newlines).
 export function termsFor(vehicleType, a) {
   const isEbike = vehicleType === 'ebike';
+  const L = liabilityFor(a, vehicleType);
   const items = [];
 
   if (!isEbike) {
@@ -91,7 +113,7 @@ export function termsFor(vehicleType, a) {
     });
     items.push({
       title: 'Accidents and insurance',
-      body: `The scooter has Compulsory Third Party (CTP) and third-party property insurance. It is not comprehensively insured. If there is an accident you are responsible for the insurance excess and for damage to the scooter itself.\n\nYou can choose below how this is handled:\n• Standard liability: an accident will cost you $${totalLiability(a)} in total. Your $${a.defaultBond} bond is kept and the balance is charged to your card on file.\n• Reduced liability: $${a.reducedExcessWeekly} extra per week for ongoing rentals, or a one-off $${a.reducedExcessFixed} for rentals of a week or less. Your maximum out-of-pocket per incident is capped at $${a.reducedExcess}. Nothing is charged on top of your bond.\n\nNeither option applies to ${COVER_EXCLUSIONS.join(', ')}. In those cases you are liable for the full cost.`,
+      body: `The scooter has Compulsory Third Party (CTP) and third-party property insurance. It is not comprehensively insured. If there is an accident you are responsible for the insurance excess and for damage to the scooter itself.\n\nYou can choose below how this is handled:\n• Standard liability: an accident will cost you $${L.total} in total. Your $${L.bond} bond is kept and the balance is charged to your card on file.\n• Reduced liability: $${L.weekly} extra per week for ongoing rentals, or a one-off $${L.fixed} for rentals of a week or less. Your maximum out-of-pocket per incident is capped at $${L.cap}. Nothing is charged on top of your bond.\n\nNeither option applies to ${COVER_EXCLUSIONS.join(', ')}. In those cases you are liable for the full cost.`,
     });
     items.push({
       title: 'Fuel and engine oil',
@@ -104,7 +126,7 @@ export function termsFor(vehicleType, a) {
     });
     items.push({
       title: 'Accidents and damage',
-      body: `The e-bike is not a registered motor vehicle and has no insurance. You are responsible for any loss, damage or theft of the e-bike and its accessories while it is in your care, and for any damage you cause to other people or their property. The bond is used first to recover these costs.`,
+      body: `The e-bike is not a registered motor vehicle and has no insurance. You are responsible for any loss, damage or theft of the e-bike and its accessories while it is in your care, and for any damage you cause to other people or their property.\n\nYou can choose below how this is handled:\n• Standard liability: an accident, damage or theft will cost you $${L.total} in total. Your $${L.bond} bond is kept and the balance is charged to your card on file.\n• Reduced liability: $${L.weekly} extra per week. Your maximum out-of-pocket per incident is capped at $${L.cap}. Nothing is charged on top of your bond.\n\nNeither option applies to ${COVER_EXCLUSIONS.join(', ')}. In those cases you are liable for the full cost.`,
     });
     items.push({
       title: 'Battery and charging',

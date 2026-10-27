@@ -79,6 +79,16 @@ export default function Settings() {
                 <input className="input" type="number" min="0" value={form.reducedExcessFixed || ''} onChange={e => sf('reducedExcessFixed', e.target.value)} />
                 <span className="field-hint">Single charge for fixed-term rentals of a week or less</span>
               </div>
+              <div className="field">
+                <label className="label">E-bike Total Liability ($)</label>
+                <input className="input" type="number" min="0" value={form.ebikeTotalLiability || ''} onChange={e => sf('ebikeTotalLiability', e.target.value)} />
+                <span className="field-hint">What an incident costs an e-bike renter under Standard liability (bond kept + balance charged)</span>
+              </div>
+              <div className="field">
+                <label className="label">E-bike Reduced Liability Premium ($/week)</label>
+                <input className="input" type="number" min="0" value={form.ebikeReducedWeekly || ''} onChange={e => sf('ebikeReducedWeekly', e.target.value)} />
+                <span className="field-hint">Caps the e-bike renter's liability at the e-bike bond</span>
+              </div>
             </div>
             <div>
               <button className="btn btn-primary" onClick={save} disabled={saving}>

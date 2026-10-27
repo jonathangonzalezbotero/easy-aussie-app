@@ -13,7 +13,7 @@ import { matchesSearch } from '../utils/search';
 import { formatDate, daysBetween, todayStr, ageOn, isYoungRenter } from '../utils/dates';
 import { BOND_STATUSES, BOND_RETAIN_REASONS, bondLabel, bondVariant, closedBondStatus } from '../utils/bond';
 import { confirmOdometer, latestReading, describeReading } from '../utils/odometer';
-import { insuranceOptions, termsAmountsFromSettings, reducedPremiumText } from '../utils/terms';
+import { insuranceOptions, termsAmountsFromSettings, reducedPremiumText, liabilityFor } from '../utils/terms';
 
 const EF = {
   customerId: '', vehicleId: '', startDate: todayStr(), endDate: '', contractNumber: '', notes: '', odometer: '', price: '', billingPeriod: 'weekly', insuranceOption: 'standard',
@@ -381,20 +381,20 @@ export default function Rentals() {
       </div>
       {(() => {
         const v = data.vehicles.find(x => x.id === form.vehicleId);
-        if (v?.type === 'ebike') return null;
         const a = termsAmountsFromSettings(data.settings);
+        const L = liabilityFor(a, v?.type);
         const c = data.customers.find(x => x.id === form.customerId);
         return (
           <div className="field">
             <label className="label">Liability Option</label>
             <select className="select" value={form.insuranceOption} onChange={e => sf('insuranceOption', e.target.value)}>
-              {insuranceOptions(a).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              {insuranceOptions(a, v?.type).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             <span className="field-hint">
               {form.insuranceOption === 'reduced'
-                ? `Out-of-pocket capped at $${a.reducedExcess} per incident — include the ${reducedPremiumText(a, form.billingPeriod)} in the price.`
-                : `An accident costs the renter $${Number(a.defaultBond) + Number(a.insuranceExcess)} in total (bond kept, balance charged to card).`}
-              {c?.insuranceOption && c.insuranceOption !== form.insuranceOption ? ` Customer chose "${insuranceOptions(a).find(o => o.value === c.insuranceOption)?.label}" on the intake form.` : ''}
+                ? `Out-of-pocket capped at $${L.cap} per incident — include the ${reducedPremiumText(a, form.billingPeriod, v?.type)} in the price.`
+                : `An accident costs the renter $${L.total} in total (bond kept, balance charged to card).`}
+              {c?.insuranceOption && c.insuranceOption !== form.insuranceOption ? ` Customer chose "${insuranceOptions(a, v?.type).find(o => o.value === c.insuranceOption)?.label}" on the intake form.` : ''}
             </span>
           </div>
         );
@@ -766,7 +766,7 @@ export default function Rentals() {
                 {selected.contractNumber && <div><div className="label">Contract No.</div><div style={{ marginTop: 3, fontWeight: 600 }}>{selected.contractNumber}</div></div>}
                 {selected.odometer && <div><div className="label">Odometer at Start</div><div style={{ marginTop: 3 }}>{Number(selected.odometer).toLocaleString()} km</div></div>}
                 {selected.odometerReturn && <div><div className="label">Odometer at Return</div><div style={{ marginTop: 3, fontWeight: 600 }}>{Number(selected.odometerReturn).toLocaleString()} km{selected.odometer ? ` (+${(Number(selected.odometerReturn) - Number(selected.odometer)).toLocaleString()} km)` : ''}</div></div>}
-                {selected.insuranceOption && data.vehicles.find(x => x.id === selected.vehicleId)?.type !== 'ebike' && <div><div className="label">Liability Option</div><div style={{ marginTop: 3 }}>{insuranceOptions(termsAmountsFromSettings(data.settings)).find(o => o.value === selected.insuranceOption)?.label || selected.insuranceOption}</div></div>}
+                {selected.insuranceOption && <div><div className="label">Liability Option</div><div style={{ marginTop: 3 }}>{insuranceOptions(termsAmountsFromSettings(data.settings), data.vehicles.find(x => x.id === selected.vehicleId)?.type).find(o => o.value === selected.insuranceOption)?.label || selected.insuranceOption}</div></div>}
                 {selected.price && <div><div className="label">{selected.billingPeriod === 'fixed' ? 'Total Price (Rental Period)' : 'Weekly Price'}</div><div style={{ marginTop: 3, fontWeight: 600 }}>${Number(selected.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}{selected.billingPeriod === 'fixed' ? ' total' : ' / week'}</div></div>}
               </div>
               <div style={{ background: selected.bond?.amount ? (selected.bond.status === 'held' ? 'var(--amber-bg)' : selected.bond.status === 'awaiting' ? 'var(--blue-bg)' : 'var(--accent-light)') : 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>

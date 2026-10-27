@@ -45,7 +45,7 @@ const Field = ({ label, value }) => (
   </div>
 );
 
-import { COVER_EXCLUSIONS, totalLiability } from '../utils/terms';
+import { COVER_EXCLUSIONS } from '../utils/terms';
 
 export default function ContractDocument({ d, isEbike, isCar, contractRef = null, ownerSignature = true }) {
   const today = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -71,22 +71,24 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
   // Liability option + surcharges (scooters and cars). Mirrors the wording the
   // customer accepted on the intake page (src/utils/terms.js).
   const reduced   = d.insuranceOption === 'reduced';
-  const noun      = isCar ? 'vehicle' : 'moped';
+  const noun      = isCar ? 'vehicle' : isEbike ? 'e-bike' : 'moped';
+  const L         = d.liability || { total: 0, cap: 0, weekly: '', fixed: null, hasExcess: !isEbike };
+  const premiumText = weekly || !L.fixed ? `$${fmtMoney(L.weekly)} AUD per week` : `$${fmtMoney(L.fixed)} AUD as a one-off charge`;
   const feeNotes  = (
     <>
-      {reduced && d.reducedExcessWeekly && (
-        <p style={{ marginTop: 6 }}>The Rental Fee includes the <strong>Reduced Liability premium of {weekly ? `$${fmtMoney(d.reducedExcessWeekly)} AUD per week` : `$${fmtMoney(d.reducedExcessFixed)} AUD (one-off)`}</strong> (see clause on Renter's Liability).</p>
+      {reduced && L.weekly && (
+        <p style={{ marginTop: 6 }}>The Rental Fee includes the <strong>Reduced Liability premium of {premiumText}</strong> (see clause on Renter's Liability).</p>
       )}
     </>
   );
   const liabilityTitle = reduced ? 'Reduced Liability (selected)' : 'Standard Liability (selected)';
   const liabilityClause = (
     <>
-      <p>The security bond of <strong>${fmtMoney(d.bondAmount)} AUD</strong> is applied first towards the insurance excess and any damage to the {noun}.</p>
+      <p>The security bond of <strong>${fmtMoney(d.bondAmount)} AUD</strong> is applied first towards {L.hasExcess ? 'the insurance excess and ' : ''}any damage to or loss of the {noun}.</p>
       {reduced ? (
-        <p style={{ marginTop: 6 }}>The Renter has selected the <strong>Reduced Liability</strong> option for <strong>{weekly ? `$${fmtMoney(d.reducedExcessWeekly)} AUD per week` : `$${fmtMoney(d.reducedExcessFixed)} AUD as a one-off charge`}</strong>. Under this option the Renter's total liability per incident, covering both the insurance excess and damage to the {noun} itself, is capped at <strong>${fmtMoney(d.reducedExcess)} AUD</strong>. Nothing further is charged on top of the bond.</p>
+        <p style={{ marginTop: 6 }}>The Renter has selected the <strong>Reduced Liability</strong> option for <strong>{premiumText}</strong>. Under this option the Renter's total liability per incident, covering {L.hasExcess ? 'both the insurance excess and ' : ''}damage to or loss of the {noun} itself, is capped at <strong>${fmtMoney(L.cap)} AUD</strong>. Nothing further is charged on top of the bond.</p>
       ) : (
-        <p style={{ marginTop: 6 }}>The Renter has selected the <strong>Standard Liability</strong> option. In the event of an accident the Renter will pay <strong>${fmtMoney(totalLiability(d))} AUD in total</strong>: the <strong>${fmtMoney(d.bondAmount)} AUD</strong> bond is retained and the balance is charged to the card on file. The Renter is also liable for the full cost of repairing or replacing the {noun} where this exceeds that amount.</p>
+        <p style={{ marginTop: 6 }}>The Renter has selected the <strong>Standard Liability</strong> option. In the event of an accident{L.hasExcess ? '' : ', damage or theft'} the Renter will pay <strong>${fmtMoney(L.total)} AUD in total</strong>: the <strong>${fmtMoney(d.bondAmount)} AUD</strong> bond is retained and the balance is charged to the card on file. The Renter is also liable for the full cost of repairing or replacing the {noun} where this exceeds that amount.</p>
       )}
       <p style={{ marginTop: 6 }}>The liability cap and the bond limit do not apply, and the Renter is liable for the full cost, in the case of {COVER_EXCLUSIONS.join('; ')}.</p>
     </>
@@ -174,8 +176,8 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
           <ul style={{ marginLeft: 20, marginBottom: 8 }}>
             {[
               reduced
-                ? `The Renter's liability of up to $${fmtMoney(d.reducedExcess)} AUD per incident under the Reduced Liability option, or the full amount where that option does not apply.`
-                : `In the event of an accident, third-party property damage, or insurance claim, the balance of the Renter's total liability of $${fmtMoney(totalLiability(d))} AUD per incident under the Standard Liability option (the $${fmtMoney(d.bondAmount)} AUD bond is retained and the remainder is charged to the card on file).`,
+                ? `The Renter's liability of up to $${fmtMoney(L.cap)} AUD per incident under the Reduced Liability option, or the full amount where that option does not apply.`
+                : `In the event of an accident, third-party property damage, or insurance claim, the balance of the Renter's total liability of $${fmtMoney(L.total)} AUD per incident under the Standard Liability option (the $${fmtMoney(d.bondAmount)} AUD bond is retained and the remainder is charged to the card on file).`,
               reduced ? 'Damage to or loss of the moped up to the Reduced Liability cap, or the full cost where that option does not apply.' : 'The full cost of repairs, replacement, or loss resulting from damage, neglect, or theft of the moped (as no comprehensive insurance is included).',
               'Unpaid traffic infringements, parking fines, tolls, speed camera penalties, and associated administrative processing fees.',
               'Late return fees, professional cleaning fees, or vehicle recovery/towing costs.',
@@ -263,12 +265,14 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
     { num: '3', title: 'Payment, Security Bond & Card Authorisation', content: (
       <div style={bodyText}>
         <RateBlock />
-        <div><strong>3.1 Rental Fee</strong><p>The Rental Fee of <strong>{d.price ? `$${fmtMoney(d.price)} AUD ${perUnit}` : `$_______________ AUD ${perUnit}`}</strong> must be paid in full via bank transfer or an approved payment method prior to e-bike handover.</p></div>
+        <div><strong>3.1 Rental Fee</strong><p>The Rental Fee of <strong>{d.price ? `$${fmtMoney(d.price)} AUD ${perUnit}` : `$_______________ AUD ${perUnit}`}</strong> must be paid in full via bank transfer or an approved payment method prior to e-bike handover.</p>{feeNotes}</div>
         <div style={{ marginTop: 10 }}><strong>3.2 Security Bond &amp; Card on File</strong><p>The Renter must provide a security deposit of <strong>${d.bondAmount} AUD</strong> via bank transfer or credit/debit card. Additionally, the Renter agrees to provide a valid credit or debit card to be securely stored on file via the Owner's digital payment gateway (e.g. Stripe) for the duration of the rental period.</p></div>
         <div style={{ marginTop: 10 }}><strong>3.3 Authority to Charge Saved Card</strong><p style={{ marginBottom: 4 }}>The Renter explicitly authorises the Owner to automatically charge the saved credit/debit card on file to recover any outstanding balances, costs, or liabilities incurred under this Agreement. The card on file may be charged for:</p>
           <ul style={{ marginLeft: 20, marginBottom: 8 }}>
             {[
-              'The full cost of repairs, replacement, or loss resulting from damage, neglect, or theft of the e-bike or its accessories (no insurance is included).',
+              reduced
+                ? `Damage to, loss or theft of the e-bike or its accessories up to the Renter's liability cap of $${fmtMoney(L.cap)} AUD per incident under the Reduced Liability option, or the full cost where that option does not apply.`
+                : `In the event of damage, loss or theft of the e-bike or its accessories, the balance of the Renter's total liability of $${fmtMoney(L.total)} AUD per incident under the Standard Liability option (the $${fmtMoney(d.bondAmount)} AUD bond is retained and the remainder is charged to the card on file).`,
               'Unpaid traffic infringements, fines, penalties, and associated administrative processing fees.',
               'Late return fees, professional cleaning fees where the e-bike is returned in an unacceptable condition, or recovery costs.',
             ].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
@@ -317,7 +321,8 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
         <ul style={{ marginLeft: 20, marginBottom: 8 }}>
           {['No registration or CTP is applicable to this e-bike', 'The security bond is the primary mechanism for recovering costs from damage or loss', 'The Renter is fully liable for any damage to third-party property or injury caused by the Renter\'s use of the e-bike', 'The Owner holds no liability for personal injury to the Renter'].map(i => <li key={i} style={{ marginBottom: 4 }}>{i}</li>)}
         </ul>
-        <p>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel or accident insurance for the duration of the rental.</p>
+        <div style={{ marginTop: 10 }}><strong>9.1 Renter's Liability — {liabilityTitle}</strong>{liabilityClause}</div>
+        <p style={{ marginTop: 10 }}>Easy Aussie AU Pty Ltd strongly recommends the Renter holds personal travel or accident insurance for the duration of the rental.</p>
       </div>
     )},
     { num: '10', title: 'Assumption of Risk', content: <p style={bodyText}>The Renter acknowledges that riding an e-bike involves inherent risks, including serious injury or death. The Renter voluntarily accepts all risks associated with the use of the e-bike, whether foreseeable or not.</p> },
@@ -346,8 +351,8 @@ export default function ContractDocument({ d, isEbike, isCar, contractRef = null
           <ul style={{ marginLeft: 20, marginBottom: 8 }}>
             {[
               reduced
-                ? `The Renter's liability of up to $${fmtMoney(d.reducedExcess)} AUD per incident under the Reduced Liability option, or the full amount where that option does not apply.`
-                : `In the event of an accident, third-party property damage, or insurance claim, the balance of the Renter's total liability of $${fmtMoney(totalLiability(d))} AUD per incident under the Standard Liability option (the $${fmtMoney(d.bondAmount)} AUD bond is retained and the remainder is charged to the card on file).`,
+                ? `The Renter's liability of up to $${fmtMoney(L.cap)} AUD per incident under the Reduced Liability option, or the full amount where that option does not apply.`
+                : `In the event of an accident, third-party property damage, or insurance claim, the balance of the Renter's total liability of $${fmtMoney(L.total)} AUD per incident under the Standard Liability option (the $${fmtMoney(d.bondAmount)} AUD bond is retained and the remainder is charged to the card on file).`,
               reduced ? 'Damage to or loss of the vehicle up to the Reduced Liability cap, or the full cost where that option does not apply.' : 'The full cost of repairs, replacement, or loss resulting from damage, neglect, or theft of the vehicle (as no comprehensive insurance is included).',
               'Unpaid traffic infringements, parking fines, tolls, speed camera penalties, and associated administrative processing fees.',
               'Late return fees, professional cleaning fees, refuelling costs, or vehicle recovery/towing costs.',

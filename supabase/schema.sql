@@ -107,7 +107,9 @@ create table if not exists settings (
   oil_refill_fee        text default '5',
   reduced_excess        text default '300',
   reduced_excess_weekly text default '10',
-  reduced_excess_fixed  text default '30'
+  reduced_excess_fixed  text default '30',
+  ebike_total_liability text default '600',
+  ebike_reduced_weekly  text default '10'
 );
 
 -- Insert the single settings row

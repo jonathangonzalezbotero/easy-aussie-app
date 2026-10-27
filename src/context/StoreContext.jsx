@@ -122,6 +122,7 @@ const settingsFromDb = (s) => ({
   insuranceExcess: s.insurance_excess,
   ebikeBond: s.ebike_bond, oilRefillFee: s.oil_refill_fee,
   reducedExcess: s.reduced_excess, reducedExcessWeekly: s.reduced_excess_weekly, reducedExcessFixed: s.reduced_excess_fixed,
+  ebikeTotalLiability: s.ebike_total_liability, ebikeReducedWeekly: s.ebike_reduced_weekly,
 });
 
 const settingsToDb = (s) => ({
@@ -130,6 +131,7 @@ const settingsToDb = (s) => ({
   insurance_excess: s.insuranceExcess,
   ebike_bond: s.ebikeBond, oil_refill_fee: s.oilRefillFee,
   reduced_excess: s.reducedExcess, reduced_excess_weekly: s.reducedExcessWeekly, reduced_excess_fixed: s.reducedExcessFixed,
+  ebike_total_liability: s.ebikeTotalLiability, ebike_reduced_weekly: s.ebikeReducedWeekly,
 });
 
 // ── Provider ─────────────────────────────────────────────────────────────────
@@ -138,7 +140,7 @@ const DEFAULT_SETTINGS = {
   ownerCompany: 'Easy Aussie AU Pty Ltd', ownerABN: '20 680 626 251',
   ownerResponsible: 'Jonathan Alexander Gonzalez Botero', defaultBond: '300',
   insuranceExcess: '700',
-  ebikeBond: '150', oilRefillFee: '5', reducedExcess: '300', reducedExcessWeekly: '10', reducedExcessFixed: '30',
+  ebikeBond: '150', oilRefillFee: '5', reducedExcess: '300', reducedExcessWeekly: '10', reducedExcessFixed: '30', ebikeTotalLiability: '600', ebikeReducedWeekly: '10',
 };
 
 const readingFromDb = (r) => ({

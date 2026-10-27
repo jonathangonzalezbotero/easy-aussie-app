@@ -14,6 +14,8 @@ alter table settings add column if not exists reduced_excess_weekly text default
 -- If the column was created by an earlier run with the old $5 default:
 update settings set reduced_excess_weekly = '10' where id = 1 and reduced_excess_weekly = '5';
 alter table settings add column if not exists reduced_excess_fixed  text default '30';
+alter table settings add column if not exists ebike_total_liability text default '600';
+alter table settings add column if not exists ebike_reduced_weekly  text default '10';
 
 -- The public intake page shows the rental conditions (bond, excess, surcharges) before
 -- the form, so it needs to read the single settings row. Everything in this table is

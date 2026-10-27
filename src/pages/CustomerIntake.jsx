@@ -25,7 +25,7 @@ export default function CustomerIntake() {
   const fileInputRef = useRef(null);
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const needsLicence = VEHICLE_TYPES.find(t => t.value === form.vehicleType)?.needsLicence ?? true;
-  const hasInsuranceOption = form.vehicleType === 'scooter';
+  const hasInsuranceOption = !!form.vehicleType;
   const vehicleLabel = VEHICLE_TYPES.find(t => t.value === form.vehicleType)?.label || '';
 
   // Bond / excess / surcharge amounts come from the settings row (anon read policy).
@@ -184,7 +184,7 @@ export default function CustomerIntake() {
                   <div style={fieldStyle}>
                     <label style={labelStyle}>Choose your liability option *</label>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {insuranceOptions(amounts).map(o => {
+                      {insuranceOptions(amounts, form.vehicleType).map(o => {
                         const active = form.insuranceOption === o.value;
                         return (
                           <label key={o.value} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: 'pointer', borderRadius: 10, padding: '12px 14px',
@@ -231,7 +231,7 @@ export default function CustomerIntake() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px' }}>
               <div style={{ fontSize: 14, color: '#14532d' }}>
                 <strong>Renting: {vehicleLabel}</strong>
-                {hasInsuranceOption && <span style={{ color: '#166534' }}> · {insuranceOptions(amounts).find(o => o.value === form.insuranceOption)?.label}</span>}
+                {hasInsuranceOption && <span style={{ color: '#166534' }}> · {insuranceOptions(amounts, form.vehicleType).find(o => o.value === form.insuranceOption)?.label}</span>}
                 {!needsLicence && <span style={{ color: '#166534' }}> · no licence needed</span>}
               </div>
               <button type="button" onClick={() => setStep('terms')} style={{ background: 'none', border: 'none', color: '#166534', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline', whiteSpace: 'nowrap' }}>Change</button>
