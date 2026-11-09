@@ -88,6 +88,14 @@ export default function Transactions({ go }) {
     catch (e) { setToast({ message: e.message }); }
   };
 
+  const selectedIgnored = selected.filter(id => fin.transactions.find(t => t.id === id)?.matchStatus === 'ignored');
+  const deleteIgnored = async () => {
+    const n = selectedIgnored.length;
+    if (!n || !window.confirm(`Permanently delete ${n} ignored transaction${n === 1 ? '' : 's'}? This cannot be undone, and they will not come back on a later import or Stripe sync.`)) return;
+    try { await fin.removeTransactions(selectedIgnored); setToast({ message: `${n} ignored transaction${n === 1 ? '' : 's'} deleted` }); setSelected(s => s.filter(id => !selectedIgnored.includes(id))); }
+    catch (e) { setToast({ message: e.message }); }
+  };
+
   const onSaved = (tx, effects) => {
     if (!tx) { setToast({ message: 'Transaction deleted' }); return; }
     setToast({ message: effects?.[0] || (tx.matchStatus === 'ignored' ? 'Marked as ignored' : 'Saved and confirmed'), undo: tx.hasUndo ? tx.id : null });
@@ -165,6 +173,7 @@ export default function Transactions({ go }) {
             <button className="btn btn-primary btn-sm" disabled={!bulkPayee} onClick={() => { applyBulk({ payeeId: bulkPayee }); setBulkPayee(''); }}>Set payee</button>
             <button className="btn btn-sm" style={{ background: 'transparent', color: 'white' }} onClick={() => applyBulk({ matchStatus: 'confirmed' })}>Confirm as is</button>
             <button className="btn btn-sm" style={{ background: 'transparent', color: 'white' }} onClick={() => applyBulk({ matchStatus: 'ignored' })}>Mark ignored</button>
+            {selectedIgnored.length > 0 && <button className="btn btn-sm" style={{ background: 'var(--red)', color: 'white' }} onClick={deleteIgnored}>Delete {selectedIgnored.length} ignored</button>}
             <span style={{ flex: 1 }} />
             <button className="btn btn-sm" style={{ background: 'transparent', color: 'white' }} onClick={() => setSelected([])}>Clear selection</button>
           </div>

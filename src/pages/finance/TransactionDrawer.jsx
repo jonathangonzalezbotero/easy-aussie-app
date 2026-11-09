@@ -116,7 +116,7 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
     catch (e) { setErr(e.message); } finally { setSaving(false); }
   };
   const del = async () => {
-    if (!window.confirm('Delete this manual transaction?')) return;
+    if (!window.confirm(tx.source === 'manual' ? 'Delete this manual transaction?' : 'Permanently delete this ignored line? It will not come back on a later import or Stripe sync.')) return;
     setSaving(true);
     try { await fin.removeTransaction(tx.id); onSaved?.(null, []); onClose(); }
     catch (e) { setErr(e.message); } finally { setSaving(false); }
@@ -311,7 +311,7 @@ export default function TransactionDrawer({ tx, open, onClose, onSaved, defaultA
         <div className="fin-drawer-footer" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', paddingTop: 6, borderTop: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', gap: 6 }}>
             {tx && tx.matchStatus !== 'ignored' && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={ignore} disabled={saving}>Mark as ignored</button>}
-            {tx && tx.source === 'manual' && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={del} disabled={saving}>Delete</button>}
+            {tx && (tx.source === 'manual' || tx.matchStatus === 'ignored') && <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={del} disabled={saving}>Delete</button>}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-secondary" onClick={onClose}>Cancel</button>

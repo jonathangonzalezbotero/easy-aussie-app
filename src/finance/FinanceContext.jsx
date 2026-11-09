@@ -154,6 +154,14 @@ export function FinanceProvider({ children }) {
     setState(s => ({ ...s, transactions: s.transactions.filter(t => t.id !== id) }));
   };
 
+  // Hard delete (used for ignored lines). Imported lines are remembered server-side so they are not re-imported.
+  const removeTransactions = async (ids) => {
+    if (!ids.length) return;
+    const { error } = await supabase.from('finance_transactions').delete().in('id', ids);
+    if (error) throw error;
+    setState(s => ({ ...s, transactions: s.transactions.filter(t => !ids.includes(t.id)) }));
+  };
+
   const bulkUpdate = async (ids, updates) => {
     const dbPatch = {};
     if ('category' in updates) dbPatch.category = updates.category || null;
@@ -268,7 +276,7 @@ export function FinanceProvider({ children }) {
 
   const value = {
     ...state, loading, error, refresh, queueCount,
-    addTransaction, updateTransaction, removeTransaction, bulkUpdate, insertTransactions, addImport,
+    addTransaction, updateTransaction, removeTransaction, removeTransactions, bulkUpdate, insertTransactions, addImport,
     confirmTransaction, undoTransaction,
     addRule: rulesApi.add, updateRule: rulesApi.update, removeRule: rulesApi.remove,
     addRecurring: recurringApi.add, updateRecurring: recurringApi.update, removeRecurring: recurringApi.remove,
