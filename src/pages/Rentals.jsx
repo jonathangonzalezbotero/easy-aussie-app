@@ -74,7 +74,7 @@ function CustomerPicker({ customers, value, onChange, startDate }) {
 }
 
 export default function Rentals() {
-  const { data, add, update, remove, refresh } = useStore();
+  const { data, add, update, remove, refresh, addRentalVehiclePeriod, addOdometerReading } = useStore();
   const fin = useFinance();
   const financeReady = !!fin && !fin.error && !fin.loading;
   // Offer shown after a bond is kept in full: { rental, amount, reason, deposits }
@@ -113,6 +113,8 @@ export default function Rentals() {
   const [odometerReturn, setOdometerReturn] = useState('');
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EF);
+  // Changing the vehicle in Edit: 'swap' keeps who had which bike when, 'fix' corrects a wrong pick.
+  const [vehicleChange, setVehicleChange] = useState({ mode: 'swap', date: todayStr(), reason: '' });
   const [sort, setSort] = useState({ col: 'payDay', dir: 'asc' });
   const [sendingSign, setSendingSign] = useState(false);
   const [signEmailAddr, setSignEmailAddr] = useState('');
@@ -175,11 +177,17 @@ export default function Rentals() {
   }, [form.vehicleId, showCreate]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
+  // Closed vehicle periods of a rental (bikes the customer had before a swap), oldest first.
+  const periodsOf = (rentalId) => (data.rentalVehiclePeriods || []).filter(p => p.rentalId === rentalId).sort((a, b) => a.fromDate.localeCompare(b.fromDate));
+  // The current vehicle has been on the rental since the last swap (or the start date).
+  const currentSince = (r) => periodsOf(r.id).reduce((d, p) => (p.toDate > d ? p.toDate : d), r.startDate);
+
   const rentalMatches = (r) => {
     if (!search.trim()) return true;
     const c = data.customers.find(x => x.id === r.customerId);
     const v = data.vehicles.find(x => x.id === r.vehicleId);
-    return matchesSearch(search, c?.name, c?.phone, c?.email, v?.plate, v?.name, r.contractNumber, r.notes, r.startDate, r.endDate, r.price, r.bond?.amount);
+    const earlier = periodsOf(r.id).map(p => data.vehicles.find(x => x.id === p.vehicleId)?.plate);
+    return matchesSearch(search, c?.name, c?.phone, c?.email, v?.plate, v?.name, ...earlier, r.contractNumber, r.notes, r.startDate, r.endDate, r.price, r.bond?.amount);
   };
   const active = data.rentals.filter(r => r.status === 'active' && rentalMatches(r));
   const past = data.rentals.filter(r => r.status === 'completed' && rentalMatches(r));
@@ -192,6 +200,7 @@ export default function Rentals() {
   const openEdit = (r, e) => {
     e?.stopPropagation();
     setEditR(r);
+    setVehicleChange({ mode: 'swap', date: todayStr(), reason: '' });
     setForm({
       customerId: r.customerId || '',
       vehicleId: r.vehicleId || '',
@@ -237,18 +246,33 @@ export default function Rentals() {
     if (!form.customerId) { alert('Please select a customer'); return; }
     if (!form.vehicleId) { alert('Please select a vehicle'); return; }
     if (!form.startDate) { alert('Start date is required'); return; }
-    if (form.odometer && !confirmOdometer(data.odometerReadings, form.vehicleId, form.odometer, form.startDate, editR.id)) return;
+    const swapping = editR.vehicleId && editR.vehicleId !== form.vehicleId && vehicleChange.mode === 'swap';
+    let updates = { ...form };
+    if (swapping) {
+      const since = currentSince(editR);
+      const d = vehicleChange.date;
+      if (!d) { alert('Pick the date the vehicle was swapped'); return; }
+      if (d < since) { alert(`The swap date can't be before ${formatDate(since)}, when the current vehicle went on this rental.`); return; }
+      if (form.endDate && d > form.endDate) { alert('The swap date is after the rental end date.'); return; }
+      // The start reading belongs to the bike the rental started on; keep it there instead of moving it to the new bike.
+      if (editR.odometer) updates.odometer = '';
+    }
+    if (updates.odometer && !confirmOdometer(data.odometerReadings, form.vehicleId, updates.odometer, form.startDate, editR.id)) return;
     setSaving(true);
     try {
+      if (swapping) {
+        await addRentalVehiclePeriod({ rentalId: editR.id, vehicleId: editR.vehicleId, fromDate: currentSince(editR), toDate: vehicleChange.date, reason: vehicleChange.reason.trim() });
+        if (editR.odometer) await addOdometerReading({ vehicleId: editR.vehicleId, reading: editR.odometer, readAt: editR.startDate, note: `Rental start${editR.contractNumber ? ` ${editR.contractNumber}` : ''} (before vehicle swap)` });
+      }
       // If vehicle changed on an active rental, update both vehicle statuses
       if (editR.status === 'active' && editR.vehicleId !== form.vehicleId) {
         await update('vehicles', editR.vehicleId, { status: 'available' });
         await update('vehicles', form.vehicleId, { status: 'rented' });
       }
-      await update('rentals', editR.id, { ...form });
+      await update('rentals', editR.id, updates);
       await refresh(); // odometer log and vehicle odometer are updated by database triggers
       // Refresh the detail drawer if it's open for this rental
-      if (detailR?.id === editR.id) setDetailR({ ...detailR, ...form });
+      if (detailR?.id === editR.id) setDetailR({ ...detailR, ...updates });
       setEditR(null);
       setForm(EF);
     } finally { setSaving(false); }
@@ -601,6 +625,33 @@ export default function Rentals() {
       <Modal open={!!editR} onClose={() => { setEditR(null); setForm(EF); }} title="Edit Rental" width={560}
         footer={<><button className="btn btn-secondary" onClick={() => { setEditR(null); setForm(EF); }}>Cancel</button><button className="btn btn-primary" onClick={saveRental} disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</button></>}>
         {editR && renderForm(vehicleOptions(editR.vehicleId), availableCustomers(editR.customerId))}
+        {editR && editR.vehicleId && form.vehicleId && editR.vehicleId !== form.vehicleId && (() => {
+          const oldV = data.vehicles.find(x => x.id === editR.vehicleId);
+          const newV = data.vehicles.find(x => x.id === form.vehicleId);
+          const sv = (k, v) => setVehicleChange(c => ({ ...c, [k]: v }));
+          return (
+            <div style={{ background: 'var(--amber-bg)', borderRadius: 10, padding: '14px 16px', marginTop: 4 }}>
+              <div className="fw-600" style={{ fontSize: 13, marginBottom: 8 }}>Vehicle changed: {oldV?.plate || '—'} → {newV?.plate || '—'}</div>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14, marginBottom: 6, cursor: 'pointer' }}>
+                <input type="radio" checked={vehicleChange.mode === 'swap'} onChange={() => sv('mode', 'swap')} style={{ marginTop: 3 }} />
+                <span><strong>Swap</strong> — the customer changed bikes. Keeps a record that they had {oldV?.plate || 'the old bike'} until the swap date.</span>
+              </label>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14, cursor: 'pointer' }}>
+                <input type="radio" checked={vehicleChange.mode === 'fix'} onChange={() => sv('mode', 'fix')} style={{ marginTop: 3 }} />
+                <span><strong>Correct a mistake</strong> — the wrong bike was picked. No history is kept.</span>
+              </label>
+              {vehicleChange.mode === 'swap' && (
+                <div className="grid-2" style={{ marginTop: 12 }}>
+                  <div className="field"><label className="label">Swap date</label>
+                    <input className="input" type="date" value={vehicleChange.date} min={currentSince(editR)} max={form.endDate || undefined} onChange={e => sv('date', e.target.value)} /></div>
+                  <div className="field"><label className="label">Reason (optional)</label>
+                    <input className="input" value={vehicleChange.reason} onChange={e => sv('reason', e.target.value)} placeholder="e.g. mechanical issue" /></div>
+                </div>
+              )}
+              {vehicleChange.mode === 'swap' && editR.odometer && <div className="text-sm text-muted" style={{ marginTop: 6 }}>The start odometer ({Number(editR.odometer).toLocaleString()} km) stays with {oldV?.plate || 'the old bike'} in its odometer log.</div>}
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* Delete rental */}
@@ -760,7 +811,7 @@ export default function Rentals() {
               <div style={{ marginBottom: 20 }}><Badge variant={selected.status === 'active' ? 'blue' : 'gray'}>{selected.status}</Badge></div>
               <div className="grid-2 mb-20">
                 <div><div className="label">Customer</div><div className="fw-500" style={{ marginTop: 3 }}>{c?.name || '—'}</div></div>
-                <div><div className="label">Vehicle</div><div className="fw-500" style={{ marginTop: 3 }}>{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</div></div>
+                <div><div className="label">Vehicle</div><div className="fw-500" style={{ marginTop: 3 }}>{v ? v.plate + (v.name ? ' · ' + v.name : '') : '—'}</div>{periodsOf(selected.id).length > 0 && <div className="text-sm text-muted">since {formatDate(currentSince(selected))}</div>}</div>
                 <div><div className="label">Start Date</div><div style={{ marginTop: 3 }}>{formatDate(selected.startDate)}</div></div>
                 <div><div className="label">End Date</div><div style={{ marginTop: 3 }}>{selected.endDate ? formatDate(selected.endDate) : 'Ongoing'}</div></div>
                 {selected.contractNumber && <div><div className="label">Contract No.</div><div style={{ marginTop: 3, fontWeight: 600 }}>{selected.contractNumber}</div></div>}
@@ -769,6 +820,21 @@ export default function Rentals() {
                 {selected.insuranceOption && <div><div className="label">Liability Option</div><div style={{ marginTop: 3 }}>{insuranceOptions(termsAmountsFromSettings(data.settings), data.vehicles.find(x => x.id === selected.vehicleId)?.type).find(o => o.value === selected.insuranceOption)?.label || selected.insuranceOption}</div></div>}
                 {selected.price && <div><div className="label">{selected.billingPeriod === 'fixed' ? 'Total Price (Rental Period)' : 'Weekly Price'}</div><div style={{ marginTop: 3, fontWeight: 600 }}>${Number(selected.price).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}{selected.billingPeriod === 'fixed' ? ' total' : ' / week'}</div></div>}
               </div>
+              {periodsOf(selected.id).length > 0 && (
+                <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+                  <div className="fw-600" style={{ marginBottom: 8, fontSize: 13 }}>Vehicle history</div>
+                  {[...periodsOf(selected.id).map(p => ({ ...p, current: false })), { id: 'current', vehicleId: selected.vehicleId, fromDate: currentSince(selected), toDate: selected.endDate || '', current: true }].map(p => {
+                    const pv = data.vehicles.find(x => x.id === p.vehicleId);
+                    return (
+                      <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '6px 0', borderTop: '1px solid var(--border)', fontSize: 14 }}>
+                        <div><span className="fw-500">{pv ? pv.plate + (pv.name ? ' · ' + pv.name : '') : 'Deleted vehicle'}</span>{p.reason ? <div className="text-sm text-muted">Swapped out: {p.reason}</div> : null}</div>
+                        <div style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{formatDate(p.fromDate)} – {p.toDate ? formatDate(p.toDate) : 'now'}{p.current && <div className="text-sm text-muted">Current</div>}</div>
+                      </div>
+                    );
+                  })}
+                  <div className="text-sm text-muted" style={{ marginTop: 6 }}>On a swap day the customer had both bikes.</div>
+                </div>
+              )}
               <div style={{ background: selected.bond?.amount ? (selected.bond.status === 'held' ? 'var(--amber-bg)' : selected.bond.status === 'awaiting' ? 'var(--blue-bg)' : 'var(--accent-light)') : 'var(--bg)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
                 <div className="fw-600" style={{ marginBottom: 10, fontSize: 13 }}>Bond / Deposit</div>
                 {selected.bond?.amount ? (

@@ -154,8 +154,12 @@ const signingFromDb = (s) => ({
   signedAt: s.signed_at, createdAt: s.created_at, expiresAt: s.expires_at,
 });
 
+const vehiclePeriodFromDb = (p) => ({
+  id: p.id, rentalId: p.rental_id, vehicleId: p.vehicle_id, fromDate: p.from_date, toDate: p.to_date, reason: p.reason || '', createdAt: p.created_at,
+});
+
 export function StoreProvider({ children }) {
-  const [data, setData] = useState({ vehicles: [], customers: [], rentals: [], maintenance: [], settings: DEFAULT_SETTINGS, signingRequests: [], odometerReadings: [] });
+  const [data, setData] = useState({ vehicles: [], customers: [], rentals: [], maintenance: [], settings: DEFAULT_SETTINGS, signingRequests: [], odometerReadings: [], rentalVehiclePeriods: [] });
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState({});
 
@@ -169,6 +173,7 @@ export function StoreProvider({ children }) {
       { key: 'settings',        fromDb: settingsFromDb,    query: supabase.from('settings').select('*').eq('id', 1).single() },
       { key: 'signingRequests', fromDb: signingFromDb,     query: supabase.from('signing_requests').select('*').order('created_at', { ascending: false }) },
       { key: 'odometerReadings', fromDb: readingFromDb,    query: supabase.from('odometer_readings').select('*').order('read_at', { ascending: false }) },
+      { key: 'rentalVehiclePeriods', fromDb: vehiclePeriodFromDb, query: supabase.from('rental_vehicle_periods').select('*').order('from_date') },
     ];
     await Promise.allSettled(fetches.map(async ({ key, fromDb, query }) => {
       const { data: rows, error } = await query;
@@ -233,6 +238,14 @@ export function StoreProvider({ children }) {
     await refresh();
   };
 
+  // A closed vehicle period of a rental (the bike the customer had before a swap).
+  const addRentalVehiclePeriod = async ({ rentalId, vehicleId, fromDate, toDate, reason }) => {
+    const { data: row, error } = await supabase.from('rental_vehicle_periods')
+      .insert({ rental_id: rentalId, vehicle_id: vehicleId, from_date: fromDate, to_date: toDate, reason: reason || null }).select().single();
+    if (error) throw error;
+    setData(d => ({ ...d, rentalVehiclePeriods: [...d.rentalVehiclePeriods, vehiclePeriodFromDb(row)] }));
+  };
+
   const updateSettings = async (updates) => {
     const merged = { ...data.settings, ...updates };
     const { error } = await supabase.from('settings').update(settingsToDb(merged)).eq('id', 1);
@@ -241,7 +254,7 @@ export function StoreProvider({ children }) {
   };
 
   return (
-    <StoreContext.Provider value={{ data, loading, errors, add, update, remove, updateSettings, refresh, getCustomerPhoto, addOdometerReading, removeOdometerReading }}>
+    <StoreContext.Provider value={{ data, loading, errors, add, update, remove, updateSettings, refresh, getCustomerPhoto, addOdometerReading, removeOdometerReading, addRentalVehiclePeriod }}>
       {children}
     </StoreContext.Provider>
   );
